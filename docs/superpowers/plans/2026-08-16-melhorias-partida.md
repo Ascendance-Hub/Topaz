@@ -492,70 +492,138 @@ git commit -m "feat: eliminacao abaixo da aposta minima, sem rebuy"
 
 - [ ] **Step 1: Escrever os testes que falham**
 
+A decisão de fim é lógica pura sobre o estado — alvo, empate no alvo, último
+sobrevivente, solo, apto sem cadeira. Testá-la dirigindo rodadas reais seria
+frágil e, para os casos de quebra, impossível: um jogador com menos que a aposta
+mínima não consegue apostar, então a rodada nunca se completaria e o teste
+falharia por o cenário não acontecer, não por a regra estar errada.
+
+Por isso `decidirFim` é **exportada** e testada direto, e fica **um** teste de
+integração dirigindo rodada real — o suficiente para provar que `limparRodada`
+de fato a chama.
+
+`limparRodadaParaTeste` já existe no arquivo desde a Task 3. **Reutilize-a; não
+a redefina.**
+
 ```ts
-describe('fim de partida', () => {
-  function comDois(fichasP1: number, fichasP2: number): Contexto {
+describe('decidirFim', () => {
+  function jogador(peerId: string, fichas: number, eliminadoEm: number | null): Jogador {
+    return {
+      peerId, apelido: peerId, cadeira: eliminadoEm === null ? 0 : null, fichas,
+      maos: [], maoAtiva: 0, seguro: 0, rodadasInativo: 0,
+      desconectadoEm: null, decidiuSeguro: false, eliminadoEm,
+    }
+  }
+
+  function estado(jogadores: Jogador[], naPartida?: string[]): EstadoJogo {
+    return {
+      fase: 'acerto', jogadores, vezDe: null, prazoTurno: null, maoDealer: [],
+      dealerTemOculta: false, cartasRestantes: 100, hostAtual: 'p1', rodada: 5,
+      proximoIdMao: 1, vencedor: null,
+      naPartida: naPartida ?? jogadores.map((j) => j.peerId),
+    }
+  }
+
+  it('quem atinge o alvo vence', () => {
+    expect(decidirFim(estado([
+      jogador('p1', REGRAS.alvoVitoria, null), jogador('p2', 400, null),
+    ]))).toEqual({ acabou: true, vencedor: 'p1' })
+  })
+
+  it('entre dois no alvo, vence quem tem mais fichas', () => {
+    expect(decidirFim(estado([
+      jogador('p1', REGRAS.alvoVitoria + 200, null),
+      jogador('p2', REGRAS.alvoVitoria + 50, null),
+    ]))).toEqual({ acabou: true, vencedor: 'p1' })
+  })
+
+  it('empate exato no alvo acaba a partida sem vencedor', () => {
+    expect(decidirFim(estado([
+      jogador('p1', REGRAS.alvoVitoria, null), jogador('p2', REGRAS.alvoVitoria, null),
+    ]))).toEqual({ acabou: true, vencedor: null })
+  })
+
+  it('sobrando um único apto, ele vence', () => {
+    expect(decidirFim(estado([
+      jogador('p1', 600, null), jogador('p2', 0, 4),
+    ]))).toEqual({ acabou: true, vencedor: 'p1' })
+  })
+
+  it('ninguém apto acaba sem vencedor', () => {
+    expect(decidirFim(estado([
+      jogador('p1', 0, 5), jogador('p2', 0, 5),
+    ]))).toEqual({ acabou: true, vencedor: null })
+  })
+
+  it('com dois aptos a partida continua', () => {
+    expect(decidirFim(estado([
+      jogador('p1', 600, null), jogador('p2', 400, null),
+    ]))).toEqual({ acabou: false, vencedor: null })
+  })
+
+  it('jogando sozinho, a regra do último sobrevivente não dispara', () => {
+    expect(decidirFim(estado([jogador('p1', 600, null)]))).toEqual({
+      acabou: false, vencedor: null,
+    })
+  })
+
+  it('jogando sozinho, quebrar encerra pela regra de ninguém apto', () => {
+    expect(decidirFim(estado([jogador('p1', 0, 5)]))).toEqual({
+      acabou: true, vencedor: null,
+    })
+  })
+
+  it('quem perdeu a cadeira mas tem fichas continua apto', () => {
+    const semCadeira = jogador('p2', 600, null)
+    semCadeira.cadeira = null
+    expect(decidirFim(estado([
+      jogador('p1', 600, null), semCadeira,
+    ]))).toEqual({ acabou: false, vencedor: null })
+  })
+
+  it('quem está na sala mas não entrou na partida não conta', () => {
+    expect(decidirFim(estado([
+      jogador('p1', 600, null), jogador('p2', 900, null),
+    ], ['p1']))).toEqual({ acabou: true, vencedor: 'p1' })
+  })
+})
+
+describe('fim de partida ligado à rodada', () => {
+  it('uma rodada que zera o único adversário leva a fase para fim', () => {
     let ctx = criarContexto('p1', RNG())
     ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
     ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
     ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
     ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
     ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
-    ctx.estado.jogadores.find((j) => j.peerId === 'p1')!.fichas = fichasP1
-    ctx.estado.jogadores.find((j) => j.peerId === 'p2')!.fichas = fichasP2
-    return ctx
-  }
+    // Bruno entra na rodada com o mínimo; perdendo ou empatando ele fica
+    // abaixo do mínimo e é eliminado no acerto.
+    ctx.estado.jogadores.find((j) => j.peerId === 'p2')!.fichas = REGRAS.apostaMin
 
-  it('quem atinge o alvo vence', () => {
-    const depois = limparRodadaParaTeste(comDois(REGRAS.alvoVitoria + 100, 400))
-    expect(depois.estado.fase).toBe('fim')
-    expect(depois.estado.vencedor).toBe('p1')
-  })
-
-  it('empate exato no alvo não declara vencedor', () => {
-    const depois = limparRodadaParaTeste(comDois(REGRAS.alvoVitoria, REGRAS.alvoVitoria))
-    expect(depois.estado.fase).toBe('fim')
-    expect(depois.estado.vencedor).toBeNull()
-  })
-
-  it('quem tem mais fichas vence quando os dois passam do alvo', () => {
-    const depois = limparRodadaParaTeste(comDois(REGRAS.alvoVitoria + 200, REGRAS.alvoVitoria + 50))
-    expect(depois.estado.vencedor).toBe('p1')
-  })
-
-  it('sobrando um único apto, ele vence', () => {
-    const depois = limparRodadaParaTeste(comDois(600, 10))
-    expect(depois.estado.fase).toBe('fim')
-    expect(depois.estado.vencedor).toBe('p1')
-  })
-
-  it('todos quebrando na mesma rodada não declara vencedor', () => {
-    const depois = limparRodadaParaTeste(comDois(10, 10))
-    expect(depois.estado.fase).toBe('fim')
-    expect(depois.estado.vencedor).toBeNull()
-  })
-
-  it('jogando sozinho, a regra do último sobrevivente não dispara', () => {
-    let ctx = criarContexto('p1', RNG())
-    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
-    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
-    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
-    ctx.estado.jogadores[0]!.fichas = 600
     const depois = limparRodadaParaTeste(ctx)
-    expect(depois.estado.fase).not.toBe('fim')
-  })
 
-  it('quem perdeu a cadeira mas tem fichas ainda conta como apto', () => {
-    let ctx = comDois(600, 600)
-    ctx = aplicar(ctx, 'p2', { tipo: 'levantar' }, 0, RNG())
-    const depois = limparRodadaParaTeste(ctx)
-    expect(depois.estado.fase).not.toBe('fim')
+    const bruno = depois.estado.jogadores.find((j) => j.peerId === 'p2')!
+    if (bruno.eliminadoEm !== null) {
+      expect(depois.estado.fase).toBe('fim')
+      expect(depois.estado.vencedor).toBe('p1')
+    } else {
+      // Bruno ganhou a mão e segue no jogo — a partida continua.
+      expect(depois.estado.fase).not.toBe('fim')
+    }
   })
 
   it('novaPartida devolve todo mundo à sala de espera com o stack cheio', () => {
-    let ctx = limparRodadaParaTeste(comDois(REGRAS.alvoVitoria + 100, 10))
-    expect(ctx.estado.fase).toBe('fim')
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
+    ctx.estado.fase = 'fim'
+    ctx.estado.vencedor = 'p1'
+    ctx.estado.jogadores.find((j) => j.peerId === 'p2')!.eliminadoEm = 3
+
     ctx = aplicar(ctx, 'p1', { tipo: 'novaPartida' }, 0, RNG())
+
     expect(ctx.estado.fase).toBe('aguardando')
     expect(ctx.estado.vencedor).toBeNull()
     expect(ctx.estado.naPartida).toEqual([])
@@ -568,12 +636,20 @@ describe('fim de partida', () => {
   })
 
   it('quem não é anfitrião não reinicia', () => {
-    let ctx = limparRodadaParaTeste(comDois(REGRAS.alvoVitoria + 100, 10))
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+    ctx.estado.fase = 'fim'
+
     ctx = aplicar(ctx, 'p2', { tipo: 'novaPartida' }, 0, RNG())
+
     expect(ctx.estado.fase).toBe('fim')
   })
 })
 ```
+
+Os dois últimos testes montam a fase `fim` diretamente porque o que está sob
+teste é o `novaPartida`, não como se chega ao fim — isso já é coberto acima.
 
 - [ ] **Step 2: Rodar e confirmar que falham**
 
@@ -599,7 +675,8 @@ function aptos(estado: EstadoJogo): Jogador[] {
   )
 }
 
-function decidirFim(estado: EstadoJogo): { acabou: boolean; vencedor: string | null } {
+/** Exportada para teste direto: a lógica é pura e não precisa de rodada. */
+export function decidirFim(estado: EstadoJogo): { acabou: boolean; vencedor: string | null } {
   const emJogo = aptos(estado)
 
   const noAlvo = emJogo.filter((j) => j.fichas >= REGRAS.alvoVitoria)
@@ -684,8 +761,8 @@ Depois do `case 'iniciar'`:
 
 - [ ] **Step 6: Rodar os testes**
 
-Run: `npm test -- machine -t "fim de partida"`
-Expected: PASS, 9 testes.
+Run: `npm test -- machine -t "decidirFim"` e `npm test -- machine -t "fim de partida"`
+Expected: PASS, 10 + 3 testes.
 
 - [ ] **Step 7: Rodar tudo**
 
