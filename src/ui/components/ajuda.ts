@@ -9,7 +9,8 @@ const JOGADAS: { titulo: string; texto: string }[] = [
     titulo: 'Dividir',
     texto: 'Se suas duas cartas têm o mesmo valor, separa em duas mãos '
       + 'independentes, cada uma com uma aposta igual à original. Um par de '
-      + 'Ases recebe só uma carta em cada mão.',
+      + 'Ases recebe só uma carta em cada mão. Vale quase sempre dividir Ases '
+      + 'e 8; um par de 10 já é uma mão forte e dividir costuma piorá-la.',
   },
   {
     titulo: 'Seguro',
