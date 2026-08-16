@@ -26,6 +26,25 @@ function div(classe: string, texto?: string): HTMLElement {
 }
 
 /**
+ * Selo de saldo — usado tanto na peça do adversário quanto no painel
+ * próprio, para que o número de fichas tenha sempre o mesmo destaque
+ * visual, fora de qualquer frase.
+ */
+function seloFichas(fichas: number): HTMLElement {
+  const selo = document.createElement('div')
+  selo.className = 'selo-fichas'
+  selo.dataset['fichas'] = String(fichas)
+
+  const valor = document.createElement('b')
+  valor.textContent = fichas.toLocaleString('pt-BR')
+  const rotulo = document.createElement('span')
+  rotulo.textContent = 'fichas'
+
+  selo.append(valor, rotulo)
+  return selo
+}
+
+/**
  * Quantas cartas cada "entidade" (uma mão, pelo id, ou o dealer) tinha na
  * tela da última vez que essa raiz renderizou. Vem de fora (render.ts a lê
  * do próprio elemento raiz) — mesa.ts não guarda nada entre chamadas, só
@@ -146,7 +165,7 @@ function pecaJogador(jogador: Jogador, vezDele: boolean, anteriores: ContagensCa
   }
 
   peca.append(blocoMaos(jogador, vezDele, {}, anteriores))
-  peca.append(div('nome', jogador.apelido), div('fichas', String(jogador.fichas)))
+  peca.append(div('nome', jogador.apelido), seloFichas(jogador.fichas))
   if (jogador.maos.length === 0) peca.append(div('total', 'aguardando'))
   return peca
 }
@@ -220,7 +239,8 @@ function painelProprio(
   painel.append(
     div('rotulo', eu.maos.length > 1 ? 'Suas mãos' : 'Sua mão'),
     blocoMaos(eu, vezDele, { grande: true, mostrarAposta: true }, anteriores),
-    div('nome', `${eu.apelido} — ${eu.fichas} fichas`),
+    div('nome', eu.apelido),
+    seloFichas(eu.fichas),
   )
   if (eu.maos.length === 0) painel.append(div('total', 'sem aposta'))
 

@@ -92,6 +92,41 @@ describe('grade de outros jogadores', () => {
   })
 })
 
+describe('selo de fichas', () => {
+  it('o saldo do próprio jogador aparece dentro de um selo identificável, fora da frase do nome', () => {
+    const estado = criarEstado({
+      fase: 'apostas',
+      jogadores: [
+        criarJogador({ peerId: 'eu', apelido: 'Alex', cadeira: 0, fichas: 860 }),
+        criarJogador({ peerId: 'p2', apelido: 'Bruno', cadeira: 1 }),
+      ],
+    })
+    const mesa = renderizarMesa(estado, 'eu', semAcao)
+    const painel = mesa.querySelector('.painel-proprio')!
+    const selo = painel.querySelector('[data-fichas]')
+
+    expect(selo).not.toBeNull()
+    expect(selo!.getAttribute('data-fichas')).toBe('860')
+    expect(painel.querySelector('.nome')?.textContent).toBe('Alex')
+  })
+
+  it('o saldo de um adversário aparece no mesmo selo', () => {
+    const estado = criarEstado({
+      jogadores: [
+        criarJogador({ peerId: 'eu', cadeira: 0 }),
+        criarJogador({ peerId: 'p2', apelido: 'Bruno', cadeira: 1, fichas: 860 }),
+      ],
+    })
+    const mesa = renderizarMesa(estado, 'eu', semAcao)
+    const peca = mesa.querySelector('.grade .peca')!
+    const selo = peca.querySelector('[data-fichas]')
+
+    expect(selo).not.toBeNull()
+    expect(selo!.getAttribute('data-fichas')).toBe('860')
+    expect(peca.querySelector('.nome')?.textContent).toBe('Bruno')
+  })
+})
+
 describe('classe "poucos" na grade', () => {
   it.each([1, 2, 3])('com %i outro(s) jogador(es), a grade recebe a classe "poucos"', (n) => {
     const estado = criarEstado({
