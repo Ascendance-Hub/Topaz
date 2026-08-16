@@ -1,4 +1,6 @@
 import { classificacao } from '../../game/classificacao'
+import type { Colocacao } from '../../game/classificacao'
+import { REGRAS } from '../../game/rules'
 import type { Acao, EstadoJogo } from '../../game/types'
 
 function div(classe: string, texto?: string): HTMLElement {
@@ -6,6 +8,40 @@ function div(classe: string, texto?: string): HTMLElement {
   el.className = classe
   if (texto !== undefined) el.textContent = texto
   return el
+}
+
+/** "Alex e Bruno"; "Alex, Bruno e Carla". */
+function listar(nomes: string[]): string {
+  if (nomes.length <= 1) return nomes.join('')
+  return `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}`
+}
+
+/**
+ * A frase abaixo do título. `vencedor` nulo tem DOIS significados na spec §6:
+ * ninguém sobrou apto (regra 3) e dois ou mais cruzaram o alvo com fichas
+ * idênticas — empate de verdade. A tela só conhecia o primeiro, então uma
+ * mesa com dois jogadores de 1600 fichas anunciava que "a mesa quebrou junto"
+ * logo acima do placar que mostrava as 1600 de cada um.
+ *
+ * Por isso a decisão sai do vencedor sozinho e passa pelo placar, onde o
+ * grupo empatado já vem em primeiro.
+ */
+function subtitulo(estado: EstadoJogo, grupos: Colocacao[]): string {
+  const campeao = estado.jogadores.find((j) => j.peerId === estado.vencedor)
+  if (campeao) return `${campeao.apelido} venceu`
+
+  const topo = grupos[0]
+  const empateNoAlvo = topo !== undefined
+    && topo.jogadores.length > 1
+    && topo.jogadores.every((j) => j.eliminadoEm === null && j.fichas >= REGRAS.alvoVitoria)
+
+  if (empateNoAlvo) {
+    const nomes = listar(topo.jogadores.map((j) => j.apelido))
+    const fichas = topo.jogadores[0]!.fichas.toLocaleString('pt-BR')
+    return `Empate no topo — ${nomes} chegaram juntos a ${fichas} fichas`
+  }
+
+  return 'Ninguém sobrou com fichas — a mesa quebrou junto'
 }
 
 export function renderizarFim(
@@ -17,17 +53,13 @@ export function renderizarFim(
   titulo.textContent = 'Fim de partida'
   tela.append(titulo)
 
+  const grupos = classificacao(estado)
   const campeao = estado.jogadores.find((j) => j.peerId === estado.vencedor)
-  const sub = div('sub')
-  if (campeao) {
-    sub.textContent = `${campeao.apelido} venceu`
-    sub.dataset.vencedor = campeao.peerId
-  } else {
-    sub.textContent = 'Ninguém sobrou com fichas — a mesa quebrou junto'
-  }
+  const sub = div('sub', subtitulo(estado, grupos))
+  if (campeao) sub.dataset.vencedor = campeao.peerId
   tela.append(sub)
 
-  for (const grupo of classificacao(estado)) {
+  for (const grupo of grupos) {
     for (const jogador of grupo.jogadores) {
       const linha = div('colocacao')
       linha.dataset.colocacao = String(grupo.posicao)
@@ -37,7 +69,9 @@ export function renderizarFim(
         div('pos', `${grupo.posicao}º`),
         div('quem', jogador.apelido),
         jogador.eliminadoEm === null
-          ? div('saldo', String(jogador.fichas))
+          // Mesmo formato do selo de fichas da mesa: a mesma pessoa que via
+          // "1.520" na mesa via "1520" aqui.
+          ? div('saldo', jogador.fichas.toLocaleString('pt-BR'))
           : div('caiu', `eliminado na rodada ${jogador.eliminadoEm}`),
       )
       tela.append(linha)
