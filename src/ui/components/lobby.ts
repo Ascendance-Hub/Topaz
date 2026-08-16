@@ -1,13 +1,25 @@
-import { gerarCodigoSala, lerCodigoDaUrl } from '../sala'
+import { gerarCodigoSala, lerCodigoDaUrl, TAMANHO_CODIGO } from '../sala'
 
 const CHAVE_APELIDO = 'topaz:apelido'
 
+/** Em janela anônima ou sob certas políticas corporativas, localStorage
+ * pode estar bloqueado e lançar em qualquer acesso. Como o lobby inteiro
+ * roda no topo de main.ts sem nada capturando exceções, deixar isso
+ * escapar apagaria a página inteira por causa de um apelido não salvo. */
 export function apelidoSalvo(): string {
-  return localStorage.getItem(CHAVE_APELIDO) ?? ''
+  try {
+    return localStorage.getItem(CHAVE_APELIDO) ?? ''
+  } catch {
+    return ''
+  }
 }
 
 export function salvarApelido(apelido: string): void {
-  localStorage.setItem(CHAVE_APELIDO, apelido)
+  try {
+    localStorage.setItem(CHAVE_APELIDO, apelido)
+  } catch {
+    // Armazenamento indisponível: só não lembramos o apelido da próxima vez.
+  }
 }
 
 /** Remove espaços e normaliza para maiúsculas um código digitado à mão. */
@@ -43,14 +55,24 @@ export function renderizarLobby(
   const campoCodigo = document.createElement('input')
   campoCodigo.className = 'campo'
   campoCodigo.placeholder = 'Código da sala'
-  campoCodigo.maxLength = 8
+  campoCodigo.maxLength = TAMANHO_CODIGO
 
-  function entrar(codigo: string): void {
+  /** Devolve o apelido digitado, ou `null` e foca o campo se estiver
+   * vazio. Verificado antes de qualquer efeito colateral (gerar código,
+   * mudar o hash) para não desperdiçar um código de sala nem reescrever a
+   * URL só para depois barrar por falta de apelido. */
+  function apelidoValido(): string | null {
     const apelido = campoApelido.value.trim()
     if (!apelido) {
       campoApelido.focus()
-      return
+      return null
     }
+    return apelido
+  }
+
+  function entrar(codigo: string): void {
+    const apelido = apelidoValido()
+    if (!apelido) return
     salvarApelido(apelido)
     aoEntrar(apelido, codigo)
   }
@@ -66,6 +88,7 @@ export function renderizarLobby(
     criar.className = 'botao'
     criar.textContent = 'Criar sala'
     criar.onclick = () => {
+      if (!apelidoValido()) return
       const codigo = gerarCodigoSala()
       location.hash = `sala=${codigo}`
       entrar(codigo)
@@ -80,7 +103,7 @@ export function renderizarLobby(
     entrarBotao.textContent = 'Entrar'
     entrarBotao.onclick = () => {
       const codigo = normalizarCodigoDigitado(campoCodigo.value)
-      if (codigo.length === 8) {
+      if (codigo.length === TAMANHO_CODIGO) {
         location.hash = `sala=${codigo}`
         entrar(codigo)
       }

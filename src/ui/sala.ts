@@ -1,6 +1,6 @@
 // Sem O, 0, I, 1 e L — pares que as pessoas confundem ao digitar.
 const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
-const TAMANHO_CODIGO = 8
+export const TAMANHO_CODIGO = 8
 
 /**
  * Fonte de bytes aleatórios: recebe quantos bytes quer e devolve exatamente
@@ -42,8 +42,14 @@ export function gerarCodigoSala(fonte: FonteBytes = fonteBytesPadrao): string {
   return codigo
 }
 
+// Ligado a TAMANHO_CODIGO em vez de um `8` solto: um código curto demais ou
+// truncado (link cortado ao colar, por exemplo) não deve parecer válido —
+// isso levaria a lobby a mostrar "Entrando na sala X" com botão de entrar
+// para um código que nunca vai bater com o de ninguém.
+const PADRAO_HASH_SALA = new RegExp(`^#sala=([A-Za-z0-9]{${TAMANHO_CODIGO}})$`)
+
 export function lerCodigoDaUrl(hash: string): string | null {
-  const encontrado = /^#sala=([A-Za-z0-9]+)$/.exec(hash)
+  const encontrado = PADRAO_HASH_SALA.exec(hash)
   return encontrado ? encontrado[1]!.toUpperCase() : null
 }
 

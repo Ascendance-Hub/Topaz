@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { gerarCodigoSala, lerCodigoDaUrl, montarLinkSala } from './sala'
+import { describe, it, expect, vi } from 'vitest'
+import { gerarCodigoSala, lerCodigoDaUrl, montarLinkSala, TAMANHO_CODIGO } from './sala'
 import type { FonteBytes } from './sala'
 import { rngSemente } from '../game/shoe'
 
@@ -38,9 +38,22 @@ describe('gerarCodigoSala', () => {
     expect(gerarCodigoSala(fonteDeSemente(42))).toBe(gerarCodigoSala(fonteDeSemente(42)))
   })
 
-  it('sem argumento, usa crypto.getRandomValues e evita caracteres ambíguos', () => {
+  it('sem argumento, evita caracteres ambíguos usando a fonte criptográfica real', () => {
     for (let i = 0; i < 200; i++) {
       expect(gerarCodigoSala()).not.toMatch(/[O0I1L]/)
+    }
+  })
+
+  it('sem argumento, chama de fato crypto.getRandomValues', () => {
+    // Sem isto, trocar fonteBytesPadrao por Math.random() continuaria
+    // passando em todos os outros testes — eles só olham o formato da
+    // saída, não a fonte. Este é o único que pinaria essa regressão.
+    const espia = vi.spyOn(crypto, 'getRandomValues')
+    try {
+      gerarCodigoSala()
+      expect(espia).toHaveBeenCalled()
+    } finally {
+      espia.mockRestore()
     }
   })
 
@@ -64,6 +77,16 @@ describe('lerCodigoDaUrl', () => {
 
   it('normaliza para maiúsculas', () => {
     expect(lerCodigoDaUrl('#sala=k7x2qw9f')).toBe('K7X2QW9F')
+  })
+
+  it('devolve null para código mais curto que TAMANHO_CODIGO (link truncado)', () => {
+    const curto = 'K7X2QW9F'.slice(0, TAMANHO_CODIGO - 1)
+    expect(lerCodigoDaUrl(`#sala=${curto}`)).toBeNull()
+  })
+
+  it('devolve null para código mais longo que TAMANHO_CODIGO', () => {
+    const longo = 'K7X2QW9F' + 'A'.repeat(TAMANHO_CODIGO)
+    expect(lerCodigoDaUrl(`#sala=${longo}`)).toBeNull()
   })
 })
 
