@@ -1,4 +1,5 @@
 import { renderizarMesa, CHAVE_DEALER, chaveMao } from './components/mesa'
+import { renderizarFim } from './components/fim'
 import { animarEntrada, origemSapata } from './animate'
 import type { ContagensCartas } from './components/mesa'
 import type { Acao, EstadoJogo } from '../game/types'
@@ -50,6 +51,16 @@ export function renderizar(
 ): void {
   const anteriores = lerContagensAnteriores(raiz)
   const atuais = contarCartas(estado)
+
+  if (estado.fase === 'fim') {
+    raiz.replaceChildren(renderizarFim(estado, meuId, aoAgir))
+    // Grava a contagem mesmo aqui: sem isto, uma volta à mesa (nova partida)
+    // comparava com a contagem de antes do fim e disparava voo de cartas
+    // que nunca existiram nesta tela.
+    raiz.dataset[CHAVE_DATASET] = JSON.stringify(atuais)
+    return
+  }
+
   // Por entidade, não por soma: se uma mão encolhe e outra cresce no mesmo
   // render, as somas podem se cancelar e esconder uma distribuição real.
   // Uma rodada nova zera todas as mãos (todas encolhem) — isso nunca conta

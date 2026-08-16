@@ -284,3 +284,30 @@ body {
 }
 .barra-sala .codigo { color: var(--topazio-500); letter-spacing: 0.12em; font-weight: 700; }
 .barra-sala .botao { padding: 6px 12px; font-size: 11px; }
+
+.fim {
+  max-width: 520px;
+  margin: 8vh auto 0;
+  padding: 26px 24px;
+  background: var(--carvao-700);
+  border: 1px solid var(--topazio-900);
+  border-radius: 14px;
+  text-align: center;
+}
+.fim h2 { color: var(--topazio-500); font-size: 22px; margin: 0 0 4px; }
+.fim .sub { color: var(--texto-fraco); font-size: 13px; margin-bottom: 22px; }
+
+.colocacao {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 9px; margin-bottom: 6px;
+  background: rgba(255, 255, 255, 0.028);
+  border: 1px solid rgba(201, 162, 39, 0.12);
+}
+.colocacao.campea { border-color: var(--topazio-600); background: rgba(201, 162, 39, 0.1); }
+.colocacao .pos { color: var(--topazio-600); font-size: 15px; min-width: 32px; text-align: left; }
+.colocacao .quem { color: var(--texto); font-size: 15px; flex: 1; text-align: left; }
+.colocacao .saldo { color: var(--topazio-400); font-size: 15px; font-variant-numeric: tabular-nums; }
+.colocacao .caiu { color: var(--texto-fraco); font-size: 12px; }
+
+.espera { text-align: center; }
+.espera .aviso { color: var(--texto-fraco); font-size: 13px; margin-top: 10px; }

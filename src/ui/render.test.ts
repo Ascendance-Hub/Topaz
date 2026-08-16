@@ -41,9 +41,16 @@ function criarJogador(over: Partial<Jogador> & Pick<Jogador, 'peerId'>): Jogador
 }
 
 function criarEstado(over: Partial<EstadoJogo> = {}): EstadoJogo {
+  // `naPartida` acompanha `jogadores` por padrão: o motor só sai de
+  // `aguardando` preenchendo `naPartida` com quem está sentado (`iniciar`), e
+  // volta a esvaziá-la ao entrar em `aguardando` (`novaPartida`). Uma fixture
+  // com fase `aguardando` e `naPartida` não-vazia, ou com outra fase e
+  // `naPartida: []` fixo, descreveria um estado que o motor nunca produz.
+  const jogadores = over.jogadores ?? []
+  const fase = over.fase ?? 'turnos'
   return {
-    fase: 'turnos',
-    jogadores: [],
+    fase,
+    jogadores,
     vezDe: null,
     prazoTurno: null,
     maoDealer: [],
@@ -53,7 +60,7 @@ function criarEstado(over: Partial<EstadoJogo> = {}): EstadoJogo {
     rodada: 1,
     proximoIdMao: 1,
     vencedor: null,
-    naPartida: [],
+    naPartida: fase === 'aguardando' ? [] : jogadores.map((j) => j.peerId),
     ...over,
   }
 }
@@ -93,7 +100,9 @@ describe('decisão de animar', () => {
 
   it('não anima quando não há nenhuma carta em cena', () => {
     const raiz = document.createElement('div')
-    renderizar(raiz, criarEstado(), 'eu', semAcao)
+    // Mesa vazia de verdade: sem ninguém sentado, só `aguardando` é um
+    // estado que o motor produz com `jogadores: []`.
+    renderizar(raiz, criarEstado({ fase: 'aguardando' }), 'eu', semAcao)
     expect(animarEntrada).not.toHaveBeenCalled()
   })
 

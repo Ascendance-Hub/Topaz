@@ -32,9 +32,16 @@ function criarJogador(over: Partial<Jogador> & Pick<Jogador, 'peerId'>): Jogador
 }
 
 function criarEstado(over: Partial<EstadoJogo> = {}): EstadoJogo {
+  // `naPartida` acompanha `jogadores` por padrão: o motor só sai de
+  // `aguardando` preenchendo `naPartida` com quem está sentado (`iniciar`), e
+  // volta a esvaziá-la ao entrar em `aguardando` (`novaPartida`). Uma fixture
+  // com fase `aguardando` e `naPartida` não-vazia, ou com outra fase e
+  // `naPartida: []` fixo, descreveria um estado que o motor nunca produz.
+  const jogadores = over.jogadores ?? []
+  const fase = over.fase ?? 'turnos'
   return {
-    fase: 'turnos',
-    jogadores: [],
+    fase,
+    jogadores,
     vezDe: null,
     prazoTurno: null,
     maoDealer: [],
@@ -44,7 +51,7 @@ function criarEstado(over: Partial<EstadoJogo> = {}): EstadoJogo {
     rodada: 1,
     proximoIdMao: 1,
     vencedor: null,
-    naPartida: [],
+    naPartida: fase === 'aguardando' ? [] : jogadores.map((j) => j.peerId),
     ...over,
   }
 }
@@ -332,6 +339,47 @@ describe('espectador', () => {
     const mesa = renderizarMesa(estado, 'eu', semAcao)
     const botaoSentar = mesa.querySelector<HTMLButtonElement>('[data-acao="sentar"]')!
     expect(botaoSentar.disabled).toBe(true)
+  })
+})
+
+describe('sala de espera', () => {
+  it('o anfitrião vê Iniciar partida quando há alguém sentado', () => {
+    const estado = criarEstado({
+      fase: 'aguardando', hostAtual: 'p1',
+      jogadores: [criarJogador({ peerId: 'p1', cadeira: 0 })],
+    })
+    const el = renderizarMesa(estado, 'p1', semAcao)
+    expect(el.querySelector('[data-acao="iniciar"]')).not.toBeNull()
+  })
+
+  it('quem não é anfitrião não vê Iniciar partida', () => {
+    const estado = criarEstado({
+      fase: 'aguardando', hostAtual: 'p1',
+      jogadores: [
+        criarJogador({ peerId: 'p1', cadeira: 0 }),
+        criarJogador({ peerId: 'p2', cadeira: 1 }),
+      ],
+    })
+    const el = renderizarMesa(estado, 'p2', semAcao)
+    expect(el.querySelector('[data-acao="iniciar"]')).toBeNull()
+  })
+
+  it('o botão fica desabilitado com a mesa vazia', () => {
+    const estado = criarEstado({
+      fase: 'aguardando', hostAtual: 'p1',
+      jogadores: [criarJogador({ peerId: 'p1', cadeira: null })],
+    })
+    const el = renderizarMesa(estado, 'p1', semAcao)
+    expect(el.querySelector<HTMLButtonElement>('[data-acao="iniciar"]')!.disabled).toBe(true)
+  })
+
+  it('a sala de espera não mostra painel de mão', () => {
+    const estado = criarEstado({
+      fase: 'aguardando', hostAtual: 'p1',
+      jogadores: [criarJogador({ peerId: 'p1', cadeira: 0 })],
+    })
+    const el = renderizarMesa(estado, 'p1', semAcao)
+    expect(el.querySelector('[data-acao="apostar"]')).toBeNull()
   })
 })
 

@@ -3,11 +3,15 @@ import { avaliar } from '../../game/hand'
 import { REGRAS, acoesDisponiveis } from '../../game/rules'
 import type { Acao, EstadoJogo, Jogador, Mao, ResultadoMao, TipoAcao } from '../../game/types'
 
-const ROTULO_ACAO: Record<TipoAcao, string> = {
+// `iniciar` e `novaPartida` ficam fora deste mapa de propósito: seus botões
+// (sala de espera e tela de fim) usam o texto ("Iniciar partida", "Nova
+// partida") direto na chamada de `botao`, e nada aqui os lia — mantê-los só
+// para cumprir a exaustividade do `Record` era peso morto. `Exclude` mantém
+// o mapa exaustivo sobre o que sobra, sem reintroduzir entradas sem leitor.
+const ROTULO_ACAO: Record<Exclude<TipoAcao, 'iniciar' | 'novaPartida'>, string> = {
   entrar: 'Entrar', sentar: 'Sentar', levantar: 'Levantar',
   apostar: 'Apostar', seguro: 'Seguro',
   pedir: 'Pedir', parar: 'Parar', dobrar: 'Dobrar', dividir: 'Dividir',
-  iniciar: 'Iniciar', novaPartida: 'Nova Partida',
 }
 
 const ROTULO_RESULTADO: Record<ResultadoMao, string> = {
@@ -244,6 +248,11 @@ function painelProprio(
 
   if (estado.fase === 'turnos' && vezDele && mao) {
     for (const tipo of acoesDisponiveis(mao, eu)) {
+      // `acoesDisponiveis` promete `TipoAcao[]` mas por construção só
+      // devolve ações de turno — o guarda estreita para o que `ROTULO_ACAO`
+      // cobre, sem recorrer a cast nem reintroduzir `iniciar`/`novaPartida`
+      // como entradas mortas no mapa.
+      if (tipo !== 'pedir' && tipo !== 'parar' && tipo !== 'dobrar' && tipo !== 'dividir') continue
       const classe = tipo === 'pedir' || tipo === 'parar' ? 'botao' : 'botao fantasma'
       acoes.append(botao(classe, ROTULO_ACAO[tipo], () => aoAgir({ tipo, maoId: mao.id } as Acao), {
         dataset: { acao: tipo },
@@ -281,6 +290,31 @@ export function renderizarMesa(
       grade.append(pecaJogador(jogador, estado.vezDe === jogador.peerId, anteriores))
     }
     mesa.append(grade)
+  }
+
+  if (estado.fase === 'aguardando') {
+    const espera = div('painel-proprio espera')
+    espera.append(div('rotulo', 'Sala de espera'))
+
+    if (eu && eu.cadeira === null) {
+      const livre = Array.from({ length: REGRAS.maxCadeiras }, (_, i) => i)
+        .find((c) => !estado.jogadores.some((j) => j.cadeira === c))
+      espera.append(botao('botao', livre === undefined ? 'Mesa cheia' : 'Sentar à mesa',
+        () => { if (livre !== undefined) aoAgir({ tipo: 'sentar', cadeira: livre }) },
+        { desabilitado: livre === undefined, dataset: { acao: 'sentar' } }))
+    }
+
+    if (estado.hostAtual === meuId) {
+      const sentados = estado.jogadores.filter((j) => j.cadeira !== null).length
+      espera.append(botao('botao', 'Iniciar partida',
+        () => aoAgir({ tipo: 'iniciar' }),
+        { desabilitado: sentados === 0, dataset: { acao: 'iniciar' } }))
+    } else {
+      espera.append(div('aviso', 'Aguardando o anfitrião iniciar'))
+    }
+
+    mesa.append(espera)
+    return mesa
   }
 
   if (eu && eu.cadeira !== null) {
