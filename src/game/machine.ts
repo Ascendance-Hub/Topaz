@@ -60,6 +60,54 @@ function aptos(estado: EstadoJogo): Jogador[] {
   )
 }
 
+/**
+ * Spec §6 regra 3 aplicada fora do acerto: se ninguém mais pode disputar a
+ * partida, ela acaba aqui mesmo. Sem isto, uma fase com prazo (`apostas`) só
+ * sabia reatar o próprio prazo — e, com todos os participantes fora da sala,
+ * reatava para sempre: `limparRodada` nunca rodava, `decidirFim` nunca era
+ * consultado e nenhuma outra ação abria saída, porque `iniciar` exige
+ * `aguardando` e `novaPartida` exige `fim`.
+ *
+ * Só é seguro consultar em fase sem aposta em jogo: durante a rodada as
+ * fichas apostadas já saíram do saldo, e quem está all-in apareceria como
+ * inapto sem estar.
+ */
+function encerrarSemNinguemApto(estado: EstadoJogo): boolean {
+  if (aptos(estado).length > 0) return false
+  estado.fase = 'fim'
+  estado.vencedor = null
+  estado.vezDe = null
+  estado.prazoTurno = null
+  return true
+}
+
+/**
+ * A vez aponta para alguém que já não está em `jogadores` — a purga de
+ * desconectados o levou embora no meio do turno dele. O prazo dele vence e
+ * não há a quem aplicá-lo: sem esta recuperação, todo tique seguinte tornava
+ * a cair no mesmo nada e a fase `turnos` ficava presa para sempre.
+ *
+ * A vez vai para o primeiro sentado, em ordem de cadeira, que ainda tem mão
+ * por jogar (`maoAtiva` dentro do array). Quem já parou tem o cursor além do
+ * fim e fica de fora, então a vez nunca volta para quem já jogou. Não
+ * sobrando ninguém, os turnos encerram — `dealer` segue sozinho daí.
+ */
+function recuperarVezOrfa(ctx: Contexto, agora: number): void {
+  const estado = ctx.estado
+  const proximo = sentados(estado)
+    .filter((j) => j.maos.length > 0)
+    .find((j) => j.maoAtiva < j.maos.length)
+
+  if (proximo) {
+    estado.vezDe = proximo.peerId
+    estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
+  } else {
+    estado.vezDe = null
+    estado.prazoTurno = null
+    estado.fase = 'dealer'
+  }
+}
+
 /** Exportada para teste direto: a lógica é pura e não precisa de rodada. */
 export function decidirFim(estado: EstadoJogo): { acabou: boolean; vencedor: string | null } {
   const emJogo = aptos(estado)
@@ -492,6 +540,9 @@ export function avancar(ctx: Contexto, agora: number, rng: Rng): Contexto {
     if (sentados(estado).some((j) => j.maos.length > 0)) {
       distribuir(novo, agora, rng)
     } else {
+      // Ninguém apostou: ou a mesa continua esperando, ou já não há mesa
+      // nenhuma para esperar e a partida acaba.
+      if (encerrarSemNinguemApto(estado)) return transicionar(novo, agora, rng)
       estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
     }
     for (const jogador of semAposta) {
@@ -525,6 +576,8 @@ export function avancar(ctx: Contexto, agora: number, rng: Rng): Contexto {
         jogador.cadeira = null
       }
       avancarTurnoSeNecessario(novo, agora, cadeiraAtual)
+    } else {
+      recuperarVezOrfa(novo, agora)
     }
     return transicionar(novo, agora, rng)
   }

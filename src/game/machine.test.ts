@@ -728,6 +728,82 @@ describe('eliminação', () => {
   })
 })
 
+describe('nenhuma fase gira para sempre sem ninguém que possa jogar', () => {
+  /** Leva a mesa até `turnos` com os dois jogadores apostados. */
+  function emTurnosComDois(): Contexto {
+    let ctx = comDoisJogadores()
+    ctx = aplicar(ctx, 'p1', { tipo: 'apostar', valor: 100 }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'apostar', valor: 100 }, 0, RNG())
+    ctx = avancar(ctx, 0, RNG())
+    if (ctx.estado.fase === 'seguro') {
+      ctx = aplicar(ctx, 'p1', { tipo: 'seguro', aceitar: false }, 0, RNG())
+      ctx = aplicar(ctx, 'p2', { tipo: 'seguro', aceitar: false }, 0, RNG())
+    }
+    return ctx
+  }
+
+  /** A purga de desconectados de `sessao.ts` some com quem passou da janela
+   *  de reconexão — do ponto de vista do motor, o jogador simplesmente
+   *  desaparece de `jogadores`. */
+  function purgar(ctx: Contexto, ...peerIds: string[]): void {
+    ctx.estado.jogadores = ctx.estado.jogadores.filter((j) => !peerIds.includes(j.peerId))
+  }
+
+  it('apostas sem nenhum participante restante acaba em fim, com saída para quem sobrou na sala', () => {
+    let ctx = comDoisJogadores()
+    ctx = aplicar(ctx, 'p3', { tipo: 'entrar', apelido: 'Carla' }, 0, RNG())
+
+    // Os dois participantes somem; sobra quem entrou depois do início e, por
+    // isso, não pode sentar (spec §4). Sem fim de partida, `apostas` reatava
+    // o próprio prazo para sempre: `iniciar` exige `aguardando` e
+    // `novaPartida` exige `fim`, então a sala ficava sem nenhuma saída.
+    purgar(ctx, 'p1', 'p2')
+    ctx.estado.hostAtual = 'p3'
+
+    let agora = 0
+    for (let i = 0; i < 200; i++) {
+      agora += REGRAS.segundosTurno * 1000 + 1
+      ctx = avancar(ctx, agora, RNG())
+    }
+
+    expect(ctx.estado.fase).toBe('fim')
+    expect(ctx.estado.vencedor).toBeNull()
+    expect(ctx.estado.prazoTurno).toBeNull()
+
+    ctx = aplicar(ctx, 'p3', { tipo: 'novaPartida' }, agora, RNG())
+    ctx = aplicar(ctx, 'p3', { tipo: 'sentar', cadeira: 0 }, agora, RNG())
+    expect(ctx.estado.jogadores.find((j) => j.peerId === 'p3')!.cadeira).toBe(0)
+  })
+
+  it('a vez de quem foi purgado passa para quem ainda tem mão para jogar', () => {
+    let ctx = emTurnosComDois()
+    expect(ctx.estado.fase).toBe('turnos')
+    expect(ctx.estado.vezDe).toBe('p1')
+
+    purgar(ctx, 'p1')
+    ctx = avancar(ctx, REGRAS.segundosTurno * 1000 + 1, RNG())
+
+    // Antes, o `if (jogador)` simplesmente não fazia nada: o prazo continuava
+    // vencido e todo tique seguinte caía no mesmo nada, com a mesa parada.
+    expect(ctx.estado.vezDe).toBe('p2')
+    expect(ctx.estado.prazoTurno).toBe(REGRAS.segundosTurno * 1000 * 2 + 1)
+  })
+
+  it('turnos com todo mundo purgado chega a fim em vez de girar', () => {
+    let ctx = emTurnosComDois()
+    purgar(ctx, 'p1', 'p2')
+
+    let agora = 0
+    for (let i = 0; i < 200; i++) {
+      agora += REGRAS.segundosTurno * 1000 + 1
+      ctx = avancar(ctx, agora, RNG())
+    }
+
+    expect(ctx.estado.fase).toBe('fim')
+    expect(ctx.estado.vencedor).toBeNull()
+  })
+})
+
 describe('decidirFim', () => {
   function jogador(peerId: string, fichas: number, eliminadoEm: number | null): Jogador {
     return {
