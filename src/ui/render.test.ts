@@ -168,6 +168,61 @@ describe('contagem isolada por raiz', () => {
   })
 })
 
+describe('painel de ajuda entre renderizações', () => {
+  function mesaComPainelProprio(): EstadoJogo {
+    return criarEstado({
+      fase: 'apostas',
+      jogadores: [criarJogador({ peerId: 'eu', cadeira: 0 })],
+    })
+  }
+
+  it('continua aberto quando o estado muda e a tela é redesenhada', () => {
+    const raiz = document.createElement('div')
+    const estado = mesaComPainelProprio()
+
+    renderizar(raiz, estado, 'eu', semAcao)
+    expect(raiz.querySelector('[data-painel-ajuda]')).toBeNull()
+
+    raiz.querySelector<HTMLButtonElement>('[data-ajuda]')!.click()
+    expect(raiz.querySelector('[data-painel-ajuda]')).not.toBeNull()
+
+    // `renderizar` troca todos os filhos a cada mudança de estado, e num
+    // cliente isso é a cada broadcast do host — a cada 700ms enquanto o
+    // dealer compra. Quem abriu para ler o que é Dividir perdia o painel no
+    // meio da frase.
+    renderizar(raiz, estado, 'eu', semAcao)
+    expect(raiz.querySelector('[data-painel-ajuda]')).not.toBeNull()
+  })
+
+  it('continua fechado depois de fechado, mesmo com a tela redesenhada', () => {
+    const raiz = document.createElement('div')
+    const estado = mesaComPainelProprio()
+
+    renderizar(raiz, estado, 'eu', semAcao)
+    raiz.querySelector<HTMLButtonElement>('[data-ajuda]')!.click()
+    raiz.querySelector<HTMLButtonElement>('[data-ajuda]')!.click()
+    expect(raiz.querySelector('[data-painel-ajuda]')).toBeNull()
+
+    renderizar(raiz, estado, 'eu', semAcao)
+    expect(raiz.querySelector('[data-painel-ajuda]')).toBeNull()
+  })
+
+  it('anuncia o estado do painel em aria-expanded', () => {
+    const raiz = document.createElement('div')
+    const estado = mesaComPainelProprio()
+
+    renderizar(raiz, estado, 'eu', semAcao)
+    const gatilho = () => raiz.querySelector<HTMLButtonElement>('[data-ajuda]')!
+    expect(gatilho().getAttribute('aria-expanded')).toBe('false')
+
+    gatilho().click()
+    expect(gatilho().getAttribute('aria-expanded')).toBe('true')
+
+    renderizar(raiz, estado, 'eu', semAcao)
+    expect(gatilho().getAttribute('aria-expanded')).toBe('true')
+  })
+})
+
 describe('contagem guardada na raiz, não em módulo', () => {
   it('grava a contagem atual no dataset da própria raiz depois de renderizar', () => {
     const raiz = document.createElement('div')

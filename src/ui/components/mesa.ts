@@ -56,6 +56,18 @@ function seloFichas(fichas: number): HTMLElement {
 export type ContagensCartas = Record<string, number>
 
 /**
+ * O painel de ajuda aberto/fechado, vindo de fora e devolvido para fora pelo
+ * mesmo caminho da contagem de cartas: `render.ts` guarda no dataset da raiz,
+ * porque a tela é reconstruída inteira a cada mudança de estado.
+ */
+export type EstadoAjuda = {
+  aberta: boolean
+  aoAlternar: (aberta: boolean) => void
+}
+
+const AJUDA_FECHADA: EstadoAjuda = { aberta: false, aoAlternar: () => {} }
+
+/**
  * Chave da entidade "dealer" em `ContagensCartas`, e o formatador da chave
  * de mão — exportados porque render.ts monta o `ContagensCartas` do lado de
  * fora (comparando com a renderização anterior) e precisa gerar exatamente
@@ -270,7 +282,8 @@ function barraPrazo(prazoTurno: number, agora: number): HTMLElement {
 }
 
 function painelProprio(
-  estado: EstadoJogo, eu: Jogador, aoAgir: (acao: Acao) => void, anteriores: ContagensCartas,
+  estado: EstadoJogo, eu: Jogador, aoAgir: (acao: Acao) => void,
+  anteriores: ContagensCartas, ajuda: EstadoAjuda,
 ): HTMLElement {
   const painel = div('painel-proprio')
   // A mão que recebe os botões continua sendo a ativa — só ela aceita ação.
@@ -322,7 +335,7 @@ function painelProprio(
     }
   }
 
-  acoes.append(botaoAjuda())
+  acoes.append(botaoAjuda(ajuda.aberta, ajuda.aoAlternar))
 
   painel.append(acoes)
 
@@ -335,7 +348,7 @@ function painelProprio(
 
 export function renderizarMesa(
   estado: EstadoJogo, meuId: string, aoAgir: (acao: Acao) => void,
-  anteriores: ContagensCartas = {},
+  anteriores: ContagensCartas = {}, ajuda: EstadoAjuda = AJUDA_FECHADA,
 ): HTMLElement {
   const mesa = div('mesa')
   mesa.append(areaDealer(estado, anteriores), div('separador'))
@@ -376,7 +389,7 @@ export function renderizarMesa(
   }
 
   if (eu && eu.cadeira !== null) {
-    mesa.append(painelProprio(estado, eu, aoAgir, anteriores))
+    mesa.append(painelProprio(estado, eu, aoAgir, anteriores, ajuda))
   } else if (eu) {
     const convite = div('painel-proprio')
     convite.append(div('rotulo', 'Espectador'), botaoSentar(estado, eu, aoAgir))

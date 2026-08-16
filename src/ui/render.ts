@@ -1,10 +1,25 @@
 import { renderizarMesa, CHAVE_DEALER, chaveMao } from './components/mesa'
 import { renderizarFim } from './components/fim'
 import { animarEntrada, origemSapata } from './animate'
-import type { ContagensCartas } from './components/mesa'
+import type { ContagensCartas, EstadoAjuda } from './components/mesa'
 import type { Acao, EstadoJogo } from '../game/types'
 
 const CHAVE_DATASET = 'contagensCartas'
+const CHAVE_AJUDA = 'ajudaAberta'
+
+/**
+ * O painel de ajuda aberto/fechado, guardado no dataset da própria raiz —
+ * pelo mesmo motivo que a contagem de cartas: `renderizar` troca todos os
+ * filhos a cada mudança de estado, e num cliente isso é a cada broadcast do
+ * host (700ms durante a compra do dealer). Sem isto o painel nascia fechado
+ * a cada render e sumia da tela de quem estava lendo.
+ */
+function estadoAjuda(raiz: HTMLElement): EstadoAjuda {
+  return {
+    aberta: raiz.dataset[CHAVE_AJUDA] === '1',
+    aoAlternar: (aberta) => { raiz.dataset[CHAVE_AJUDA] = aberta ? '1' : '0' },
+  }
+}
 
 /**
  * Quantas cartas cada entidade (cada mão, pelo id, ou o dealer) tem na tela
@@ -69,7 +84,7 @@ export function renderizar(
     ([chave, n]) => n > (anteriores[chave] ?? 0),
   )
 
-  raiz.replaceChildren(renderizarMesa(estado, meuId, aoAgir, anteriores))
+  raiz.replaceChildren(renderizarMesa(estado, meuId, aoAgir, anteriores, estadoAjuda(raiz)))
   raiz.dataset[CHAVE_DATASET] = JSON.stringify(atuais)
 
   if (houveDistribuicao) {
