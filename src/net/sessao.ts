@@ -19,7 +19,13 @@ export class Sessao {
     private transporte: Transporte,
     private rng: () => Rng,
   ) {
-    this.hostId = elegerHost(this.todosIds())
+    // Sozinho na sala, eu sou o host. Entrando numa sala que já existe, não
+    // presumo nada: fico com o sentinela '' ("ainda não sei quem manda") até
+    // que o primeiro snapshot de alguém se declarando host me diga quem é.
+    // A entrada de um peer NUNCA reelege — só a saída do host muda quem
+    // manda — senão um terceiro amigo com id menor derrubaria a mesa real
+    // e assumiria com um Contexto vazio.
+    this.hostId = this.transporte.peers().length === 0 ? this.transporte.meuId() : ''
     this.ctx = criarContexto(this.hostId, this.rng())
 
     this.transporte.aoReceberAcao((acao, peerId) => {
@@ -30,19 +36,34 @@ export class Sessao {
 
     this.transporte.aoReceberEstado((estado, peerId) => {
       if (this.souHost()) return
-      if (peerId !== this.hostId) return
+      // O remetente precisa se declarar host no próprio payload — não
+      // decidimos por um id em cache, porque numa saída com 3+ peers um
+      // sobrevivente pode publicar antes que eu tenha processado a saída
+      // do host antigo. Aceitamos se for o host que eu já conhecia, ou se
+      // o host que eu conhecia já sumiu da lista (inclusive quando eu
+      // ainda não conheço ninguém: o sentinela '' nunca aparece em
+      // todosIds(), então essa condição também cobre o primeiro snapshot).
+      if (estado.hostAtual !== peerId) return
+      const hostConhecidoSumiu = !this.todosIds().includes(this.hostId)
+      if (peerId !== this.hostId && !hostConhecidoSumiu) return
+      this.hostId = peerId
       this.ctx = { ...this.ctx, estado }
       this.notificar()
     })
 
     this.transporte.aoEntrarPeer(() => {
-      this.reeleger()
+      // Só atualiza o recém-chegado; nunca reelege. É esse snapshot que
+      // ensina ao recém-chegado quem é o host.
       if (this.souHost()) this.publicar()
     })
 
     this.transporte.aoSairPeer((peerId) => {
       const eraHost = peerId === this.hostId
-      this.reeleger()
+      // Só reelege se o host que eu conhecia de fato sumiu da lista — a
+      // saída de qualquer outro peer não deve mexer em quem manda.
+      if (!this.todosIds().includes(this.hostId)) {
+        this.hostId = elegerHost(this.todosIds())
+      }
 
       if (this.souHost()) {
         // Marca como ausente em vez de remover: cadeira e fichas ficam
@@ -70,10 +91,6 @@ export class Sessao {
     return [this.transporte.meuId(), ...this.transporte.peers()]
   }
 
-  private reeleger(): void {
-    this.hostId = elegerHost(this.todosIds())
-  }
-
   /**
    * Assumindo o posto: o host anterior levou a sapata embora.
    * Reconstruímos descontando as cartas visíveis. A carta oculta do dealer
@@ -90,7 +107,9 @@ export class Sessao {
   }
 
   private publicar(): void {
-    this.ctx.estado.hostAtual = this.hostId
+    // Declara o próprio id, não o `hostId` em cache — é essa autodeclaração
+    // que um cliente usa para aceitar (ou não) o snapshot.
+    this.ctx.estado.hostAtual = this.transporte.meuId()
     this.transporte.enviarEstado(this.ctx.estado)
     this.notificar()
   }
