@@ -1,0 +1,75 @@
+:root {
+  --topazio-300: #FFCE6B;
+  --topazio-400: #F5B942;
+  --topazio-500: #E8A317;
+  --topazio-600: #C9A227;
+  --topazio-700: #A4801A;
+  --topazio-900: #4A3A0E;
+
+  --feltro-400: #1D5641;
+  --feltro-600: #123528;
+  --feltro-800: #0B2117;
+
+  --carvao-900: #0E0F12;
+  --carvao-700: #1A1C21;
+  --carvao-500: #2A2E36;
+  --texto: #EFE6CF;
+  --texto-fraco: #CFC4A4;
+
+  --carta-face: #F6F1E3;
+  --carta-borda: #D8CDB0;
+  --naipe-vermelho: #A3232A;
+
+  --serif: Georgia, 'Times New Roman', serif;
+  --dur-carta: 380ms;
+  --dur-virada: 300ms;
+  --easing: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--carvao-900);
+  color: var(--texto);
+  font-family: var(--serif);
+}
+
+.carta {
+  width: 42px;
+  height: 60px;
+  border-radius: 5px;
+  background: var(--carta-face);
+  color: var(--carvao-900);
+  border: 1px solid var(--carta-borda);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 700;
+  margin-left: -14px;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.4);
+  transition: transform var(--dur-carta) var(--easing);
+}
+
+.carta:first-child { margin-left: 0; }
+.carta.vermelha { color: var(--naipe-vermelho); }
+
+.carta.grande {
+  width: 57px;
+  height: 81px;
+  font-size: 22px;
+  margin-left: -17px;
+}
+.carta.grande:first-child { margin-left: 0; }
+
+.carta.verso {
+  background: repeating-linear-gradient(45deg, #7C1D22 0 4px, #651418 4px 8px);
+  border-color: var(--topazio-600);
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
