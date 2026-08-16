@@ -12,6 +12,9 @@ function comDoisJogadores(): Contexto {
   ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
   ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
   ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+  // 'p1' é o hostId passado a criarContexto: só ele pode tirar a mesa da
+  // sala de espera.
+  ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
   return ctx
 }
 
@@ -50,8 +53,76 @@ describe('entrar e sentar', () => {
     expect(ctx.estado.jogadores.find((j) => j.peerId === 'p2')!.cadeira).toBe(1)
   })
 
-  it('vai para apostas com dois jogadores sentados', () => {
+  it('vai para apostas quando o anfitrião inicia com dois jogadores sentados', () => {
     expect(comDoisJogadores().estado.fase).toBe('apostas')
+  })
+})
+
+describe('sala de espera', () => {
+  it('sentar não inicia mais a partida sozinho', () => {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    expect(ctx.estado.fase).toBe('aguardando')
+  })
+
+  it('o anfitrião inicia e a partida vai para apostas', () => {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
+    expect(ctx.estado.fase).toBe('apostas')
+    expect(ctx.estado.naPartida).toEqual(['p1'])
+  })
+
+  it('quem não é anfitrião não consegue iniciar', () => {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'iniciar' }, 0, RNG())
+    expect(ctx.estado.fase).toBe('aguardando')
+  })
+
+  it('não inicia com a mesa vazia', () => {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
+    expect(ctx.estado.fase).toBe('aguardando')
+  })
+
+  it('naPartida registra todos os sentados no momento do início', () => {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+    ctx = aplicar(ctx, 'p3', { tipo: 'entrar', apelido: 'Carla' }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
+    // Carla entrou na sala mas não sentou antes do início.
+    expect(ctx.estado.naPartida.sort()).toEqual(['p1', 'p2'])
+  })
+
+  it('quem não entrou na partida não consegue sentar depois que ela começa', () => {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+    expect(ctx.estado.jogadores.find((j) => j.peerId === 'p2')!.cadeira).toBeNull()
+  })
+
+  it('quem estava na partida e perdeu a cadeira consegue voltar a sentar', () => {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'levantar' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+    expect(ctx.estado.jogadores.find((j) => j.peerId === 'p2')!.cadeira).toBe(1)
   })
 })
 
@@ -193,6 +264,7 @@ describe('dividir', () => {
     ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
     ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
     ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
     ctx = aplicar(ctx, 'p1', { tipo: 'apostar', valor: 100 }, 0, RNG())
     ctx = aplicar(ctx, 'p2', { tipo: 'apostar', valor: 100 }, 0, RNG())
     ctx = avancar(ctx, 0, RNG())
@@ -423,6 +495,8 @@ describe('a vez nunca volta para quem já jogou', () => {
       ctx = aplicar(ctx, id, { tipo: 'entrar', apelido }, 0, RNG())
       ctx = aplicar(ctx, id, { tipo: 'sentar', cadeira }, 0, RNG())
     })
+    // 'p1' é o hostId passado a criarContexto.
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
     for (const [id] of nomes) {
       ctx = aplicar(ctx, id, { tipo: 'apostar', valor: 100 }, 0, RNG())
     }

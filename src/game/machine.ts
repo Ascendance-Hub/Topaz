@@ -32,6 +32,18 @@ function sentados(estado: EstadoJogo): Jogador[] {
     .sort((a, b) => a.cadeira! - b.cadeira!)
 }
 
+/**
+ * Na sala de espera qualquer um senta. Com a partida em andamento, só volta
+ * a sentar quem já estava nela — assim quem perdeu a cadeira por inatividade
+ * consegue voltar, mas um retardatário não entra com 1000 fichas numa mesa
+ * onde os outros já lutaram até 400.
+ */
+function podeSentar(estado: EstadoJogo, jogador: Jogador): boolean {
+  if (estado.fase === 'aguardando') return true
+  if (estado.fase === 'fim') return false
+  return estado.naPartida.includes(jogador.peerId)
+}
+
 /** Cunha um novo id de mão a partir do contador que viaja no próprio estado —
  *  assim uma migração de host (nova aba, contador de módulo zerado) nunca
  *  gera ids que colidem com mãos já existentes. */
@@ -109,6 +121,7 @@ export function aplicar(
       if (!jogador || jogador.cadeira !== null) break
       if (acao.cadeira < 0 || acao.cadeira >= REGRAS.maxCadeiras) break
       if (estado.jogadores.some((j) => j.cadeira === acao.cadeira)) break
+      if (!podeSentar(estado, jogador)) break
       jogador.cadeira = acao.cadeira
       // Sentar é ação manual e recomeço: sem zerar isto, quem foi rebaixado
       // por inatividade (contador já no limite) perderia a cadeira de novo
@@ -131,6 +144,17 @@ export function aplicar(
       // Sem isto a vez ficava presa em quem acabou de sair: a mesa inteira
       // esperava os 30 segundos do prazo por alguém que já não está lá.
       if (eraSuaVez) passarVez(novo, agora, cadeiraAnterior)
+      break
+    }
+
+    case 'iniciar': {
+      if (estado.fase !== 'aguardando') break
+      if (peerId !== estado.hostAtual) break
+      const naMesa = sentados(estado)
+      if (naMesa.length === 0) break
+      estado.naPartida = naMesa.map((j) => j.peerId)
+      estado.fase = 'apostas'
+      estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
       break
     }
 
@@ -352,11 +376,6 @@ function limparRodada(ctx: Contexto, agora: number, rng: Rng): void {
 
 function transicionar(ctx: Contexto, agora: number, rng: Rng): Contexto {
   const estado = ctx.estado
-
-  if (estado.fase === 'aguardando' && sentados(estado).length >= 1) {
-    estado.fase = 'apostas'
-    estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
-  }
 
   if (estado.fase === 'apostas') {
     const naMesa = sentados(estado)

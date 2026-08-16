@@ -513,6 +513,8 @@ function mesaDistribuida(): Contexto {
   ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
   ctx = aplicar(ctx, 'eu', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
   ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+  // 'eu' é o hostId passado a criarContexto: só ele tira a mesa da sala de espera.
+  ctx = aplicar(ctx, 'eu', { tipo: 'iniciar' }, 0, RNG())
   ctx = aplicar(ctx, 'eu', { tipo: 'apostar', valor: 100 }, 0, RNG())
   ctx = aplicar(ctx, 'p2', { tipo: 'apostar', valor: 100 }, 0, RNG())
   ctx = avancar(ctx, 0, RNG())

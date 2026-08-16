@@ -421,6 +421,8 @@ describe('migração de host', () => {
     b!.entrar('Bruno')
     a!.despachar({ tipo: 'sentar', cadeira: 0 })
     b!.despachar({ tipo: 'sentar', cadeira: 1 })
+    // 'pa' é o menor peerId da sala: é ele o anfitrião eleito.
+    a!.despachar({ tipo: 'iniciar' })
     a!.despachar({ tipo: 'apostar', valor: 100 })
     b!.despachar({ tipo: 'apostar', valor: 100 })
 
@@ -478,6 +480,8 @@ describe('migração de host', () => {
     b!.entrar('Bruno')
     a!.despachar({ tipo: 'sentar', cadeira: 0 })
     b!.despachar({ tipo: 'sentar', cadeira: 1 })
+    // 'pa' é o menor peerId da sala: é ele o anfitrião eleito.
+    a!.despachar({ tipo: 'iniciar' })
     a!.despachar({ tipo: 'apostar', valor: 100 })
     b!.despachar({ tipo: 'apostar', valor: 100 })
 
