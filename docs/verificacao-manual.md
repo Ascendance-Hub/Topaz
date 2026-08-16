@@ -62,6 +62,12 @@ para você saber o que esperar.
 vence (a que tiver mais jogo) e a outra é descartada com as fichas. É raro:
 exige a conexão demorar mais de 2,5s *e* alguém ter entrado no lado perdedor.
 
+**Se dois jogadores nunca conseguirem se enxergar entre si mas ambos enxergarem
+um terceiro**, esse terceiro pode ver a mesa alternando entre as duas — cada
+troca é para uma mesa com mais jogo que a anterior, então não gira em círculo,
+mas pisca enquanto as duas avançam. Isso é uma divisão que não tem como ser
+resolvida sem os dois primeiros se conectarem; nenhuma escolha nossa conserta.
+
 **Se o relay de descoberta estiver totalmente inacessível**, cada jogador vê uma
 mesa normal com "aguardando jogadores" — indistinguível de uma sala vazia. O
 aviso explícito de falha só aparece quando existe um peer visível mas silencioso.
