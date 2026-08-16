@@ -31,7 +31,12 @@ export function botaoAjuda(): HTMLElement {
   const gatilho = document.createElement('button')
   gatilho.className = 'ajuda-gatilho'
   gatilho.textContent = '?'
-  gatilho.dataset.acao = 'ajuda'
+  // `data-ajuda`, não `data-acao`: `data-acao` significa "este botão despacha
+  // uma `Acao` deste `tipo`", e abrir a ajuda não é jogada nenhuma. Enquanto
+  // o gatilho se disfarçava de ação, `button[data-acao]` deixava de contar só
+  // os botões de jogada e os testes da mesa tiveram de recorrer a um seletor
+  // estrutural.
+  gatilho.dataset.ajuda = 'gatilho'
   gatilho.setAttribute('aria-label', 'Explicação das jogadas')
   raiz.append(gatilho)
 

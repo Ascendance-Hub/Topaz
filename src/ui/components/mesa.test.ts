@@ -248,7 +248,7 @@ describe('botões de ação do próprio jogador', () => {
       ],
     })
     const mesa = renderizarMesa(estado, 'eu', semAcao)
-    expect(mesa.querySelectorAll('.painel-proprio .acoes > button')).toHaveLength(0)
+    expect(mesa.querySelectorAll('.painel-proprio button[data-acao]')).toHaveLength(0)
   })
 
   it('mostra apenas as ações permitidas pelas regras, sem oferecer Dividir numa mão que não pode dividir', () => {
@@ -262,7 +262,7 @@ describe('botões de ação do próprio jogador', () => {
       ],
     })
     const mesa = renderizarMesa(estado, 'eu', semAcao)
-    const acoes = [...mesa.querySelectorAll('.painel-proprio .acoes > button')]
+    const acoes = [...mesa.querySelectorAll('.painel-proprio button[data-acao]')]
       .map((b) => (b as HTMLElement).dataset['acao'])
     expect(acoes.sort()).toEqual(['dobrar', 'parar', 'pedir'])
     expect(acoes).not.toContain('dividir')
@@ -279,7 +279,7 @@ describe('botões de ação do próprio jogador', () => {
       ],
     })
     const mesa = renderizarMesa(estado, 'eu', semAcao)
-    const acoes = [...mesa.querySelectorAll('.painel-proprio .acoes > button')]
+    const acoes = [...mesa.querySelectorAll('.painel-proprio button[data-acao]')]
       .map((b) => (b as HTMLElement).dataset['acao'])
     expect(acoes).toContain('dividir')
   })
@@ -297,7 +297,7 @@ describe('botões de ação do próprio jogador', () => {
       ],
     })
     const mesa = renderizarMesa(estado, 'eu', semAcao)
-    expect(mesa.querySelectorAll('.painel-proprio .acoes > button')).toHaveLength(0)
+    expect(mesa.querySelectorAll('.painel-proprio button[data-acao]')).toHaveLength(0)
   })
 
   it('chama aoAgir com a ação e a mão certas ao clicar em Pedir', () => {
