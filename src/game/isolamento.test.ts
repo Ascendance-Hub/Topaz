@@ -37,7 +37,7 @@ describe('isolamento da camada game/', () => {
 
   it('não importa nada de net/ nem de ui/', () => {
     const violacoes = arquivosTs('src/game').filter((caminho) => {
-      if (caminho.endsWith('.test.ts')) return false
+      if (caminho.endsWith('isolamento.test.ts')) return false
       const conteudo = readFileSync(caminho, 'utf-8')
       return importaCamadaProibida(conteudo)
     })
