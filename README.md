@@ -7,10 +7,17 @@ sem cadastro: os navegadores conversam entre si por WebRTC.
 
 ## Blackjack
 
-Até 7 jogadores. Regras completas — pedir, parar, dobrar, dividir e seguro.
+Até 7 jogadores. Regras completas — pedir, parar, dobrar, dividir e seguro,
+com um botão "?" explicando as três que não são óbvias para quem não joga.
 Dealer automático que para em 17, com o avanço pausado no tempo (turnos e a
 compra do dealer têm prazo visível, não resolvem tudo instantaneamente).
-Fichas valem só durante a sessão.
+
+A partida começa quando o anfitrião aperta "Iniciar partida" — sentar não
+inicia mais nada sozinho, então os outros esperam com um aviso na tela. Quem
+quebra (fica sem fichas) vira espectador e não consegue sentar de novo até a
+próxima partida. Fichas valem só durante a sessão: todos começam com 1000, e
+a partida termina assim que alguém chega a 1500, mostrando o placar final.
+"Nova partida" devolve todo mundo à sala de espera com 1000 fichas de novo.
 
 Crie uma sala — o código é gerado com `crypto.getRandomValues`, então não dá
 para adivinhar — copie o link e mande para os amigos. Ao entrar, o navegador

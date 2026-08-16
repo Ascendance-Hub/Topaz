@@ -325,3 +325,17 @@ body {
 
 .espera { text-align: center; }
 .espera .aviso { color: var(--texto-fraco); font-size: 13px; margin-top: 10px; }
+
+.ajuda-gatilho {
+  width: 30px; height: 30px; border-radius: 999px;
+  background: transparent; color: var(--topazio-500);
+  border: 1px solid var(--topazio-600);
+  font-family: var(--serif); font-size: 15px; cursor: pointer;
+}
+.ajuda-painel {
+  background: var(--carvao-700); border: 1px solid var(--topazio-900);
+  border-radius: 10px; padding: 14px 16px; margin-top: 12px; text-align: left;
+}
+.ajuda-painel h4 { color: var(--topazio-500); font-size: 14px; margin: 0 0 4px; }
+.ajuda-painel p { color: var(--texto-fraco); font-size: 13px; margin: 0 0 12px; line-height: 1.45; }
+.ajuda-painel p:last-child { margin-bottom: 0; }

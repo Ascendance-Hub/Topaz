@@ -20,6 +20,11 @@ simular um navegador separado.
       resultado
 - [ ] O dealer compra uma carta por vez, com pausa visível entre elas
 - [ ] A barra de tempo do turno anda de verdade
+- [ ] O anfitrião vê "Iniciar partida" e os outros veem o aviso de espera
+- [ ] Quem quebra vira espectador e não consegue sentar de novo
+- [ ] Alguém chegando a 1500 encerra a partida com placar
+- [ ] "Nova partida" devolve todos à sala de espera com 1000 fichas
+- [ ] O botão "?" explica Dobrar, Dividir e Seguro
 
 ## Rede
 
@@ -93,6 +98,7 @@ Coisas deliberadamente não implementadas, para você decidir:
 - **Sem *dealer peek***: com Ás ou dez à mostra, os jogadores jogam a mão inteira
   antes de o dealer revelar um blackjack natural, e perdem também o que
   dobraram ou dividiram.
-- **Espectadores não aparecem** na mesa para os outros jogadores.
+- **Espectadores não aparecem** na mesa para os outros jogadores — inclusive
+  quem foi eliminado, que fica invisível para quem continua jogando.
 - **Faltam duas animações** do spec: a virada da carta oculta do dealer e o
   contador de fichas interpolado.

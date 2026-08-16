@@ -1,4 +1,5 @@
 import { elementoCarta } from './carta'
+import { botaoAjuda } from './ajuda'
 import { avaliar } from '../../game/hand'
 import { REGRAS, acoesDisponiveis } from '../../game/rules'
 import type { Acao, EstadoJogo, Jogador, Mao, ResultadoMao, TipoAcao } from '../../game/types'
@@ -279,6 +280,8 @@ function painelProprio(
       }))
     }
   }
+
+  acoes.append(botaoAjuda())
 
   painel.append(acoes)
 
