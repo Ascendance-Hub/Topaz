@@ -48,9 +48,14 @@ export function criarRedeFalsa(opcoes: OpcoesRedeFalsa = {}) {
     }
   }
 
-  /** Conclui o handshake de todos os nós ainda pendentes (modo diferido). */
-  function bombear(): void {
-    for (const id of [...nos.keys()]) tornarVisivel(id)
+  /**
+   * Conclui o handshake dos nós pedidos — ou de todos, se nenhum for pedido
+   * (modo diferido). A lista existe para montar visibilidade parcial: um
+   * terceiro peer que o relay ainda não entregou a ninguém, que é como um
+   * cliente acaba preso a um host que depois perde um conflito.
+   */
+  function bombear(ids?: string[]): void {
+    for (const id of ids ?? [...nos.keys()]) tornarVisivel(id)
   }
 
   function conectar(id: string): Transporte {

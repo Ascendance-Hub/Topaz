@@ -180,6 +180,38 @@ describe('rede falsa com conexão diferida', () => {
     expect(a.peers()).toEqual(['p3'])
   })
 
+  it('bombear com lista conecta só os pedidos, deixando um terceiro invisível', () => {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const a = rede.conectar('pa')
+    const b = rede.conectar('pb')
+    const c = rede.conectar('pc')
+
+    rede.bombear(['pa', 'pc'])
+
+    expect(a.peers()).toEqual(['pc'])
+    expect(c.peers()).toEqual(['pa'])
+    // 'pb' não existe para ninguém ainda, e não enxerga ninguém.
+    expect(b.peers()).toEqual([])
+
+    rede.bombear()
+    expect(b.peers().sort()).toEqual(['pa', 'pc'])
+    expect(a.peers().sort()).toEqual(['pb', 'pc'])
+  })
+
+  it('quem ainda não foi bombeado não recebe o que os conectados trocam', () => {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const a = rede.conectar('pa')
+    rede.conectar('pb')
+    const c = rede.conectar('pc')
+    rede.bombear(['pa', 'pc'])
+    const recebidoPorC = vi.fn()
+    c.aoReceberAcao(recebidoPorC)
+
+    a.enviarAcao({ tipo: 'levantar' })
+
+    expect(recebidoPorC).toHaveBeenCalledWith({ tipo: 'levantar' }, 'pa')
+  })
+
   it('quem sai deixa de aparecer em peers() e avisa os que ficaram', () => {
     const rede = criarRedeFalsa({ conexaoDiferida: true })
     const a = rede.conectar('p1')

@@ -201,19 +201,106 @@ describe('descoberta de host', () => {
     expect(mudou).toHaveBeenCalled()
   })
 
-  it('a chegada de um peer reabre a janela, para a eleição não rodar com lista pela metade', () => {
+  it('a chegada de um peer reabre a janela: quem reivindicaria espera o tempo todo de novo', () => {
+    // O relógio precisa ser controlado dos dois lados: a janela é SEMEADA
+    // pelo `Date.now()` da construção e da chegada do peer, e AVALIADA
+    // contra o `agora` do tique. Sem relógio falso, os dois instantes caem
+    // no mesmo milissegundo e a reabertura fica invisível ao teste.
+    vi.useFakeTimers()
+    try {
+      const inicio = Date.now()
+      const rede = redeDiferida()
+      // 'pa' é o menor id da sala: é ele quem reivindicaria o posto. Se a
+      // reabertura não valesse, ele assumiria com a lista pela metade.
+      const a = new Sessao(rede.conectar('pa'), rng)
+      rede.conectar('pz')
+
+      // Um segundo depois de 'pa' entrar, o handshake com 'pz' fecha.
+      vi.setSystemTime(inicio + 1000)
+      rede.bombear()
+
+      // No instante em que a janela ORIGINAL venceria, ainda não pode ter
+      // reivindicado nada: a chegada de 'pz' reabriu a contagem.
+      a.tique(inicio + MS_DESCOBERTA + 1)
+      expect(a.souHost()).toBe(false)
+      expect(a.statusConexao()).toBe('conectando')
+
+      // Vencida a janela reaberta, aí sim assume.
+      a.tique(inicio + 1000 + MS_DESCOBERTA + 1)
+      expect(a.souHost()).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('cliente de um host que se demitiu segue o host novo em vez de congelar', () => {
+    // Caminho de três peers: o relay conecta 'pc' a 'pa' antes de 'pa' e
+    // 'pb' se enxergarem. Quando 'pa' perde o conflito e se demite, ele
+    // continua na sala — então, para 'pc', o host conhecido não sumiu (nada
+    // reelege) e os snapshots de 'pb' vinham de um "estranho". A mesa de
+    // 'pc' congelava com botões mortos, sem nem status para mostrar.
     const rede = redeDiferida()
+    const a = new Sessao(rede.conectar('pa'), rng)
     const b = new Sessao(rede.conectar('pb'), rng)
-    const inicio = Date.now()
+    const c = new Sessao(rede.conectar('pc'), rng)
 
-    // Quase no fim da janela, 'pa' aparece — a eleição não pode acontecer
-    // com a lista antiga (em que 'pb' era o menor id).
-    const a = rede.conectar('pa')
+    // 'pa' e 'pc' formam uma mesa; 'pb' ainda não existe para ninguém.
+    rede.bombear(['pa', 'pc'])
+    passarJanela([a, c])
+    a.entrar('Alex')
+    c.entrar('Carla')
+    expect(a.souHost()).toBe(true)
+    expect(c.souHost()).toBe(false)
+    expect(c.estado().hostAtual).toBe('pa')
+
+    // 'pb' assume a própria mesa, mais adiantada que a de 'pa'.
+    passarJanela([b])
+    b.entrar('Bruno')
+    b.estado().rodada = 7
+    expect(b.souHost()).toBe(true)
+
     rede.bombear()
-    b.tique(inicio + MS_DESCOBERTA + 1)
 
-    expect(b.souHost()).toBe(false)
-    expect(a.peers()).toEqual(['pb'])
+    // 'pa' perdeu e se demitiu — e 'pc' foi junto, pela MESMA ordem.
+    expect(a.souHost()).toBe(false)
+    expect(b.souHost()).toBe(true)
+    expect(c.souHost()).toBe(false)
+    expect(c.estado().hostAtual).toBe('pb')
+    expect(c.estado().rodada).toBe(7)
+
+    // E as ações de 'pc' chegam ao host novo, em vez de sumirem no antigo.
+    c.despachar({ tipo: 'sentar', cadeira: 4 })
+
+    const carlaNoHost = b.estado().jogadores.find((j) => j.peerId === 'pc')
+    expect(carlaNoHost).toBeDefined()
+    expect(carlaNoHost!.apelido).toBe('Carla')
+    expect(carlaNoHost!.cadeira).toBe(4)
+    expect(c.estado().jogadores.find((j) => j.peerId === 'pc')!.cadeira).toBe(4)
+  })
+
+  it('o cliente recusa a mesa que perde para a que ele já carrega', () => {
+    // A outra metade da antissimetria: adotar "qualquer host que fale" faria
+    // o cliente oscilar entre duas mesas em conflito.
+    const rede = redeDiferida()
+    const a = new Sessao(rede.conectar('pa'), rng)
+    const b = new Sessao(rede.conectar('pb'), rng)
+    const c = new Sessao(rede.conectar('pc'), rng)
+
+    rede.bombear(['pb', 'pc'])
+    passarJanela([b, c])
+    b.entrar('Bruno')
+    b.estado().rodada = 9
+    expect(c.estado().hostAtual).toBe('pb')
+
+    // 'pa' chega com uma mesa mais pobre e se declarando host.
+    passarJanela([a])
+    a.entrar('Alex')
+    expect(a.souHost()).toBe(true)
+    rede.bombear()
+
+    expect(c.estado().hostAtual).toBe('pb')
+    expect(c.estado().rodada).toBe(9)
+    expect(a.souHost()).toBe(false)
   })
 })
 

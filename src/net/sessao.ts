@@ -108,7 +108,20 @@ export class Sessao {
       // já sumiu da lista, ou se eu ainda não conhecia ninguém.
       const hostConhecidoSumiu =
         this.hostId === null || !this.todosIds().includes(this.hostId)
-      if (peerId !== this.hostId && !hostConhecidoSumiu) return
+
+      // E aceitamos também quando a mesa que chega vence a que eu carrego,
+      // pela MESMA ordem que os hosts usam entre si. Sem isto, um cliente
+      // fica órfão em silêncio: o host dele pode ter perdido um conflito e
+      // se demitido continuando na sala, então nem sumiu da lista (para
+      // reeleger) nem manda mais em nada — os snapshots do host novo eram
+      // recusados e as ações do cliente caíam no vazio, com a mesa
+      // congelada e os botões mortos. Reusar `mesaPrevalece` (antissimétrica)
+      // garante que cliente e host nunca discordem sobre quem venceu.
+      const outraMesaVence =
+        this.hostId !== null && peerId !== this.hostId &&
+        mesaPrevalece(estado, peerId, this.ctx.estado, this.hostId)
+
+      if (peerId !== this.hostId && !hostConhecidoSumiu && !outraMesaVence) return
       this.adotar(estado, peerId)
     })
 
