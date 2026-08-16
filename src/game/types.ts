@@ -4,7 +4,7 @@ export type Valor =
   | 'A' | '2' | '3' | '4' | '5' | '6' | '7'
   | '8' | '9' | '10' | 'J' | 'Q' | 'K'
 
-export interface Carta {
+export type Carta = {
   naipe: Naipe
   valor: Valor
 }
@@ -13,7 +13,7 @@ export type Rng = () => number
 
 export type ResultadoMao = 'ganhou' | 'perdeu' | 'empatou' | 'blackjack'
 
-export interface Mao {
+export type Mao = {
   id: string
   cartas: Carta[]
   aposta: number
@@ -23,7 +23,7 @@ export interface Mao {
   resultado?: ResultadoMao
 }
 
-export interface Jogador {
+export type Jogador = {
   peerId: string
   apelido: string
   cadeira: number | null
@@ -48,7 +48,7 @@ export type Fase =
   | 'dealer'
   | 'acerto'
 
-export interface EstadoJogo {
+export type EstadoJogo = {
   fase: Fase
   jogadores: Jogador[]
   vezDe: string | null

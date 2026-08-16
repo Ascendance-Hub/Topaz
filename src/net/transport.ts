@@ -1,5 +1,4 @@
 import { joinRoom, selfId } from 'trystero/nostr'
-import type { DataPayload } from 'trystero/nostr'
 import type { Acao, EstadoJogo } from '../game/types'
 
 export const APP_ID = 'topaz-ascendance-hub'
@@ -19,14 +18,7 @@ export interface Transporte {
 export function criarTransporteTrystero(codigoSala: string): Transporte {
   const sala = joinRoom({ appId: APP_ID }, codigoSala)
   const acaoAction = sala.makeAction<Acao>('acao')
-  // `EstadoJogo` é declarado como `interface`, então — ao contrário de
-  // `Acao`, que é um `type` de objetos literais — não recebe assinatura de
-  // índice implícita e não satisfaz a constraint `DataPayload` do Trystero,
-  // mesmo sendo, em tempo de execução, um objeto JSON simples. A ação
-  // 'estado' trafega então sem parâmetro de tipo explícito (assumindo
-  // `DataPayload`) e convertemos nas duas bordas abaixo, onde confiamos no
-  // formato definido pelo nosso próprio protocolo.
-  const estadoAction = sala.makeAction('estado')
+  const estadoAction = sala.makeAction<EstadoJogo>('estado')
 
   return {
     meuId: () => selfId,
@@ -38,10 +30,10 @@ export function criarTransporteTrystero(codigoSala: string): Transporte {
       acaoAction.onMessage = (acao, contexto) => cb(acao, contexto.peerId)
     },
     enviarEstado: (estado) => {
-      void estadoAction.send(estado as unknown as DataPayload)
+      void estadoAction.send(estado)
     },
     aoReceberEstado: (cb) => {
-      estadoAction.onMessage = (estado, contexto) => cb(estado as unknown as EstadoJogo, contexto.peerId)
+      estadoAction.onMessage = (estado, contexto) => cb(estado, contexto.peerId)
     },
     aoEntrarPeer: (cb) => {
       sala.onPeerJoin = cb
