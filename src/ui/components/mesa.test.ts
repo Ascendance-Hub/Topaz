@@ -2,6 +2,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderizarMesa } from './mesa'
 import { REGRAS } from '../../game/rules'
+import { aplicar, avancar, criarContexto } from '../../game/machine'
+import type { Contexto } from '../../game/machine'
+import { rngSemente } from '../../game/shoe'
 import type { Carta, EstadoJogo, Jogador, Mao, Naipe, Valor } from '../../game/types'
 
 function carta(valor: Valor, naipe: Naipe): Carta {
@@ -400,7 +403,7 @@ describe('marcação de cartas novas (FLIP)', () => {
     })
     // O dealer tinha 1 carta visível (a 2ª e a oculta são novas); "eu" tinha
     // 2 (a 3ª, recém-pedida, é a única nova).
-    const anteriores = { 'jogador:eu': 2, dealer: 1 }
+    const anteriores = { 'mao:m1': 2, dealer: 1 }
     const mesa = renderizarMesa(estado, 'eu', semAcao, anteriores)
 
     const cartasDealer = [...mesa.querySelectorAll('.dealer .carta')] as HTMLElement[]
@@ -420,7 +423,7 @@ describe('marcação de cartas novas (FLIP)', () => {
         }),
       ],
     })
-    const anteriores = { 'jogador:p2': 2, dealer: 0 }
+    const anteriores = { 'mao:m2': 2, dealer: 0 }
     const mesa = renderizarMesa(estado, 'eu', semAcao, anteriores)
     const cartas = [...mesa.querySelectorAll('.grade .carta')] as HTMLElement[]
     expect(cartas.every((c) => c.dataset['nova'] === undefined)).toBe(true)
@@ -435,9 +438,9 @@ describe('marcação de cartas novas (FLIP)', () => {
         }),
       ],
     })
-    // "anteriores" só conhece uma mão antiga de outro jogador — a chave de
-    // "eu" não aparece, então o padrão (0) vale e as duas cartas são novas.
-    const anteriores = { 'jogador:p2': 2, dealer: 0 }
+    // "anteriores" só conhece uma mão antiga — a chave desta não aparece,
+    // então o padrão (0) vale e as duas cartas são novas.
+    const anteriores = { 'mao:m2': 2, dealer: 0 }
     const mesa = renderizarMesa(estado, 'eu', semAcao, anteriores)
     const cartas = [...mesa.querySelectorAll('.painel-proprio .carta')] as HTMLElement[]
     expect(cartas.map((c) => c.dataset['nova'])).toEqual(['1', '1'])
@@ -473,5 +476,126 @@ describe('seguro', () => {
     })
     const mesa = renderizarMesa(estado, 'eu', semAcao)
     expect(mesa.querySelectorAll('[data-acao="seguro"]')).toHaveLength(0)
+  })
+})
+
+/**
+ * Fixtures montadas RODANDO O MOTOR, não escritas à mão.
+ *
+ * Todos os testes acima constroem `maoAtiva: 0` na mão, um estado que o
+ * motor deixa de produzir assim que a mão encerra: aí `maoAtiva` vira o
+ * cursor "já terminei" e aponta para além do fim do array. Era exatamente
+ * essa diferença entre a fixture e a realidade que escondia as cartas de
+ * todo mundo depois de cada parada, dobra ou estouro — e que 199 testes não
+ * viam.
+ */
+const RNG = () => rngSemente(4321)
+
+function pararTodasAsMaos(ctx: Contexto, agora: number): Contexto {
+  let atual = ctx
+  let guarda = 0
+  while (atual.estado.vezDe !== null && guarda++ < 12) {
+    const vez = atual.estado.vezDe
+    const jogador = atual.estado.jogadores.find((j) => j.peerId === vez)!
+    const mao = jogador.maos[jogador.maoAtiva]!
+    atual = aplicar(atual, jogador.peerId, { tipo: 'parar', maoId: mao.id }, agora, RNG())
+  }
+  return atual
+}
+
+/** Mesa de verdade: dois jogadores sentados, apostados e com cartas na mão. */
+function mesaDistribuida(): Contexto {
+  let ctx = criarContexto('eu', RNG())
+  ctx = aplicar(ctx, 'eu', { tipo: 'entrar', apelido: 'Eu' }, 0, RNG())
+  ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+  ctx = aplicar(ctx, 'eu', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+  ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+  ctx = aplicar(ctx, 'eu', { tipo: 'apostar', valor: 100 }, 0, RNG())
+  ctx = aplicar(ctx, 'p2', { tipo: 'apostar', valor: 100 }, 0, RNG())
+  ctx = avancar(ctx, 0, RNG())
+  if (ctx.estado.fase === 'seguro') {
+    ctx = aplicar(ctx, 'eu', { tipo: 'seguro', aceitar: false }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'seguro', aceitar: false }, 0, RNG())
+  }
+  return ctx
+}
+
+describe('fixtures vindas do motor', () => {
+  it('as cartas continuam na tela depois que o jogador para', () => {
+    let ctx = mesaDistribuida()
+    const eu = ctx.estado.jogadores.find((j) => j.peerId === 'eu')!
+    const cartasNaMao = eu.maos[0]!.cartas.length
+
+    ctx = aplicar(ctx, 'eu', { tipo: 'parar', maoId: eu.maos[0]!.id }, 0, RNG())
+
+    // O motor deixa `maoAtiva` além do fim do array — é o cursor de "já
+    // terminei", não um índice de exibição.
+    const euDepois = ctx.estado.jogadores.find((j) => j.peerId === 'eu')!
+    expect(euDepois.maoAtiva).toBe(euDepois.maos.length)
+
+    const mesa = renderizarMesa(ctx.estado, 'eu', semAcao)
+    expect(mesa.querySelectorAll('.painel-proprio .carta')).toHaveLength(cartasNaMao)
+    expect(mesa.querySelector('.painel-proprio .mao .total')!.textContent).toContain('parou')
+    expect(mesa.querySelector('.painel-proprio')!.textContent).not.toContain('aguardando')
+  })
+
+  it('no acerto, todas as mãos aparecem com o resultado — o meu e o dos outros', () => {
+    let ctx = mesaDistribuida()
+    let agora = 0
+    ctx = pararTodasAsMaos(ctx, agora)
+
+    let guarda = 0
+    while (ctx.estado.fase !== 'acerto' && guarda++ < 30) {
+      agora = (ctx.estado.prazoTurno ?? agora) + 1
+      ctx = avancar(ctx, agora, RNG())
+    }
+    expect(ctx.estado.fase).toBe('acerto')
+
+    const mesa = renderizarMesa(ctx.estado, 'eu', semAcao)
+
+    // Ninguém fica com a peça vazia no momento em que o resultado aparece.
+    const minhasCartas = mesa.querySelectorAll('.painel-proprio .carta')
+    expect(minhasCartas.length).toBeGreaterThan(0)
+    const cartasDoOutro = mesa.querySelectorAll('.grade .peca .carta')
+    expect(cartasDoOutro.length).toBeGreaterThan(0)
+
+    // E cada mão mostra o resultado que o motor calculou e transmitiu.
+    const maos = [...mesa.querySelectorAll<HTMLElement>('.mao[data-resultado]')]
+    expect(maos).toHaveLength(2)
+    const esperados = ctx.estado.jogadores.flatMap((j) => j.maos.map((m) => m.resultado!))
+    expect(maos.map((m) => m.dataset['resultado']).sort()).toEqual([...esperados].sort())
+  })
+
+  it('depois de dividir, as duas mãos aparecem e só a ativa fica marcada', () => {
+    let ctx = mesaDistribuida()
+    // Par forçado para tornar o split determinístico; o resto continua
+    // sendo o motor de verdade.
+    const eu = ctx.estado.jogadores.find((j) => j.peerId === 'eu')!
+    eu.maos[0]!.cartas = [carta('8', 'copas'), carta('8', 'paus')]
+
+    ctx = aplicar(ctx, 'eu', { tipo: 'dividir', maoId: eu.maos[0]!.id }, 0, RNG())
+    const euDepois = ctx.estado.jogadores.find((j) => j.peerId === 'eu')!
+    expect(euDepois.maos).toHaveLength(2)
+
+    const mesa = renderizarMesa(ctx.estado, 'eu', semAcao)
+    const maos = mesa.querySelectorAll('.painel-proprio .mao')
+    expect(maos).toHaveLength(2)
+    expect(mesa.querySelectorAll('.painel-proprio .mao.ativa')).toHaveLength(1)
+    expect(mesa.querySelector('.painel-proprio .mao.ativa')!
+      .getAttribute('data-mao')).toBe(euDepois.maos[euDepois.maoAtiva]!.id)
+  })
+
+  it('a mão que estourou continua visível, marcada como estourada', () => {
+    let ctx = mesaDistribuida()
+    const eu = ctx.estado.jogadores.find((j) => j.peerId === 'eu')!
+    eu.maos[0]!.cartas = [carta('10', 'copas'), carta('9', 'paus'), carta('5', 'espadas')]
+    // Encerra a mão pelo caminho normal do motor (parar numa mão estourada
+    // é o que o prazo de turno faz por ele).
+    ctx = avancar(ctx, REGRAS.segundosTurno * 1000 + 1, RNG())
+
+    const mesa = renderizarMesa(ctx.estado, 'eu', semAcao)
+    const minhaMao = mesa.querySelector('.painel-proprio .mao')!
+    expect(minhaMao.querySelectorAll('.carta')).toHaveLength(3)
+    expect(minhaMao.querySelector('.total')!.textContent).toContain('estourou')
   })
 })

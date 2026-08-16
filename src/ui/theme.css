@@ -113,6 +113,17 @@ body {
 .dealer { text-align: center; margin-bottom: 16px; }
 .mao-cartas { display: flex; justify-content: center; margin-bottom: 6px; }
 
+/* Todas as mãos do jogador lado a lado — com split são até 3. */
+.maos { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.mao { padding: 4px 6px 2px; border-radius: 7px; border: 1px solid transparent; }
+.mao.ativa { border-color: rgba(201, 162, 39, 0.45); background: rgba(201, 162, 39, 0.07); }
+/* Mão resolvida continua visível, só recuada: o jogador precisa ver o que
+   tinha na hora do acerto. */
+.mao.encerrada { opacity: 0.62; }
+.mao[data-resultado='blackjack'] .total,
+.mao[data-resultado='ganhou'] .total { color: var(--topazio-400); }
+.mao[data-resultado='perdeu'] .total { color: var(--texto-fraco); }
+
 .separador {
   height: 1px;
   background: linear-gradient(90deg, transparent,

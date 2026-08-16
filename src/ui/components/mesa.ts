@@ -1,12 +1,16 @@
 import { elementoCarta } from './carta'
 import { avaliar } from '../../game/hand'
 import { REGRAS, acoesDisponiveis } from '../../game/rules'
-import type { Acao, EstadoJogo, Jogador, TipoAcao } from '../../game/types'
+import type { Acao, EstadoJogo, Jogador, Mao, ResultadoMao, TipoAcao } from '../../game/types'
 
 const ROTULO_ACAO: Record<TipoAcao, string> = {
   entrar: 'Entrar', sentar: 'Sentar', levantar: 'Levantar',
   apostar: 'Apostar', seguro: 'Seguro',
   pedir: 'Pedir', parar: 'Parar', dobrar: 'Dobrar', dividir: 'Dividir',
+}
+
+const ROTULO_RESULTADO: Record<ResultadoMao, string> = {
+  ganhou: 'ganhou', perdeu: 'perdeu', empatou: 'empatou', blackjack: 'blackjack!',
 }
 
 function div(classe: string, texto?: string): HTMLElement {
@@ -17,24 +21,28 @@ function div(classe: string, texto?: string): HTMLElement {
 }
 
 /**
- * Quantas cartas cada "entidade" (um jogador, pelo peerId, ou o dealer)
- * tinha na mão mostrada na tela da última vez que essa raiz renderizou.
- * Vem de fora (render.ts a lê do próprio elemento raiz) — mesa.ts não
- * guarda nada entre chamadas, só decide, a partir do que recebeu, quais
- * cartas de agora ficam além do que já existia.
+ * Quantas cartas cada "entidade" (uma mão, pelo id, ou o dealer) tinha na
+ * tela da última vez que essa raiz renderizou. Vem de fora (render.ts a lê
+ * do próprio elemento raiz) — mesa.ts não guarda nada entre chamadas, só
+ * decide, a partir do que recebeu, quais cartas de agora ficam além do que
+ * já existia.
  */
 export type ContagensCartas = Record<string, number>
 
 /**
  * Chave da entidade "dealer" em `ContagensCartas`, e o formatador da chave
- * de jogador — exportados porque render.ts monta o `ContagensCartas` do
- * lado de fora (comparando com a renderização anterior) e precisa gerar
- * exatamente as mesmas chaves que este módulo usa para consultar.
+ * de mão — exportados porque render.ts monta o `ContagensCartas` do lado de
+ * fora (comparando com a renderização anterior) e precisa gerar exatamente
+ * as mesmas chaves que este módulo usa para consultar.
+ *
+ * A chave é por mão, não por jogador: com split, um jogador tem até 3 mãos
+ * na tela ao mesmo tempo e uma contagem só por jogador não saberia qual
+ * delas cresceu.
  */
 export const CHAVE_DEALER = 'dealer'
 
-export function chaveJogador(peerId: string): string {
-  return `jogador:${peerId}`
+export function chaveMao(maoId: string): string {
+  return `mao:${maoId}`
 }
 
 function cartaEhNova(chave: string, indice: number, anteriores: ContagensCartas): boolean {
@@ -60,32 +68,81 @@ function botao(
   return el
 }
 
-function descreverEstado(jogador: Jogador, vezDele: boolean): string {
-  const mao = jogador.maos[jogador.maoAtiva]
-  if (!mao) return 'aguardando'
-  const { total } = avaliar(mao.cartas)
-  if (total > 21) return `${total} · estourou`
-  if (mao.encerrada) return `${total} · parou`
-  return vezDele ? `${total} · jogando…` : String(total)
+function maoEncerrada(mao: Mao): boolean {
+  return mao.encerrada || avaliar(mao.cartas).total > 21
+}
+
+/** Situação da mão em uma palavra: o resultado quando já houve acerto,
+ *  senão como ela terminou (ou que está sendo jogada agora). */
+function situacaoDaMao(mao: Mao, ativa: boolean, vezDele: boolean): string {
+  if (mao.resultado) return ROTULO_RESULTADO[mao.resultado]
+  if (avaliar(mao.cartas).total > 21) return 'estourou'
+  if (mao.encerrada) return 'parou'
+  return ativa && vezDele ? 'jogando…' : ''
+}
+
+/**
+ * Uma mão na tela. Renderizada para TODAS as mãos do jogador, não só para a
+ * de índice `maoAtiva`: assim que uma mão encerra, o motor deixa `maoAtiva`
+ * apontando para além do fim do array (é o cursor de "já terminei"), então
+ * usar esse índice como "a mão a mostrar" apagava as cartas da tela no
+ * instante em que o jogador parava, estourava ou dobrava. E com split são 2
+ * ou 3 mãos simultâneas, todas com direito a aparecer.
+ */
+function blocoMao(
+  mao: Mao, ativa: boolean, vezDele: boolean,
+  opcoes: { grande?: boolean; mostrarAposta?: boolean },
+  anteriores: ContagensCartas,
+): HTMLElement {
+  const bloco = div('mao')
+  bloco.dataset['mao'] = mao.id
+  if (ativa) bloco.classList.add('ativa')
+  if (maoEncerrada(mao)) bloco.classList.add('encerrada')
+  if (mao.resultado) bloco.dataset['resultado'] = mao.resultado
+
+  const cartas = div('mao-cartas')
+  const chave = chaveMao(mao.id)
+  mao.cartas.forEach((carta, indice) => {
+    cartas.append(elementoCarta(carta, {
+      grande: opcoes.grande, nova: cartaEhNova(chave, indice, anteriores),
+    }))
+  })
+
+  const partes = [String(avaliar(mao.cartas).total)]
+  if (opcoes.mostrarAposta) partes.push(`aposta ${mao.aposta}`)
+  const situacao = situacaoDaMao(mao, ativa, vezDele)
+  if (situacao) partes.push(situacao)
+
+  bloco.append(cartas, div('total', partes.join(' · ')))
+  return bloco
+}
+
+/** Todas as mãos do jogador lado a lado, com a ativa marcada quando o
+ *  cursor `maoAtiva` ainda aponta para dentro do array. */
+function blocoMaos(
+  jogador: Jogador, vezDele: boolean,
+  opcoes: { grande?: boolean; mostrarAposta?: boolean },
+  anteriores: ContagensCartas,
+): HTMLElement {
+  const maos = div('maos')
+  jogador.maos.forEach((mao, indice) => {
+    maos.append(blocoMao(mao, indice === jogador.maoAtiva, vezDele, opcoes, anteriores))
+  })
+  return maos
 }
 
 function pecaJogador(jogador: Jogador, vezDele: boolean, anteriores: ContagensCartas): HTMLElement {
   const peca = div('peca')
   if (vezDele) peca.classList.add('vez')
 
-  const mao = jogador.maos[jogador.maoAtiva]
-  if (mao && (mao.encerrada || avaliar(mao.cartas).total > 21)) {
+  // Esmaecida quando não sobrou nada para ele fazer nesta rodada.
+  if (jogador.maos.length > 0 && jogador.maos.every(maoEncerrada)) {
     peca.classList.add('encerrada')
   }
 
-  const cartas = div('mao-cartas')
-  const chave = chaveJogador(jogador.peerId)
-  ;(mao?.cartas ?? []).forEach((carta, indice) => {
-    cartas.append(elementoCarta(carta, { nova: cartaEhNova(chave, indice, anteriores) }))
-  })
-  peca.append(cartas, div('nome', jogador.apelido),
-    div('fichas', String(jogador.fichas)),
-    div('total', descreverEstado(jogador, vezDele)))
+  peca.append(blocoMaos(jogador, vezDele, {}, anteriores))
+  peca.append(div('nome', jogador.apelido), div('fichas', String(jogador.fichas)))
+  if (jogador.maos.length === 0) peca.append(div('total', 'aguardando'))
   return peca
 }
 
@@ -126,24 +183,17 @@ function painelProprio(
   estado: EstadoJogo, eu: Jogador, aoAgir: (acao: Acao) => void, anteriores: ContagensCartas,
 ): HTMLElement {
   const painel = div('painel-proprio')
+  // A mão que recebe os botões continua sendo a ativa — só ela aceita ação.
+  // O que se vê na tela, porém, são todas.
   const mao = eu.maos[eu.maoAtiva]
-
-  const cartas = div('mao-cartas')
-  const chave = chaveJogador(eu.peerId)
-  ;(mao?.cartas ?? []).forEach((carta, indice) => {
-    cartas.append(elementoCarta(carta, { grande: true, nova: cartaEhNova(chave, indice, anteriores) }))
-  })
-
-  const rotuloMaos = eu.maos.length > 1
-    ? `Sua mão ${eu.maoAtiva + 1} de ${eu.maos.length}`
-    : 'Sua mão'
+  const vezDele = estado.vezDe === eu.peerId
 
   painel.append(
-    div('rotulo', rotuloMaos),
-    cartas,
+    div('rotulo', eu.maos.length > 1 ? 'Suas mãos' : 'Sua mão'),
+    blocoMaos(eu, vezDele, { grande: true, mostrarAposta: true }, anteriores),
     div('nome', `${eu.apelido} — ${eu.fichas} fichas`),
-    div('total', mao ? `${avaliar(mao.cartas).total} · aposta ${mao.aposta}` : 'sem aposta'),
   )
+  if (eu.maos.length === 0) painel.append(div('total', 'sem aposta'))
 
   const acoes = div('acoes')
 
@@ -167,7 +217,7 @@ function painelProprio(
     }
   }
 
-  if (estado.fase === 'turnos' && estado.vezDe === eu.peerId && mao) {
+  if (estado.fase === 'turnos' && vezDele && mao) {
     for (const tipo of acoesDisponiveis(mao, eu)) {
       const classe = tipo === 'pedir' || tipo === 'parar' ? 'botao' : 'botao fantasma'
       acoes.append(botao(classe, ROTULO_ACAO[tipo], () => aoAgir({ tipo, maoId: mao.id } as Acao), {

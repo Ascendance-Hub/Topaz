@@ -1,4 +1,4 @@
-import { renderizarMesa, CHAVE_DEALER, chaveJogador } from './components/mesa'
+import { renderizarMesa, CHAVE_DEALER, chaveMao } from './components/mesa'
 import { animarEntrada, origemSapata } from './animate'
 import type { ContagensCartas } from './components/mesa'
 import type { Acao, EstadoJogo } from '../game/types'
@@ -6,15 +6,16 @@ import type { Acao, EstadoJogo } from '../game/types'
 const CHAVE_DATASET = 'contagensCartas'
 
 /**
- * Quantas cartas cada entidade (jogador, pelo peerId, ou dealer) tem na mão
- * mostrada agora — mesma contagem que `renderizarMesa` usa para decidir
- * quais cartas marcar como novas, calculada aqui porque é `render.ts` quem
- * compara "antes" com "agora".
+ * Quantas cartas cada entidade (cada mão, pelo id, ou o dealer) tem na tela
+ * agora — mesma contagem que `renderizarMesa` usa para decidir quais cartas
+ * marcar como novas, calculada aqui porque é `render.ts` quem compara
+ * "antes" com "agora". Por mão, não por jogador: um split põe 2 ou 3 mãos
+ * do mesmo jogador na tela ao mesmo tempo.
  */
 function contarCartas(estado: EstadoJogo): ContagensCartas {
   const contagens: ContagensCartas = {}
   for (const jogador of estado.jogadores) {
-    contagens[chaveJogador(jogador.peerId)] = jogador.maos[jogador.maoAtiva]?.cartas.length ?? 0
+    for (const mao of jogador.maos) contagens[chaveMao(mao.id)] = mao.cartas.length
   }
   contagens[CHAVE_DEALER] = estado.maoDealer.length + (estado.dealerTemOculta ? 1 : 0)
   return contagens

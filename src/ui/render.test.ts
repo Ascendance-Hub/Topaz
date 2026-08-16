@@ -162,7 +162,7 @@ describe('contagem guardada na raiz, não em módulo', () => {
     renderizar(raiz, estadoComMao([carta('9', 'copas'), carta('8', 'paus')]), 'eu', semAcao)
 
     const guardado = JSON.parse(raiz.dataset['contagensCartas']!) as Record<string, number>
-    expect(guardado['jogador:p2']).toBe(2)
+    expect(guardado['mao:m2']).toBe(2)
     expect(guardado['dealer']).toBe(0)
   })
 })
