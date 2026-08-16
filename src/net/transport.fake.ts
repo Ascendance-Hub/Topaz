@@ -19,10 +19,15 @@ export function criarRedeFalsa() {
   function conectar(id: string): Transporte {
     const no: No = { id, aoAcao: [], aoEstado: [], aoEntrar: [], aoSair: [] }
 
+    // Insere primeiro, depois avisa — assim `peers()` já enxerga o novo
+    // peer de dentro do próprio callback `aoEntrarPeer`, igual ao Trystero
+    // real (cujo `getPeers()` já inclui o peer recém-conectado). Simétrico
+    // ao `sair()`, que remove antes de avisar os que ficaram.
+    nos.set(id, no)
     for (const outro of nos.values()) {
+      if (outro.id === id) continue
       for (const cb of outro.aoEntrar) cb(id)
     }
-    nos.set(id, no)
 
     return {
       meuId: () => id,

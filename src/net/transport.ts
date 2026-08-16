@@ -20,6 +20,29 @@ export function criarTransporteTrystero(codigoSala: string): Transporte {
   const acaoAction = sala.makeAction<Acao>('acao')
   const estadoAction = sala.makeAction<EstadoJogo>('estado')
 
+  // Trystero só guarda um handler por slot (`onMessage`, `onPeerJoin`,
+  // `onPeerLeave`) — atribuir de novo substitui o anterior em vez de somar.
+  // A interface `Transporte`, porém, permite múltiplos registros (é o que a
+  // rede falsa já faz). Por isso mantemos as listas aqui e atribuímos a cada
+  // slot do Trystero um único despachante que itera a lista.
+  const aoAcao: ((acao: Acao, peerId: string) => void)[] = []
+  const aoEstado: ((estado: EstadoJogo, peerId: string) => void)[] = []
+  const aoEntrar: ((peerId: string) => void)[] = []
+  const aoSair: ((peerId: string) => void)[] = []
+
+  acaoAction.onMessage = (acao, contexto) => {
+    for (const cb of aoAcao) cb(acao, contexto.peerId)
+  }
+  estadoAction.onMessage = (estado, contexto) => {
+    for (const cb of aoEstado) cb(estado, contexto.peerId)
+  }
+  sala.onPeerJoin = (peerId) => {
+    for (const cb of aoEntrar) cb(peerId)
+  }
+  sala.onPeerLeave = (peerId) => {
+    for (const cb of aoSair) cb(peerId)
+  }
+
   return {
     meuId: () => selfId,
     peers: () => Object.keys(sala.getPeers()),
@@ -27,19 +50,19 @@ export function criarTransporteTrystero(codigoSala: string): Transporte {
       void acaoAction.send(acao)
     },
     aoReceberAcao: (cb) => {
-      acaoAction.onMessage = (acao, contexto) => cb(acao, contexto.peerId)
+      aoAcao.push(cb)
     },
     enviarEstado: (estado) => {
       void estadoAction.send(estado)
     },
     aoReceberEstado: (cb) => {
-      estadoAction.onMessage = (estado, contexto) => cb(estado, contexto.peerId)
+      aoEstado.push(cb)
     },
     aoEntrarPeer: (cb) => {
-      sala.onPeerJoin = cb
+      aoEntrar.push(cb)
     },
     aoSairPeer: (cb) => {
-      sala.onPeerLeave = cb
+      aoSair.push(cb)
     },
     sair: () => {
       void sala.leave()
