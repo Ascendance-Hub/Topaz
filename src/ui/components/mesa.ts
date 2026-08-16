@@ -3,16 +3,12 @@ import { botaoAjuda } from './ajuda'
 import { avaliar } from '../../game/hand'
 import { podeSentar } from '../../game/machine'
 import { REGRAS, acoesDisponiveis } from '../../game/rules'
-import type { Acao, EstadoJogo, Jogador, Mao, ResultadoMao, TipoAcao } from '../../game/types'
+import type { Acao, EstadoJogo, Jogador, Mao, ResultadoMao } from '../../game/types'
 
-// `iniciar` e `novaPartida` ficam fora deste mapa de propósito: seus botões
-// (sala de espera e tela de fim) usam o texto ("Iniciar partida", "Nova
-// partida") direto na chamada de `botao`, e nada aqui os lia — mantê-los só
-// para cumprir a exaustividade do `Record` era peso morto. `Exclude` mantém
-// o mapa exaustivo sobre o que sobra, sem reintroduzir entradas sem leitor.
-const ROTULO_ACAO: Record<Exclude<TipoAcao, 'iniciar' | 'novaPartida'>, string> = {
-  entrar: 'Entrar', sentar: 'Sentar', levantar: 'Levantar',
-  apostar: 'Apostar', seguro: 'Seguro',
+/** As quatro ações de turno, as únicas cujo rótulo alguém lê daqui. */
+type AcaoDeTurno = 'pedir' | 'parar' | 'dobrar' | 'dividir'
+
+const ROTULO_ACAO: Record<AcaoDeTurno, string> = {
   pedir: 'Pedir', parar: 'Parar', dobrar: 'Dobrar', dividir: 'Dividir',
 }
 
@@ -323,13 +319,13 @@ function painelProprio(
 
   if (estado.fase === 'turnos' && vezDele && mao) {
     for (const tipo of acoesDisponiveis(mao, eu)) {
-      // `acoesDisponiveis` promete `TipoAcao[]` mas por construção só
-      // devolve ações de turno — o guarda estreita para o que `ROTULO_ACAO`
-      // cobre, sem recorrer a cast nem reintroduzir `iniciar`/`novaPartida`
-      // como entradas mortas no mapa.
+      // `acoesDisponiveis` promete `TipoAcao[]` mas por construção só devolve
+      // ações de turno. O guarda estreita de verdade: depois dele `tipo` é
+      // `AcaoDeTurno`, o que faz `ROTULO_ACAO` indexar sem buraco e a ação
+      // montada abaixo já ser uma `Acao` legítima, sem cast.
       if (tipo !== 'pedir' && tipo !== 'parar' && tipo !== 'dobrar' && tipo !== 'dividir') continue
       const classe = tipo === 'pedir' || tipo === 'parar' ? 'botao' : 'botao fantasma'
-      acoes.append(botao(classe, ROTULO_ACAO[tipo], () => aoAgir({ tipo, maoId: mao.id } as Acao), {
+      acoes.append(botao(classe, ROTULO_ACAO[tipo], () => aoAgir({ tipo, maoId: mao.id }), {
         dataset: { acao: tipo },
       }))
     }
