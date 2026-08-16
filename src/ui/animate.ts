@@ -30,6 +30,9 @@ export function animarEntrada(raiz: HTMLElement, origem: DOMRect): void {
       carta.style.transition = ''
       carta.style.transform = ''
       carta.style.opacity = ''
+      // Sem isto, --indice fica preso no elemento pelo resto da vida dele e
+      // atrasaria qualquer outra transição que essa carta venha a ter.
+      carta.style.removeProperty('--indice')
     })
   })
 }

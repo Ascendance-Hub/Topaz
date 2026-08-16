@@ -20,10 +20,6 @@ function contarCartas(estado: EstadoJogo): ContagensCartas {
   return contagens
 }
 
-function somar(contagens: ContagensCartas): number {
-  return Object.values(contagens).reduce((soma, n) => soma + n, 0)
-}
-
 /**
  * Lê a contagem da renderização anterior do próprio elemento raiz, não de
  * uma variável de módulo — assim `renderizar` não guarda nenhum estado
@@ -53,9 +49,13 @@ export function renderizar(
 ): void {
   const anteriores = lerContagensAnteriores(raiz)
   const atuais = contarCartas(estado)
-  // Cresceu = alguém recebeu carta nesta rodada. Uma rodada nova zera as
-  // mãos (contagem cai) — isso nunca deve disparar o voo de entrada.
-  const houveDistribuicao = somar(atuais) > somar(anteriores)
+  // Por entidade, não por soma: se uma mão encolhe e outra cresce no mesmo
+  // render, as somas podem se cancelar e esconder uma distribuição real.
+  // Uma rodada nova zera todas as mãos (todas encolhem) — isso nunca conta
+  // como crescimento de ninguém, então nunca dispara o voo de entrada.
+  const houveDistribuicao = Object.entries(atuais).some(
+    ([chave, n]) => n > (anteriores[chave] ?? 0),
+  )
 
   raiz.replaceChildren(renderizarMesa(estado, meuId, aoAgir, anteriores))
   raiz.dataset[CHAVE_DATASET] = JSON.stringify(atuais)

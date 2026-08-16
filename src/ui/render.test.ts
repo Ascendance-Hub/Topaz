@@ -68,6 +68,15 @@ function estadoComMao(cartas: Carta[]): EstadoJogo {
   })
 }
 
+function estadoComDuasMaos(cartasP2: Carta[], cartasP3: Carta[]): EstadoJogo {
+  return criarEstado({
+    jogadores: [
+      criarJogador({ peerId: 'p2', cadeira: 1, maos: [criarMao({ id: 'm2', cartas: cartasP2 })] }),
+      criarJogador({ peerId: 'p3', cadeira: 2, maos: [criarMao({ id: 'm3', cartas: cartasP3 })] }),
+    ],
+  })
+}
+
 beforeEach(() => {
   animarEntrada.mockClear()
 })
@@ -111,6 +120,22 @@ describe('decisão de animar', () => {
     expect(animarEntrada).toHaveBeenCalledTimes(1)
 
     renderizar(raiz, estadoComMao([carta('7', 'ouros')]), 'eu', semAcao)
+    expect(animarEntrada).toHaveBeenCalledTimes(2)
+  })
+
+  it('anima quando uma mão cresce mesmo se outra encolhe no mesmo render, cancelando a soma total', () => {
+    const raiz = document.createElement('div')
+    // p2 começa com 3 cartas, p3 com nenhuma.
+    renderizar(raiz, estadoComDuasMaos(
+      [carta('9', 'copas'), carta('8', 'paus'), carta('2', 'ouros')], [],
+    ), 'eu', semAcao)
+    expect(animarEntrada).toHaveBeenCalledTimes(1)
+
+    // p2 cai para 1 (p.ex. mão ativa trocou), p3 sobe para 2: soma total
+    // fica igual (3 -> 3), mas p3 genuinamente recebeu cartas novas.
+    renderizar(raiz, estadoComDuasMaos(
+      [carta('9', 'copas')], [carta('7', 'ouros'), carta('6', 'espadas')],
+    ), 'eu', semAcao)
     expect(animarEntrada).toHaveBeenCalledTimes(2)
   })
 })

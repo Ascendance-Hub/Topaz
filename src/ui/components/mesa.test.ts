@@ -365,7 +365,7 @@ describe('carta oculta do dealer', () => {
 })
 
 describe('marcação de cartas novas (FLIP)', () => {
-  it('sem contagens anteriores, marca todas as cartas presentes como novas', () => {
+  it('sem contagens anteriores, marca as cartas do dealer e da própria mão como novas', () => {
     const estado = criarEstado({
       maoDealer: [carta('K', 'espadas'), carta('7', 'copas')],
       jogadores: [
