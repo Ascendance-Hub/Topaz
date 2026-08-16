@@ -135,6 +135,26 @@ describe('normalização do código digitado à mão', () => {
     expect(location.hash).toBe('#sala=K7X2QW9F')
   })
 
+  it('não entra quando o código tem 8 caracteres mas algum está fora do alfabeto', () => {
+    const aoEntrar = vi.fn()
+    const lobby = renderizarLobby(aoEntrar)
+    const hashAntes = location.hash
+    const campoApelido = lobby.querySelector<HTMLInputElement>('.campo')!
+    campoApelido.value = 'Ana'
+    const campoCodigo = lobby.querySelector<HTMLInputElement>(
+      'input[placeholder="Código da sala"]',
+    )!
+    // 8 caracteres certinhos, mas com "O" e "1" — fora do alfabeto sem
+    // ambiguidade (ehCodigoValido rejeita; um length-check sozinho não).
+    campoCodigo.value = 'K7X2QWO1'
+    const entrarBotao = [...lobby.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Entrar',
+    )!
+    entrarBotao.click()
+    expect(aoEntrar).not.toHaveBeenCalled()
+    expect(location.hash).toBe(hashAntes)
+  })
+
   it('não entra quando o código normalizado não tem 8 caracteres', () => {
     const aoEntrar = vi.fn()
     const lobby = renderizarLobby(aoEntrar)

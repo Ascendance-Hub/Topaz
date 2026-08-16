@@ -1,4 +1,4 @@
-import { gerarCodigoSala, lerCodigoDaUrl, TAMANHO_CODIGO } from '../sala'
+import { ehCodigoValido, gerarCodigoSala, lerCodigoDaUrl, TAMANHO_CODIGO } from '../sala'
 
 const CHAVE_APELIDO = 'topaz:apelido'
 
@@ -103,7 +103,11 @@ export function renderizarLobby(
     entrarBotao.textContent = 'Entrar'
     entrarBotao.onclick = () => {
       const codigo = normalizarCodigoDigitado(campoCodigo.value)
-      if (codigo.length !== TAMANHO_CODIGO) return
+      // Mesmo portão que a URL usa (ehCodigoValido), não só o comprimento:
+      // um código com caracteres fora do alfabeto nunca vai bater com uma
+      // sala real, e deixá-lo passar é como esse texto acabava indo parar
+      // sem tratamento no hash e na barra de sala.
+      if (!ehCodigoValido(codigo)) return
       // Mesma ordem do caminho de criar sala: valida o apelido antes de
       // qualquer efeito colateral. Sem isso, digitar um código válido com o
       // apelido em branco reescrevia o hash e só depois barrava por falta

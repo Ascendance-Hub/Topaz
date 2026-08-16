@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { gerarCodigoSala, lerCodigoDaUrl, montarLinkSala, TAMANHO_CODIGO } from './sala'
+import { ehCodigoValido, gerarCodigoSala, lerCodigoDaUrl, montarLinkSala, TAMANHO_CODIGO } from './sala'
 import type { FonteBytes } from './sala'
 import { rngSemente } from '../game/shoe'
 
@@ -87,6 +87,34 @@ describe('lerCodigoDaUrl', () => {
   it('devolve null para código mais longo que TAMANHO_CODIGO', () => {
     const longo = 'K7X2QW9F' + 'A'.repeat(TAMANHO_CODIGO)
     expect(lerCodigoDaUrl(`#sala=${longo}`)).toBeNull()
+  })
+})
+
+describe('ehCodigoValido', () => {
+  it('aceita um código de fato gerado por gerarCodigoSala', () => {
+    expect(ehCodigoValido(gerarCodigoSala(fonteDeSemente(1)))).toBe(true)
+  })
+
+  it('rejeita comprimento errado', () => {
+    expect(ehCodigoValido('K7X2QW9')).toBe(false)
+    expect(ehCodigoValido('K7X2QW9FF')).toBe(false)
+    expect(ehCodigoValido('')).toBe(false)
+  })
+
+  it('rejeita caracteres fora do alfabeto, inclusive os ambíguos excluídos de propósito', () => {
+    // O, I, 1, L: comprimento certo (8), mas fora do alfabeto.
+    expect(ehCodigoValido('K7X2QW9O')).toBe(false)
+    expect(ehCodigoValido('K7X2QW91')).toBe(false)
+    expect(ehCodigoValido('K7X2QWIL')).toBe(false)
+    expect(ehCodigoValido('K7X2QW90')).toBe(false)
+  })
+
+  it('rejeita marcação disfarçada de código (mesmo comprimento por acaso não muda o veredito)', () => {
+    expect(ehCodigoValido('<img/on>')).toBe(false)
+  })
+
+  it('minúsculas não passam sem normalização prévia — só maiúsculas do alfabeto são válidas', () => {
+    expect(ehCodigoValido('k7x2qw9f')).toBe(false)
   })
 })
 

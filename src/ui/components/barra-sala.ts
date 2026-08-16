@@ -10,8 +10,20 @@ export function renderizarBarraSala(codigo: string, souHost: boolean): HTMLEleme
   const barra = document.createElement('div')
   barra.className = 'barra-sala'
 
+  // Construído por nó, não por innerHTML: `codigo` não é uma constante — em
+  // teoria pode chegar aqui sem ter passado por `ehCodigoValido` (um chamador
+  // futuro, um bug upstream). Montar os nós diretamente fecha a porta de XSS
+  // por completo, independente do que qualquer validação anterior faça ou
+  // deixe de fazer.
   const info = document.createElement('span')
-  info.innerHTML = `Sala <span class="codigo">${codigo}</span>${souHost ? ' · você é o anfitrião' : ''}`
+  info.append('Sala ')
+
+  const cod = document.createElement('span')
+  cod.className = 'codigo'
+  cod.textContent = codigo
+  info.append(cod)
+
+  if (souHost) info.append(' · você é o anfitrião')
 
   const copiar = document.createElement('button')
   copiar.className = 'botao'

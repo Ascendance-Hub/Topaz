@@ -15,6 +15,16 @@ describe('renderizarBarraSala', () => {
     expect(barra.textContent).toContain('você é o anfitrião')
   })
 
+  it('nunca interpreta o código como HTML — mesmo se ele contiver marcação', () => {
+    // Não presume que `codigo` já passou por ehCodigoValido: o componente
+    // precisa ser seguro por construção, não por confiar em quem chama.
+    const malicioso = '<img src=x onerror="window.__xss = true">'
+    const barra = renderizarBarraSala(malicioso, false)
+
+    expect(barra.querySelector('img')).toBeNull()
+    expect(barra.querySelector('.codigo')!.textContent).toBe(malicioso)
+  })
+
   it('o botão de copiar usa montarLinkSala com a URL e o código atuais', async () => {
     const escrito = vi.fn().mockResolvedValue(undefined)
     // happy-dom expõe `navigator.clipboard` como getter só-leitura —

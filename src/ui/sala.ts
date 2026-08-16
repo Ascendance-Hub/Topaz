@@ -42,15 +42,30 @@ export function gerarCodigoSala(fonte: FonteBytes = fonteBytesPadrao): string {
   return codigo
 }
 
-// Ligado a TAMANHO_CODIGO em vez de um `8` solto: um código curto demais ou
-// truncado (link cortado ao colar, por exemplo) não deve parecer válido —
-// isso levaria a lobby a mostrar "Entrando na sala X" com botão de entrar
-// para um código que nunca vai bater com o de ninguém.
-const PADRAO_HASH_SALA = new RegExp(`^#sala=([A-Za-z0-9]{${TAMANHO_CODIGO}})$`)
+/**
+ * Único portão de validação de código de sala — usado tanto para o código
+ * lido da URL quanto para o digitado à mão, para que os dois caminhos nunca
+ * divirjam. Verificado contra `ALFABETO` (não uma classe de caracteres
+ * escrita à mão) para continuar correto se o alfabeto mudar, e porque um
+ * código com caracteres fora dele (inclusive os ambíguos que o alfabeto
+ * exclui de propósito, como O/0/I/1/L) não pode bater com nenhuma sala real
+ * — aceitá-lo só manda o jogador para uma sala que nunca vai ter ninguém.
+ */
+export function ehCodigoValido(codigo: string): boolean {
+  if (codigo.length !== TAMANHO_CODIGO) return false
+  return [...codigo].every((caractere) => ALFABETO.includes(caractere))
+}
+
+// O regex só isola o que vem depois de "#sala="; o formato em si (tamanho e
+// alfabeto) é responsabilidade de ehCodigoValido, para não duplicar essa
+// regra aqui.
+const PADRAO_HASH_SALA = /^#sala=(.+)$/
 
 export function lerCodigoDaUrl(hash: string): string | null {
   const encontrado = PADRAO_HASH_SALA.exec(hash)
-  return encontrado ? encontrado[1]!.toUpperCase() : null
+  if (!encontrado) return null
+  const codigo = encontrado[1]!.toUpperCase()
+  return ehCodigoValido(codigo) ? codigo : null
 }
 
 export function montarLinkSala(base: string, codigo: string): string {
