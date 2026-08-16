@@ -13,13 +13,23 @@ compra do dealer têm prazo visível, não resolvem tudo instantaneamente).
 Fichas valem só durante a sessão.
 
 Crie uma sala — o código é gerado com `crypto.getRandomValues`, então não dá
-para adivinhar — copie o link e mande para os amigos. Se o anfitrião cair,
-outro jogador já conectado assume automaticamente e a partida continua; quem
-entra depois nunca vira anfitrião só por entrar.
+para adivinhar — copie o link e mande para os amigos. Ao entrar, o navegador
+espera alguns segundos para descobrir quem já está mandando na sala; só
+reivindica o posto de anfitrião se ninguém aparecer e a eleição cair nele.
+Se o anfitrião cair, outro jogador já conectado assume automaticamente e a
+partida continua; quem entra depois não vira anfitrião só por entrar.
+
+### Privacidade
+
+Entrar numa sala expõe o endereço IP dos participantes uns aos outros. Isso é
+inerente ao WebRTC, que conecta os navegadores diretamente, sem servidor no
+meio — é o mesmo que acontece em qualquer chamada de vídeo peer-to-peer. Só
+mande o link para quem você conhece.
 
 ## Desenvolvimento
 
-Requer Node 20.19+ ou 22.12+ (piso do Vite 8).
+Requer Node 20.19+ ou 22.12+ (piso do Vite 8). O CI fixa a versão exata em
+`.github/workflows/deploy.yml`.
 
 ```bash
 npm install

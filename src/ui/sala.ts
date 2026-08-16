@@ -59,13 +59,24 @@ export function ehCodigoValido(codigo: string): boolean {
 // O regex só isola o que vem depois de "#sala="; o formato em si (tamanho e
 // alfabeto) é responsabilidade de ehCodigoValido, para não duplicar essa
 // regra aqui.
-const PADRAO_HASH_SALA = /^#sala=(.+)$/
+const PADRAO_HASH_SALA = /^#sala=(.*)$/
 
 export function lerCodigoDaUrl(hash: string): string | null {
   const encontrado = PADRAO_HASH_SALA.exec(hash)
   if (!encontrado) return null
   const codigo = encontrado[1]!.toUpperCase()
   return ehCodigoValido(codigo) ? codigo : null
+}
+
+/**
+ * Se a URL tenta apontar para uma sala, valendo o código ou não. Serve para
+ * distinguir "chegou pela porta da frente" de "clicou num link de convite
+ * que veio truncado": no segundo caso `lerCodigoDaUrl` devolve null e, sem
+ * essa distinção, o jogador cai na tela de criar sala achando que entrou —
+ * e acaba criando uma sala vazia diferente.
+ */
+export function haCodigoNaUrl(hash: string): boolean {
+  return PADRAO_HASH_SALA.test(hash)
 }
 
 export function montarLinkSala(base: string, codigo: string): string {

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderizarLobby, apelidoSalvo, salvarApelido } from './lobby'
+import { renderizarLobby, apelidoSalvo, salvarApelido, MENSAGEM_LINK_INVALIDO } from './lobby'
 
 beforeEach(() => {
   localStorage.clear()
@@ -208,5 +208,38 @@ describe('apelido quando o armazenamento está bloqueado', () => {
     } finally {
       Storage.prototype.getItem = original
     }
+  })
+})
+
+describe('link de convite com código inválido', () => {
+  it('avisa que o código do link não presta em vez de cair calado em criar sala', () => {
+    // Link truncado no mensageiro: aponta para uma sala, mas o código não
+    // chegou inteiro.
+    location.hash = '#sala=K7X2'
+    const lobby = renderizarLobby(() => {})
+
+    const aviso = lobby.querySelector('.aviso')
+    expect(aviso).not.toBeNull()
+    expect(aviso!.textContent).toBe(MENSAGEM_LINK_INVALIDO)
+    // Ele continua podendo digitar o código ou criar sala — só não fica
+    // achando que entrou na sala do amigo.
+    expect([...lobby.querySelectorAll('button')].map((b) => b.textContent))
+      .toContain('Criar sala')
+  })
+
+  it('avisa também quando o hash aponta para uma sala sem código nenhum', () => {
+    location.hash = '#sala='
+    const lobby = renderizarLobby(() => {})
+    expect(lobby.querySelector('.aviso')).not.toBeNull()
+  })
+
+  it('não avisa nada quando a URL não fala de sala alguma', () => {
+    location.hash = ''
+    expect(renderizarLobby(() => {}).querySelector('.aviso')).toBeNull()
+  })
+
+  it('não avisa nada quando o código do link é válido', () => {
+    location.hash = '#sala=K7X2QW9F'
+    expect(renderizarLobby(() => {}).querySelector('.aviso')).toBeNull()
   })
 })

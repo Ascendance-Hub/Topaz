@@ -238,6 +238,18 @@ body {
 
 .lobby .sub { color: var(--texto-fraco); font-size: 13px; margin-bottom: 26px; }
 
+.lobby .aviso {
+  color: var(--texto);
+  background: rgba(163, 35, 42, 0.18);
+  border: 1px solid var(--naipe-vermelho);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  margin: 0 0 18px;
+  text-align: left;
+}
+
 .campo {
   width: 100%;
   padding: 11px 13px;

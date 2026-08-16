@@ -1,5 +1,11 @@
 import { montarLinkSala } from '../sala'
 
+export const ROTULO_COPIAR = 'Copiar link'
+export const ROTULO_COPIADO = 'Copiado!'
+/** Sem clipboard (permissão negada, contexto não seguro), o link ainda está
+ *  na barra de endereços — é para lá que mandamos o jogador. */
+export const ROTULO_FALHA_COPIA = 'Copie da barra de endereços'
+
 /**
  * Barra fixa acima da mesa: código da sala, quem é o anfitrião atual e um
  * botão para copiar o link de convite. Recriada a cada mudança de estado —
@@ -27,11 +33,19 @@ export function renderizarBarraSala(codigo: string, souHost: boolean): HTMLEleme
 
   const copiar = document.createElement('button')
   copiar.className = 'botao'
-  copiar.textContent = 'Copiar link'
+  copiar.textContent = ROTULO_COPIAR
+  // `navigator.clipboard` falha (ou nem existe) com permissão negada, em
+  // http sem TLS ou em navegador antigo. Sem o catch isso virava uma
+  // rejeição não tratada e um botão que simplesmente não faz nada — o
+  // jogador fica sem o link e sem saber por quê.
   copiar.onclick = async () => {
-    await navigator.clipboard.writeText(montarLinkSala(location.href, codigo))
-    copiar.textContent = 'Copiado!'
-    setTimeout(() => { copiar.textContent = 'Copiar link' }, 1600)
+    try {
+      await navigator.clipboard.writeText(montarLinkSala(location.href, codigo))
+      copiar.textContent = ROTULO_COPIADO
+    } catch {
+      copiar.textContent = ROTULO_FALHA_COPIA
+    }
+    setTimeout(() => { copiar.textContent = ROTULO_COPIAR }, 1600)
   }
 
   barra.append(info, copiar)

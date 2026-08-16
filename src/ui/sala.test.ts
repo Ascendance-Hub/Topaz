@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
-import { ehCodigoValido, gerarCodigoSala, lerCodigoDaUrl, montarLinkSala, TAMANHO_CODIGO } from './sala'
+import {
+  ehCodigoValido, gerarCodigoSala, haCodigoNaUrl, lerCodigoDaUrl,
+  montarLinkSala, TAMANHO_CODIGO,
+} from './sala'
 import type { FonteBytes } from './sala'
 import { rngSemente } from '../game/shoe'
 
@@ -127,5 +130,18 @@ describe('montarLinkSala', () => {
   it('não duplica o hash quando a base já tem um', () => {
     const link = montarLinkSala('https://exemplo.com/Topaz/#sala=ANTIGO', 'NOVO1234')
     expect(link).toBe('https://exemplo.com/Topaz/#sala=NOVO1234')
+  })
+})
+
+describe('haCodigoNaUrl', () => {
+  it('reconhece um hash de sala mesmo com código inválido — é o que distingue link truncado de porta da frente', () => {
+    expect(haCodigoNaUrl('#sala=K7X2QW9F')).toBe(true)
+    expect(haCodigoNaUrl('#sala=K7X2')).toBe(true)
+    expect(haCodigoNaUrl('#sala=')).toBe(true)
+  })
+
+  it('não reconhece hash de outro assunto nem ausência de hash', () => {
+    expect(haCodigoNaUrl('')).toBe(false)
+    expect(haCodigoNaUrl('#outra-coisa')).toBe(false)
   })
 })

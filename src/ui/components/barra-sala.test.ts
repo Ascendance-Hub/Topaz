@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest'
-import { renderizarBarraSala } from './barra-sala'
+import { renderizarBarraSala, ROTULO_FALHA_COPIA } from './barra-sala'
 import { montarLinkSala } from '../sala'
 
 describe('renderizarBarraSala', () => {
@@ -43,5 +43,37 @@ describe('renderizarBarraSala', () => {
 
     expect(escrito).toHaveBeenCalledWith(montarLinkSala(location.href, 'CODIGO01'))
     expect(botao.textContent).toBe('Copiado!')
+  })
+})
+
+describe('falha ao copiar o link', () => {
+  it('avisa o jogador em vez de deixar uma rejeição não tratada e um botão inerte', async () => {
+    const escrito = vi.fn().mockRejectedValue(new Error('permissão negada'))
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: escrito },
+      configurable: true,
+    })
+
+    const barra = renderizarBarraSala('CODIGO01', false)
+    const botao = barra.querySelector('button')!
+
+    await expect(botao.onclick?.(new PointerEvent('click'))).resolves.not.toThrow()
+
+    expect(escrito).toHaveBeenCalled()
+    expect(botao.textContent).toBe(ROTULO_FALHA_COPIA)
+  })
+
+  it('avisa também quando a API de clipboard nem existe', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: undefined,
+      configurable: true,
+    })
+
+    const barra = renderizarBarraSala('CODIGO01', false)
+    const botao = barra.querySelector('button')!
+
+    await expect(botao.onclick?.(new PointerEvent('click'))).resolves.not.toThrow()
+
+    expect(botao.textContent).toBe(ROTULO_FALHA_COPIA)
   })
 })

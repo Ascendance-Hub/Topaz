@@ -1,6 +1,12 @@
-import { ehCodigoValido, gerarCodigoSala, lerCodigoDaUrl, TAMANHO_CODIGO } from '../sala'
+import {
+  ehCodigoValido, gerarCodigoSala, haCodigoNaUrl, lerCodigoDaUrl, TAMANHO_CODIGO,
+} from '../sala'
 
 const CHAVE_APELIDO = 'topaz:apelido'
+
+export const MENSAGEM_LINK_INVALIDO =
+  'O código do convite está incompleto ou inválido — o link pode ter sido ' +
+  'cortado ao ser enviado. Peça o link de novo, ou digite o código abaixo.'
 
 /** Em janela anônima ou sob certas políticas corporativas, localStorage
  * pode estar bloqueado e lançar em qualquer acesso. Como o lobby inteiro
@@ -31,6 +37,11 @@ export function renderizarLobby(
   aoEntrar: (apelido: string, codigo: string) => void,
 ): HTMLElement {
   const codigoDaUrl = lerCodigoDaUrl(location.hash)
+  // A URL apontava para uma sala, mas o código não sobreviveu ao caminho
+  // (link truncado no mensageiro, por exemplo). Cair calado na tela de criar
+  // sala é o pior desfecho possível: o jogador acha que entrou na sala do
+  // amigo, cria outra vazia e conclui que o jogo não funciona.
+  const linkInvalido = !codigoDaUrl && haCodigoNaUrl(location.hash)
 
   const lobby = document.createElement('div')
   lobby.className = 'lobby'
@@ -44,13 +55,19 @@ export function renderizarLobby(
     ? `Entrando na sala ${codigoDaUrl}`
     : 'Blackjack com os amigos'
 
+  const aviso = document.createElement('p')
+  aviso.className = 'aviso'
+  aviso.textContent = MENSAGEM_LINK_INVALIDO
+
   const campoApelido = document.createElement('input')
   campoApelido.className = 'campo'
   campoApelido.placeholder = 'Seu apelido'
   campoApelido.maxLength = 16
   campoApelido.value = apelidoSalvo()
 
-  lobby.append(titulo, sub, campoApelido)
+  lobby.append(titulo, sub)
+  if (linkInvalido) lobby.append(aviso)
+  lobby.append(campoApelido)
 
   const campoCodigo = document.createElement('input')
   campoCodigo.className = 'campo'
