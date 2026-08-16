@@ -73,12 +73,11 @@ export function decidirFim(estado: EstadoJogo): { acabou: boolean; vencedor: str
 
   if (emJogo.length === 0) return { acabou: true, vencedor: null }
 
-  // Sobrar um só não encerra partida de um jogador só — ele estaria
-  // sozinho desde o início e venceria antes de jogar. A checagem é sobre
-  // `jogadores`, não `naPartida`: quem está na sala mas não entrou na
-  // partida não conta como apto, mas sua presença já prova que não foi
-  // uma partida solo desde o início.
-  if (emJogo.length === 1 && estado.jogadores.length >= 2) {
+  // `naPartida`, não `jogadores`: só quem entrou na partida conta para decidir
+  // se ela era solo. Um espectador que abriu o link no meio não transforma uma
+  // partida de um jogador em partida de dois — usar `jogadores` aqui faria o
+  // solitário vencer sozinho no instante em que alguém entrasse na sala.
+  if (emJogo.length === 1 && estado.naPartida.length >= 2) {
     return { acabou: true, vencedor: emJogo[0]!.peerId }
   }
 

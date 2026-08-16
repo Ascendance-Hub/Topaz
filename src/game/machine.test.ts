@@ -805,8 +805,17 @@ describe('decidirFim', () => {
 
   it('quem está na sala mas não entrou na partida não conta', () => {
     expect(decidirFim(estado([
-      jogador('p1', 600, null), jogador('p2', 900, null),
-    ], ['p1']))).toEqual({ acabou: true, vencedor: 'p1' })
+      jogador('p1', 600, null),
+      jogador('p2', 900, null), // na sala, fora da partida
+      jogador('p3', 0, 3), // entrou na partida e foi eliminado
+    ], ['p1', 'p3']))).toEqual({ acabou: true, vencedor: 'p1' })
+  })
+
+  it('espectador entrando na sala não encerra uma partida solo', () => {
+    expect(decidirFim(estado([
+      jogador('p1', 600, null),
+      jogador('p2', 900, null), // só entrou na sala, nunca na partida
+    ], ['p1']))).toEqual({ acabou: false, vencedor: null })
   })
 })
 
