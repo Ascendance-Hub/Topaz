@@ -17,6 +17,31 @@ function div(classe: string, texto?: string): HTMLElement {
 }
 
 /**
+ * Quantas cartas cada "entidade" (um jogador, pelo peerId, ou o dealer)
+ * tinha na mão mostrada na tela da última vez que essa raiz renderizou.
+ * Vem de fora (render.ts a lê do próprio elemento raiz) — mesa.ts não
+ * guarda nada entre chamadas, só decide, a partir do que recebeu, quais
+ * cartas de agora ficam além do que já existia.
+ */
+export type ContagensCartas = Record<string, number>
+
+/**
+ * Chave da entidade "dealer" em `ContagensCartas`, e o formatador da chave
+ * de jogador — exportados porque render.ts monta o `ContagensCartas` do
+ * lado de fora (comparando com a renderização anterior) e precisa gerar
+ * exatamente as mesmas chaves que este módulo usa para consultar.
+ */
+export const CHAVE_DEALER = 'dealer'
+
+export function chaveJogador(peerId: string): string {
+  return `jogador:${peerId}`
+}
+
+function cartaEhNova(chave: string, indice: number, anteriores: ContagensCartas): boolean {
+  return indice >= (anteriores[chave] ?? 0)
+}
+
+/**
  * `data-acao` (e afins) existe só para que os testes localizem o botão
  * certo por estrutura em vez de depender do texto em português.
  */
@@ -44,7 +69,7 @@ function descreverEstado(jogador: Jogador, vezDele: boolean): string {
   return vezDele ? `${total} · jogando…` : String(total)
 }
 
-function pecaJogador(jogador: Jogador, vezDele: boolean): HTMLElement {
+function pecaJogador(jogador: Jogador, vezDele: boolean, anteriores: ContagensCartas): HTMLElement {
   const peca = div('peca')
   if (vezDele) peca.classList.add('vez')
 
@@ -54,18 +79,26 @@ function pecaJogador(jogador: Jogador, vezDele: boolean): HTMLElement {
   }
 
   const cartas = div('mao-cartas')
-  for (const carta of mao?.cartas ?? []) cartas.append(elementoCarta(carta))
+  const chave = chaveJogador(jogador.peerId)
+  ;(mao?.cartas ?? []).forEach((carta, indice) => {
+    cartas.append(elementoCarta(carta, { nova: cartaEhNova(chave, indice, anteriores) }))
+  })
   peca.append(cartas, div('nome', jogador.apelido),
     div('fichas', String(jogador.fichas)),
     div('total', descreverEstado(jogador, vezDele)))
   return peca
 }
 
-function areaDealer(estado: EstadoJogo): HTMLElement {
+function areaDealer(estado: EstadoJogo, anteriores: ContagensCartas): HTMLElement {
   const area = div('dealer')
   const cartas = div('mao-cartas')
-  for (const carta of estado.maoDealer) cartas.append(elementoCarta(carta))
-  if (estado.dealerTemOculta) cartas.append(elementoCarta(null))
+  estado.maoDealer.forEach((carta, indice) => {
+    cartas.append(elementoCarta(carta, { nova: cartaEhNova(CHAVE_DEALER, indice, anteriores) }))
+  })
+  if (estado.dealerTemOculta) {
+    const indice = estado.maoDealer.length
+    cartas.append(elementoCarta(null, { nova: cartaEhNova(CHAVE_DEALER, indice, anteriores) }))
+  }
 
   const visivel = estado.maoDealer[0]
   const totalMostrado = estado.dealerTemOculta && visivel
@@ -90,13 +123,16 @@ function areaDealer(estado: EstadoJogo): HTMLElement {
 }
 
 function painelProprio(
-  estado: EstadoJogo, eu: Jogador, aoAgir: (acao: Acao) => void,
+  estado: EstadoJogo, eu: Jogador, aoAgir: (acao: Acao) => void, anteriores: ContagensCartas,
 ): HTMLElement {
   const painel = div('painel-proprio')
   const mao = eu.maos[eu.maoAtiva]
 
   const cartas = div('mao-cartas')
-  for (const carta of mao?.cartas ?? []) cartas.append(elementoCarta(carta, { grande: true }))
+  const chave = chaveJogador(eu.peerId)
+  ;(mao?.cartas ?? []).forEach((carta, indice) => {
+    cartas.append(elementoCarta(carta, { grande: true, nova: cartaEhNova(chave, indice, anteriores) }))
+  })
 
   const rotuloMaos = eu.maos.length > 1
     ? `Sua mão ${eu.maoAtiva + 1} de ${eu.maos.length}`
@@ -156,9 +192,10 @@ function painelProprio(
 
 export function renderizarMesa(
   estado: EstadoJogo, meuId: string, aoAgir: (acao: Acao) => void,
+  anteriores: ContagensCartas = {},
 ): HTMLElement {
   const mesa = div('mesa')
-  mesa.append(areaDealer(estado), div('separador'))
+  mesa.append(areaDealer(estado, anteriores), div('separador'))
 
   const eu = estado.jogadores.find((j) => j.peerId === meuId)
   const outros = estado.jogadores
@@ -171,13 +208,13 @@ export function renderizarMesa(
     const grade = div('grade')
     if (outros.length <= 3) grade.classList.add('poucos')
     for (const jogador of outros) {
-      grade.append(pecaJogador(jogador, estado.vezDe === jogador.peerId))
+      grade.append(pecaJogador(jogador, estado.vezDe === jogador.peerId, anteriores))
     }
     mesa.append(grade)
   }
 
   if (eu && eu.cadeira !== null) {
-    mesa.append(painelProprio(estado, eu, aoAgir))
+    mesa.append(painelProprio(estado, eu, aoAgir, anteriores))
   } else if (eu) {
     const convite = div('painel-proprio')
     const livre = Array.from({ length: REGRAS.maxCadeiras }, (_, i) => i)

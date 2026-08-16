@@ -364,6 +364,86 @@ describe('carta oculta do dealer', () => {
   })
 })
 
+describe('marcação de cartas novas (FLIP)', () => {
+  it('sem contagens anteriores, marca todas as cartas presentes como novas', () => {
+    const estado = criarEstado({
+      maoDealer: [carta('K', 'espadas'), carta('7', 'copas')],
+      jogadores: [
+        criarJogador({
+          peerId: 'eu', cadeira: 0,
+          maos: [criarMao({ id: 'm1', cartas: [carta('10', 'copas'), carta('9', 'paus')] })],
+        }),
+      ],
+    })
+    // Quarto argumento omitido de propósito: é o comportamento padrão que
+    // os 25 testes estruturais acima já exercitam sem saber disso.
+    const mesa = renderizarMesa(estado, 'eu', semAcao)
+    const cartasDealer = mesa.querySelectorAll('.dealer .carta')
+    const cartasProprias = mesa.querySelectorAll('.painel-proprio .carta')
+
+    expect([...cartasDealer].every((c) => (c as HTMLElement).dataset['nova'] === '1')).toBe(true)
+    expect([...cartasProprias].every((c) => (c as HTMLElement).dataset['nova'] === '1')).toBe(true)
+  })
+
+  it('marca como nova só a carta além da contagem anterior, para o dealer e para o próprio jogador', () => {
+    const estado = criarEstado({
+      maoDealer: [carta('K', 'espadas'), carta('7', 'copas')],
+      dealerTemOculta: true,
+      jogadores: [
+        criarJogador({
+          peerId: 'eu', cadeira: 0,
+          maos: [criarMao({
+            id: 'm1', cartas: [carta('10', 'copas'), carta('9', 'paus'), carta('2', 'ouros')],
+          })],
+        }),
+      ],
+    })
+    // O dealer tinha 1 carta visível (a 2ª e a oculta são novas); "eu" tinha
+    // 2 (a 3ª, recém-pedida, é a única nova).
+    const anteriores = { 'jogador:eu': 2, dealer: 1 }
+    const mesa = renderizarMesa(estado, 'eu', semAcao, anteriores)
+
+    const cartasDealer = [...mesa.querySelectorAll('.dealer .carta')] as HTMLElement[]
+    expect(cartasDealer.map((c) => c.dataset['nova'])).toEqual([undefined, '1', '1'])
+
+    const cartasProprias = [...mesa.querySelectorAll('.painel-proprio .carta')] as HTMLElement[]
+    expect(cartasProprias.map((c) => c.dataset['nova'])).toEqual([undefined, undefined, '1'])
+  })
+
+  it('não marca nenhuma carta como nova quando a contagem anterior já cobre a mão inteira', () => {
+    const estado = criarEstado({
+      jogadores: [
+        criarJogador({ peerId: 'eu', cadeira: 0 }),
+        criarJogador({
+          peerId: 'p2', cadeira: 1,
+          maos: [criarMao({ id: 'm2', cartas: [carta('9', 'copas'), carta('8', 'paus')] })],
+        }),
+      ],
+    })
+    const anteriores = { 'jogador:p2': 2, dealer: 0 }
+    const mesa = renderizarMesa(estado, 'eu', semAcao, anteriores)
+    const cartas = [...mesa.querySelectorAll('.grade .carta')] as HTMLElement[]
+    expect(cartas.every((c) => c.dataset['nova'] === undefined)).toBe(true)
+  })
+
+  it('uma mão nova (ex.: id trocado por um split ou por uma rodada nova) conta como toda nova', () => {
+    const estado = criarEstado({
+      jogadores: [
+        criarJogador({
+          peerId: 'eu', cadeira: 0,
+          maos: [criarMao({ id: 'm-nova', cartas: [carta('10', 'copas'), carta('9', 'paus')] })],
+        }),
+      ],
+    })
+    // "anteriores" só conhece uma mão antiga de outro jogador — a chave de
+    // "eu" não aparece, então o padrão (0) vale e as duas cartas são novas.
+    const anteriores = { 'jogador:p2': 2, dealer: 0 }
+    const mesa = renderizarMesa(estado, 'eu', semAcao, anteriores)
+    const cartas = [...mesa.querySelectorAll('.painel-proprio .carta')] as HTMLElement[]
+    expect(cartas.map((c) => c.dataset['nova'])).toEqual(['1', '1'])
+  })
+})
+
 describe('seguro', () => {
   it('mostra os botões de seguro apenas para quem ainda não decidiu', () => {
     const estado = criarEstado({

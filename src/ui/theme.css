@@ -24,6 +24,10 @@
   --dur-carta: 380ms;
   --dur-virada: 300ms;
   --easing: cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Atraso entre cartas de uma mesma distribuição, para que cheguem em
+     cascata em vez de todas de uma vez. Multiplicado por --indice, que o
+     JS define só nas cartas em voo (ver src/ui/animate.ts). */
+  --atraso-cascata: 90ms;
 }
 
 * { box-sizing: border-box; }
@@ -50,7 +54,13 @@ body {
   font-weight: 700;
   margin-left: -14px;
   box-shadow: 0 2px 7px rgba(0, 0, 0, 0.4);
-  transition: transform var(--dur-carta) var(--easing);
+  /* Shorthand: precisa listar as duas propriedades explicitamente, porque
+     "transition" não faz merge — sobrescrever com uma só apagaria a outra
+     (é o que a revisão da Task 9 pegou). --indice fica 0 fora de voo, então
+     o atraso não afeta transições comuns de uma carta parada. */
+  transition:
+    transform var(--dur-carta) var(--easing) calc(var(--atraso-cascata) * var(--indice, 0)),
+    opacity var(--dur-carta) var(--easing) calc(var(--atraso-cascata) * var(--indice, 0));
 }
 
 .carta:first-child { margin-left: 0; }
@@ -71,7 +81,15 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  /* transition-delay também precisa zerar aqui: sem isso, o atraso em
+     cascata do voo de cartas (--atraso-cascata × --indice) sobreviveria e a
+     carta ainda apareceria escalonada no tempo, só que sem deslizar —
+     ainda seria movimento perceptível para quem pediu para reduzir. */
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+  }
 }
 
 .mesa {
