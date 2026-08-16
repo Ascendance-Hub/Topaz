@@ -325,6 +325,16 @@ body {
 
 .espera { text-align: center; }
 .espera .aviso { color: var(--texto-fraco); font-size: 13px; margin-top: 10px; }
+.espera .lista-espera {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  justify-content: center; margin: 12px 0 4px;
+}
+.espera .quem {
+  color: var(--texto); font-size: 15px;
+  padding: 6px 12px; border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(201, 162, 39, 0.22);
+}
 
 .ajuda-gatilho {
   width: 30px; height: 30px; border-radius: 999px;

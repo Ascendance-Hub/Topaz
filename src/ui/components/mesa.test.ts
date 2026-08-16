@@ -147,8 +147,11 @@ describe('classe "poucos" na grade', () => {
 
 describe('mesa sem outros jogadores', () => {
   it('mostra a mensagem de espera em vez da grade', () => {
+    // Partida em andamento, e sou o único sentado: é aqui que "aguardando
+    // jogadores" quer dizer alguma coisa. Na sala de espera ela só duplicava
+    // o painel logo abaixo, que já diz exatamente quem está na mesa.
     const estado = criarEstado({
-      fase: 'aguardando',
+      fase: 'apostas',
       jogadores: [criarJogador({ peerId: 'eu', cadeira: 0 })],
     })
     const mesa = renderizarMesa(estado, 'eu', semAcao)
@@ -455,6 +458,46 @@ describe('sala de espera', () => {
     })
     const el = renderizarMesa(estado, 'p1', semAcao)
     expect(el.querySelector<HTMLButtonElement>('[data-acao="iniciar"]')!.disabled).toBe(true)
+  })
+
+  it('não mostra área de dealer nem "aguardando jogadores" na sala de espera', () => {
+    // A tela mostrava, em sequência: caixa do dealer vazia, "Aguardando
+    // jogadores…" e o painel da sala de espera. O anfitrião já sentado lia
+    // "aguardando jogadores" ao lado de um "Iniciar partida" habilitado.
+    const estado = criarEstado({
+      fase: 'aguardando', hostAtual: 'p1',
+      jogadores: [criarJogador({ peerId: 'p1', cadeira: 0 })],
+    })
+    const el = renderizarMesa(estado, 'p1', semAcao)
+    expect(el.querySelector('.dealer')).toBeNull()
+    expect(el.querySelector('.vazio')).toBeNull()
+  })
+
+  it('lista quem já sentou, inclusive eu', () => {
+    const estado = criarEstado({
+      fase: 'aguardando', hostAtual: 'p1',
+      jogadores: [
+        criarJogador({ peerId: 'p2', apelido: 'Bruno', cadeira: 1 }),
+        criarJogador({ peerId: 'p1', apelido: 'Alex', cadeira: 0 }),
+        criarJogador({ peerId: 'p3', apelido: 'Carla', cadeira: null }),
+      ],
+    })
+    const el = renderizarMesa(estado, 'p1', semAcao)
+    const sentados = [...el.querySelectorAll('.espera [data-sentado]')]
+
+    // Em ordem de cadeira, e sentar-se fica visivelmente confirmado para
+    // quem sentou — sem isto o próprio jogador não aparecia em lugar nenhum.
+    expect(sentados.map((s) => s.textContent)).toEqual(['Alex (você)', 'Bruno'])
+  })
+
+  it('avisa que a mesa está vazia quando ninguém sentou ainda', () => {
+    const estado = criarEstado({
+      fase: 'aguardando', hostAtual: 'p1',
+      jogadores: [criarJogador({ peerId: 'p1', cadeira: null })],
+    })
+    const el = renderizarMesa(estado, 'p1', semAcao)
+    expect(el.querySelectorAll('.espera [data-sentado]')).toHaveLength(0)
+    expect(el.querySelector('.espera')!.textContent).toContain('Ninguém sentado ainda')
   })
 
   it('a sala de espera não mostra painel de mão', () => {

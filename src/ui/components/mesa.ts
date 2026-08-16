@@ -351,27 +351,34 @@ export function renderizarMesa(
   anteriores: ContagensCartas = {}, ajuda: EstadoAjuda = AJUDA_FECHADA,
 ): HTMLElement {
   const mesa = div('mesa')
-  mesa.append(areaDealer(estado, anteriores), div('separador'))
-
   const eu = estado.jogadores.find((j) => j.peerId === meuId)
-  const outros = estado.jogadores
-    .filter((j) => j.peerId !== meuId && j.cadeira !== null)
-    .sort((a, b) => a.cadeira! - b.cadeira!)
 
-  if (outros.length === 0) {
-    mesa.append(div('vazio', 'Aguardando jogadores… compartilhe o link da sala.'))
-  } else {
-    const grade = div('grade')
-    if (outros.length <= 3) grade.classList.add('poucos')
-    for (const jogador of outros) {
-      grade.append(pecaJogador(jogador, estado.vezDe === jogador.peerId, anteriores))
-    }
-    mesa.append(grade)
-  }
-
+  // A sala de espera é uma tela só: nem mesa de dealer vazia, nem "aguardando
+  // jogadores" (que o anfitrião já sentado lia ao lado de um "Iniciar
+  // partida" habilitado). O que importa aqui é quem já está na mesa.
   if (estado.fase === 'aguardando') {
     const espera = div('painel-proprio espera')
     espera.append(div('rotulo', 'Sala de espera'))
+
+    const naMesa = estado.jogadores
+      .filter((j) => j.cadeira !== null)
+      .sort((a, b) => a.cadeira! - b.cadeira!)
+
+    if (naMesa.length === 0) {
+      espera.append(div('aviso', 'Ninguém sentado ainda — compartilhe o link da sala.'))
+    } else {
+      const lista = div('lista-espera')
+      for (const jogador of naMesa) {
+        // Inclusive eu: sem me ver na lista, sentar não tem confirmação
+        // nenhuma na tela de quem sentou.
+        const linha = div('quem', jogador.peerId === meuId
+          ? `${jogador.apelido} (você)`
+          : jogador.apelido)
+        linha.dataset['sentado'] = String(jogador.cadeira)
+        lista.append(linha)
+      }
+      espera.append(lista)
+    }
 
     if (eu && eu.cadeira === null) espera.append(botaoSentar(estado, eu, aoAgir))
 
@@ -386,6 +393,23 @@ export function renderizarMesa(
 
     mesa.append(espera)
     return mesa
+  }
+
+  mesa.append(areaDealer(estado, anteriores), div('separador'))
+
+  const outros = estado.jogadores
+    .filter((j) => j.peerId !== meuId && j.cadeira !== null)
+    .sort((a, b) => a.cadeira! - b.cadeira!)
+
+  if (outros.length === 0) {
+    mesa.append(div('vazio', 'Aguardando jogadores… compartilhe o link da sala.'))
+  } else {
+    const grade = div('grade')
+    if (outros.length <= 3) grade.classList.add('poucos')
+    for (const jogador of outros) {
+      grade.append(pecaJogador(jogador, estado.vezDe === jogador.peerId, anteriores))
+    }
+    mesa.append(grade)
   }
 
   if (eu && eu.cadeira !== null) {
