@@ -39,11 +39,17 @@ function sentados(estado: EstadoJogo): Jogador[] {
  * a sentar quem já estava nela — assim quem perdeu a cadeira por inatividade
  * consegue voltar, mas um retardatário não entra com 1000 fichas numa mesa
  * onde os outros já lutaram até 400.
+ *
+ * Exportada porque a mesa precisa PERGUNTAR antes de convidar: enquanto a
+ * regra ficou só aqui, todo eliminado ganhava um botão "Sentar à mesa" vivo
+ * que o motor descartava em silêncio.
  */
-function podeSentar(estado: EstadoJogo, jogador: Jogador): boolean {
+export function podeSentar(estado: EstadoJogo, peerId: string): boolean {
+  const jogador = estado.jogadores.find((j) => j.peerId === peerId)
+  if (!jogador) return false
   if (estado.fase === 'aguardando') return true
   if (estado.fase === 'fim') return false
-  return estado.naPartida.includes(jogador.peerId) && aindaEmJogo(jogador)
+  return estado.naPartida.includes(peerId) && aindaEmJogo(jogador)
 }
 
 /**
@@ -212,7 +218,7 @@ export function aplicar(
       if (!jogador || jogador.cadeira !== null) break
       if (acao.cadeira < 0 || acao.cadeira >= REGRAS.maxCadeiras) break
       if (estado.jogadores.some((j) => j.cadeira === acao.cadeira)) break
-      if (!podeSentar(estado, jogador)) break
+      if (!podeSentar(estado, peerId)) break
       jogador.cadeira = acao.cadeira
       // Sentar é ação manual e recomeço: sem zerar isto, quem foi rebaixado
       // por inatividade (contador já no limite) perderia a cadeira de novo

@@ -364,6 +364,55 @@ describe('espectador', () => {
     expect(botaoSentar.disabled).toBe(false)
   })
 
+  it('desabilita o convite do eliminado, dizendo por quê', () => {
+    // Esta rodada de mudanças cria eliminados toda partida, por desenho
+    // (spec §5): o motor recusa a sentada e a tela oferecia o botão assim
+    // mesmo — um clique que não fazia absolutamente nada.
+    const estado = criarEstado({
+      fase: 'apostas',
+      jogadores: [
+        criarJogador({ peerId: 'p2', cadeira: 1 }),
+        criarJogador({ peerId: 'eu', cadeira: null, fichas: 0, eliminadoEm: 3 }),
+      ],
+    })
+    const mesa = renderizarMesa(estado, 'eu', semAcao)
+    const botaoSentar = mesa.querySelector<HTMLButtonElement>('[data-acao="sentar"]')!
+
+    expect(botaoSentar.disabled).toBe(true)
+    expect(botaoSentar.textContent).toBe('Eliminado — aguarde a próxima partida')
+  })
+
+  it('desabilita o convite de quem chegou depois do início da partida', () => {
+    const estado = criarEstado({
+      fase: 'apostas',
+      jogadores: [
+        criarJogador({ peerId: 'p2', cadeira: 1 }),
+        criarJogador({ peerId: 'eu', cadeira: null }),
+      ],
+      // 'eu' abriu o link com a partida já em andamento: fora de `naPartida`.
+      naPartida: ['p2'],
+    })
+    const mesa = renderizarMesa(estado, 'eu', semAcao)
+    const botaoSentar = mesa.querySelector<HTMLButtonElement>('[data-acao="sentar"]')!
+
+    expect(botaoSentar.disabled).toBe(true)
+    expect(botaoSentar.textContent).toBe('Partida em andamento')
+  })
+
+  it('não despacha nada ao clicar num convite recusado pelo motor', () => {
+    const aoAgir = vi.fn()
+    const estado = criarEstado({
+      fase: 'apostas',
+      jogadores: [
+        criarJogador({ peerId: 'p2', cadeira: 1 }),
+        criarJogador({ peerId: 'eu', cadeira: null, fichas: 0, eliminadoEm: 3 }),
+      ],
+    })
+    const mesa = renderizarMesa(estado, 'eu', aoAgir)
+    mesa.querySelector<HTMLButtonElement>('[data-acao="sentar"]')!.click()
+    expect(aoAgir).not.toHaveBeenCalled()
+  })
+
   it('desabilita o convite quando a mesa está cheia', () => {
     const jogadores = Array.from({ length: REGRAS.maxCadeiras }, (_, i) =>
       criarJogador({ peerId: `p${i}`, cadeira: i }))

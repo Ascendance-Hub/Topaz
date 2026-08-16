@@ -1,6 +1,7 @@
 import { elementoCarta } from './carta'
 import { botaoAjuda } from './ajuda'
 import { avaliar } from '../../game/hand'
+import { podeSentar } from '../../game/machine'
 import { REGRAS, acoesDisponiveis } from '../../game/rules'
 import type { Acao, EstadoJogo, Jogador, Mao, ResultadoMao, TipoAcao } from '../../game/types'
 
@@ -91,6 +92,46 @@ function botao(
   }
   el.onclick = aoClicar
   return el
+}
+
+/**
+ * O convite para sentar: cadeira livre E elegibilidade, num lugar só.
+ *
+ * A sala de espera e o convite do espectador varriam as cadeiras com o mesmo
+ * trecho copiado, e as duas cópias tinham passado a significar coisas
+ * diferentes do motor. `podeSentar` recusa retardatário, eliminado e partida
+ * encerrada; a tela não sabia de nada disso e oferecia o botão assim mesmo —
+ * e esta rodada cria eliminados toda partida, por desenho. A spec §5 diz que
+ * o eliminado assiste ao jogo, não que ele seja convidado de novo a cada
+ * render para ser ignorado.
+ */
+function conviteParaSentar(
+  estado: EstadoJogo, eu: Jogador,
+): { cadeira: number | null; rotulo: string; desabilitado: boolean } {
+  const livre = Array.from({ length: REGRAS.maxCadeiras }, (_, i) => i)
+    .find((c) => !estado.jogadores.some((j) => j.cadeira === c)) ?? null
+
+  if (!podeSentar(estado, eu.peerId)) {
+    return {
+      cadeira: null,
+      rotulo: eu.eliminadoEm !== null
+        ? 'Eliminado — aguarde a próxima partida'
+        : 'Partida em andamento',
+      desabilitado: true,
+    }
+  }
+
+  if (livre === null) return { cadeira: null, rotulo: 'Mesa cheia', desabilitado: true }
+  return { cadeira: livre, rotulo: 'Sentar à mesa', desabilitado: false }
+}
+
+function botaoSentar(
+  estado: EstadoJogo, eu: Jogador, aoAgir: (acao: Acao) => void,
+): HTMLButtonElement {
+  const { cadeira, rotulo, desabilitado } = conviteParaSentar(estado, eu)
+  return botao('botao', rotulo,
+    () => { if (cadeira !== null) aoAgir({ tipo: 'sentar', cadeira }) },
+    { desabilitado, dataset: { acao: 'sentar' } })
 }
 
 function maoEncerrada(mao: Mao): boolean {
@@ -319,13 +360,7 @@ export function renderizarMesa(
     const espera = div('painel-proprio espera')
     espera.append(div('rotulo', 'Sala de espera'))
 
-    if (eu && eu.cadeira === null) {
-      const livre = Array.from({ length: REGRAS.maxCadeiras }, (_, i) => i)
-        .find((c) => !estado.jogadores.some((j) => j.cadeira === c))
-      espera.append(botao('botao', livre === undefined ? 'Mesa cheia' : 'Sentar à mesa',
-        () => { if (livre !== undefined) aoAgir({ tipo: 'sentar', cadeira: livre }) },
-        { desabilitado: livre === undefined, dataset: { acao: 'sentar' } }))
-    }
+    if (eu && eu.cadeira === null) espera.append(botaoSentar(estado, eu, aoAgir))
 
     if (estado.hostAtual === meuId) {
       const sentados = estado.jogadores.filter((j) => j.cadeira !== null).length
@@ -344,14 +379,7 @@ export function renderizarMesa(
     mesa.append(painelProprio(estado, eu, aoAgir, anteriores))
   } else if (eu) {
     const convite = div('painel-proprio')
-    const livre = Array.from({ length: REGRAS.maxCadeiras }, (_, i) => i)
-      .find((c) => !estado.jogadores.some((j) => j.cadeira === c))
-    convite.append(
-      div('rotulo', 'Espectador'),
-      botao('botao', livre === undefined ? 'Mesa cheia' : 'Sentar à mesa',
-        () => { if (livre !== undefined) aoAgir({ tipo: 'sentar', cadeira: livre }) },
-        { desabilitado: livre === undefined, dataset: { acao: 'sentar' } }),
-    )
+    convite.append(div('rotulo', 'Espectador'), botaoSentar(estado, eu, aoAgir))
     mesa.append(convite)
   }
 
