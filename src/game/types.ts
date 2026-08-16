@@ -35,6 +35,8 @@ export interface Jogador {
   /** Timestamp da queda. `null` = conectado. Cadeira e fichas ficam
    *  reservadas até expirar `REGRAS.segundosReconexao`. */
   desconectadoEm: number | null
+  /** Se já respondeu à oferta de seguro nesta rodada. */
+  decidiuSeguro: boolean
 }
 
 export type Fase =
@@ -56,6 +58,9 @@ export interface EstadoJogo {
   cartasRestantes: number
   hostAtual: string
   rodada: number
+  /** Contador de ids de mão — vive no estado (não no módulo) para que uma
+   *  migração de host nunca reinicie do zero e colida com mãos existentes. */
+  proximoIdMao: number
 }
 
 export type Acao =

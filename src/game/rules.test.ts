@@ -16,7 +16,7 @@ function jogador(extras: Partial<Jogador> = {}): Jogador {
   return {
     peerId: 'p1', apelido: 'Alex', cadeira: 0, fichas: 1000,
     maos: [], maoAtiva: 0, seguro: 0, rodadasInativo: 0,
-    desconectadoEm: null, ...extras,
+    desconectadoEm: null, decidiuSeguro: false, ...extras,
   }
 }
 

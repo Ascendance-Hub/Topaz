@@ -16,6 +16,8 @@ export const REGRAS = Object.freeze({
   pagaVitoria: 1,
   pagaSeguro: 2,
   dealerParaEm: 17,
+  msEntreCartasDealer: 700,
+  msMostrarResultado: 2500,
 })
 
 export function dealerDeveComprar(cartas: Carta[]): boolean {

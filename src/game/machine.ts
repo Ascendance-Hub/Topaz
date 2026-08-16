@@ -9,12 +9,6 @@ export interface Contexto {
   ocultaDealer: Carta | null
 }
 
-let sequenciaMao = 0
-function novoIdMao(): string {
-  sequenciaMao += 1
-  return `m${sequenciaMao}`
-}
-
 function clonar(ctx: Contexto): Contexto {
   return {
     estado: structuredClone(ctx.estado),
@@ -38,9 +32,14 @@ function sentados(estado: EstadoJogo): Jogador[] {
     .sort((a, b) => a.cadeira! - b.cadeira!)
 }
 
-function maoNova(aposta: number, vindaDeSplit = false): Mao {
+/** Cunha um novo id de mão a partir do contador que viaja no próprio estado —
+ *  assim uma migração de host (nova aba, contador de módulo zerado) nunca
+ *  gera ids que colidem com mãos já existentes. */
+function maoNova(estado: EstadoJogo, aposta: number, vindaDeSplit = false): Mao {
+  const id = `m${estado.proximoIdMao}`
+  estado.proximoIdMao += 1
   return {
-    id: novoIdMao(), cartas: [], aposta,
+    id, cartas: [], aposta,
     dobrada: false, vindaDeSplit, encerrada: false,
   }
 }
@@ -60,6 +59,7 @@ export function criarContexto(hostId: string, rng: Rng): Contexto {
       cartasRestantes: sapata.length,
       hostAtual: hostId,
       rodada: 1,
+      proximoIdMao: 1,
     },
   }
 }
@@ -97,6 +97,7 @@ export function aplicar(
         peerId, apelido: acao.apelido, cadeira: null,
         fichas: REGRAS.stackInicial, maos: [], maoAtiva: 0,
         seguro: 0, rodadasInativo: 0, desconectadoEm: null,
+        decidiuSeguro: false,
       })
       break
     }
@@ -106,6 +107,9 @@ export function aplicar(
       if (acao.cadeira < 0 || acao.cadeira >= REGRAS.maxCadeiras) break
       if (estado.jogadores.some((j) => j.cadeira === acao.cadeira)) break
       jogador.cadeira = acao.cadeira
+      // Quem re-senta com o stack curto (ou zerado) é reabastecido aqui —
+      // não mais silenciosamente a cada acerto enquanto está de pé.
+      if (jogador.fichas < REGRAS.apostaMin) jogador.fichas = REGRAS.stackInicial
       break
     }
 
@@ -122,13 +126,16 @@ export function aplicar(
       if (acao.valor < REGRAS.apostaMin || acao.valor > REGRAS.apostaMax) break
       if (acao.valor > jogador.fichas) break
       jogador.fichas -= acao.valor
-      jogador.maos = [maoNova(acao.valor)]
+      jogador.maos = [maoNova(estado, acao.valor)]
       jogador.maoAtiva = 0
       break
     }
 
     case 'seguro': {
       if (!jogador || estado.fase !== 'seguro') break
+      // Marca a decisão já tomada independentemente da resposta — é isso
+      // que libera a fase antes do prazo quando todos já responderam.
+      jogador.decidiuSeguro = true
       if (!acao.aceitar) break
       const metade = Math.floor((jogador.maos[0]?.aposta ?? 0) / 2)
       if (metade > jogador.fichas) break
@@ -170,7 +177,7 @@ export function aplicar(
       if (acao.tipo === 'dividir') {
         const movida = mao.cartas.pop()!
         jogador.fichas -= mao.aposta
-        const filha = maoNova(mao.aposta, true)
+        const filha = maoNova(estado, mao.aposta, true)
         filha.cartas = [movida]
         mao.vindaDeSplit = true
         jogador.maos.splice(jogador.maoAtiva + 1, 0, filha)
@@ -226,6 +233,8 @@ function distribuir(ctx: Contexto, agora: number, rng: Rng): void {
   const estado = ctx.estado
   const jogando = sentados(estado).filter((j) => j.maos.length > 0)
 
+  for (const jogador of estado.jogadores) jogador.decidiuSeguro = false
+
   for (let volta = 0; volta < 2; volta++) {
     for (const jogador of jogando) {
       jogador.maos[0]!.cartas.push(comprar(ctx, rng))
@@ -244,20 +253,22 @@ function distribuir(ctx: Contexto, agora: number, rng: Rng): void {
   estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
 }
 
-function jogarDealer(ctx: Contexto, rng: Rng): void {
+/** Revela a carta oculta do dealer ao entrar na fase `dealer` e arma o
+ *  prazo da primeira compra — o próprio saque, daqui em diante, acontece
+ *  uma carta por vez em `avancar`, para que a UI tenha o que animar. */
+function revelarOculta(ctx: Contexto, agora: number): void {
   const estado = ctx.estado
   if (ctx.ocultaDealer) {
     estado.maoDealer.push(ctx.ocultaDealer)
     ctx.ocultaDealer = null
     estado.dealerTemOculta = false
   }
-  while (dealerDeveComprar(estado.maoDealer)) {
-    estado.maoDealer.push(comprar(ctx, rng))
-  }
-  estado.fase = 'acerto'
+  estado.prazoTurno = agora + REGRAS.msEntreCartasDealer
 }
 
-function acertar(ctx: Contexto, agora: number, rng: Rng): void {
+/** Fixa o resultado e credita fichas de cada mão e do seguro. Não limpa
+ *  nada — a mesa continua mostrando as mãos resolvidas por um tempo. */
+function resolverResultados(ctx: Contexto): void {
   const estado = ctx.estado
   const dealerBJ = estado.maoDealer.length === 2 && avaliar(estado.maoDealer).total === 21
 
@@ -270,12 +281,23 @@ function acertar(ctx: Contexto, agora: number, rng: Rng): void {
       jogador.fichas += jogador.seguro * (1 + REGRAS.pagaSeguro)
     }
   }
+}
+
+/** Limpa a mesa depois que o resultado já foi mostrado e abre a rodada
+ *  seguinte (ou volta a aguardar, se ninguém mais está sentado). */
+function limparRodada(ctx: Contexto, agora: number, rng: Rng): void {
+  const estado = ctx.estado
 
   for (const jogador of estado.jogadores) {
     jogador.maos = []
     jogador.maoAtiva = 0
     jogador.seguro = 0
-    if (jogador.fichas < REGRAS.apostaMin) jogador.fichas = REGRAS.stackInicial
+    jogador.decidiuSeguro = false
+    // Só quem está sentado é reabastecido — quem levantou fica com o
+    // stack que tinha; o reabastecimento dele acontece ao sentar de novo.
+    if (jogador.cadeira !== null && jogador.fichas < REGRAS.apostaMin) {
+      jogador.fichas = REGRAS.stackInicial
+    }
   }
 
   estado.maoDealer = []
@@ -307,12 +329,18 @@ function transicionar(ctx: Contexto, agora: number, rng: Rng): Contexto {
     }
   }
 
-  if (estado.fase === 'dealer') {
-    jogarDealer(ctx, rng)
+  if (estado.fase === 'seguro') {
+    const comMao = sentados(estado).filter((j) => j.maos.length > 0)
+    if (comMao.length > 0 && comMao.every((j) => j.decidiuSeguro)) {
+      estado.fase = 'turnos'
+      estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
+    }
   }
 
-  if (estado.fase === 'acerto') {
-    acertar(ctx, agora, rng)
+  // Entrar na fase `dealer` só revela a carta oculta e arma o prazo da
+  // próxima compra — não joga a mão inteira num único passo síncrono.
+  if (estado.fase === 'dealer' && ctx.ocultaDealer !== null) {
+    revelarOculta(ctx, agora)
   }
 
   return ctx
@@ -351,6 +379,23 @@ export function avancar(ctx: Contexto, agora: number, rng: Rng): Contexto {
       }
       avancarTurnoSeNecessario(novo, agora)
     }
+    return transicionar(novo, agora, rng)
+  }
+
+  if (estado.fase === 'dealer' && venceu) {
+    if (dealerDeveComprar(estado.maoDealer)) {
+      estado.maoDealer.push(comprar(novo, rng))
+      estado.prazoTurno = agora + REGRAS.msEntreCartasDealer
+    } else {
+      resolverResultados(novo)
+      estado.fase = 'acerto'
+      estado.prazoTurno = agora + REGRAS.msMostrarResultado
+    }
+    return transicionar(novo, agora, rng)
+  }
+
+  if (estado.fase === 'acerto' && venceu) {
+    limparRodada(novo, agora, rng)
     return transicionar(novo, agora, rng)
   }
 
