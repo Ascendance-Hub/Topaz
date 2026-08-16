@@ -109,3 +109,88 @@ describe('rede falsa', () => {
     expect(recebidaPorC?.tipo === 'entrar' && recebidaPorC.apelido).toBe('Alex')
   })
 })
+
+describe('rede falsa com conexão diferida', () => {
+  it('peers() começa vazio para todo mundo, como no Trystero real', () => {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const a = rede.conectar('p1')
+    const b = rede.conectar('p2')
+
+    expect(a.peers()).toEqual([])
+    expect(b.peers()).toEqual([])
+  })
+
+  it('não dispara aoEntrarPeer na conexão, só no bombeamento', () => {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const a = rede.conectar('p1')
+    const entrouEmA = vi.fn()
+    a.aoEntrarPeer(entrouEmA)
+
+    const b = rede.conectar('p2')
+    const entrouEmB = vi.fn()
+    b.aoEntrarPeer(entrouEmB)
+    expect(entrouEmA).not.toHaveBeenCalled()
+
+    rede.bombear()
+
+    // Os dois lados são avisados: o Trystero dispara `onPeerJoin` em quem já
+    // estava e em quem chegou.
+    expect(entrouEmA).toHaveBeenCalledWith('p2')
+    expect(entrouEmB).toHaveBeenCalledWith('p1')
+    expect(a.peers()).toEqual(['p2'])
+  })
+
+  it('mensagem enviada antes do bombeamento não chega a ninguém', () => {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const a = rede.conectar('p1')
+    const b = rede.conectar('p2')
+    const recebido = vi.fn()
+    b.aoReceberAcao(recebido)
+
+    a.enviarAcao({ tipo: 'levantar' })
+    expect(recebido).not.toHaveBeenCalled()
+
+    rede.bombear()
+    a.enviarAcao({ tipo: 'levantar' })
+    expect(recebido).toHaveBeenCalledWith({ tipo: 'levantar' }, 'p1')
+  })
+
+  it('bombear é idempotente: não redispara aoEntrarPeer para quem já se conhece', () => {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const a = rede.conectar('p1')
+    const entrou = vi.fn()
+    a.aoEntrarPeer(entrou)
+    rede.conectar('p2')
+
+    rede.bombear()
+    rede.bombear()
+
+    expect(entrou).toHaveBeenCalledTimes(1)
+  })
+
+  it('um peer que conecta depois do bombeamento só aparece no bombeamento seguinte', () => {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const a = rede.conectar('p1')
+    rede.bombear()
+
+    rede.conectar('p3')
+    expect(a.peers()).toEqual([])
+
+    rede.bombear()
+    expect(a.peers()).toEqual(['p3'])
+  })
+
+  it('quem sai deixa de aparecer em peers() e avisa os que ficaram', () => {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const a = rede.conectar('p1')
+    const b = rede.conectar('p2')
+    rede.bombear()
+    const saiu = vi.fn()
+    a.aoSairPeer(saiu)
+
+    b.sair()
+
+    expect(saiu).toHaveBeenCalledWith('p2')
+    expect(a.peers()).toEqual([])
+  })
+})
