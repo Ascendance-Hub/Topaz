@@ -124,6 +124,39 @@ describe('sala de espera', () => {
     ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
     expect(ctx.estado.jogadores.find((j) => j.peerId === 'p2')!.cadeira).toBe(1)
   })
+
+  it('quem reconecta com peerId novo depois do início consegue voltar a sentar ao perder a cadeira', () => {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
+
+    // 'p2' cai da sala — a rede marca a ausência; isso acontece fora do
+    // alcance do motor (ver sessao.ts), então simulamos a marca aqui.
+    const p2 = ctx.estado.jogadores.find((j) => j.peerId === 'p2')!
+    p2.desconectadoEm = 500
+
+    // Volta com um peerId novo, mesmo apelido: recupera cadeira e identidade.
+    ctx = aplicar(ctx, 'p2-novo', { tipo: 'entrar', apelido: 'Bruno' }, 1000, RNG())
+
+    // Perde a cadeira por inatividade — 'levantar' modela a perda.
+    ctx = aplicar(ctx, 'p2-novo', { tipo: 'levantar' }, 1000, RNG())
+
+    // Sem atualizar naPartida no reconecte, o peerId novo não consta como
+    // participante e esta sentada seria recusada.
+    ctx = aplicar(ctx, 'p2-novo', { tipo: 'sentar', cadeira: 1 }, 1000, RNG())
+    expect(ctx.estado.jogadores.find((j) => j.peerId === 'p2-novo')!.cadeira).toBe(1)
+  })
+
+  it('iniciar de novo no meio da partida não muda nada', () => {
+    let ctx = comDoisJogadores()
+    const antes = { naPartida: [...ctx.estado.naPartida], prazo: ctx.estado.prazoTurno }
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 999, RNG())
+    expect(ctx.estado.naPartida).toEqual(antes.naPartida)
+    expect(ctx.estado.prazoTurno).toBe(antes.prazo)
+  })
 })
 
 describe('apostas', () => {

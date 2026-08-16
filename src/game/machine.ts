@@ -103,6 +103,11 @@ export function aplicar(
         (j) => j.desconectadoEm !== null && j.apelido === acao.apelido,
       )
       if (ausente) {
+        // `naPartida` guarda quem estava sentado no início. Ao reconectar, o
+        // jogador troca de peerId — sem atualizar aqui, ele deixa de constar
+        // como participante e perde o direito de voltar a sentar.
+        const iAntigo = estado.naPartida.indexOf(ausente.peerId)
+        if (iAntigo !== -1) estado.naPartida[iAntigo] = peerId
         ausente.peerId = peerId
         ausente.desconectadoEm = null
         break
