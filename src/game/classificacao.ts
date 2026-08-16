@@ -1,4 +1,4 @@
-import { REGRAS } from './rules'
+import { aindaEmJogo } from './rules'
 import type { EstadoJogo, Jogador } from './types'
 
 /** Uma posição do placar. Mais de um jogador significa empate real. */
@@ -35,9 +35,9 @@ export function classificacao(estado: EstadoJogo): Colocacao[] {
   const vencedor = daPartida.filter((j) => j.peerId === estado.vencedor)
   const restantes = daPartida.filter((j) => j.peerId !== estado.vencedor)
 
-  const sobreviventes = restantes.filter(
-    (j) => j.eliminadoEm === null && j.fichas >= REGRAS.apostaMin,
-  )
+  // Mesmo predicado que decide o fim da partida em `machine.ts`: o placar
+  // nunca pode discordar do motor sobre quem ainda está vivo.
+  const sobreviventes = restantes.filter(aindaEmJogo)
   const eliminados = restantes.filter((j) => !sobreviventes.includes(j))
 
   const grupos: Colocacao[] = [

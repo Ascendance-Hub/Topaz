@@ -21,6 +21,17 @@ export const REGRAS = Object.freeze({
   msMostrarResultado: 2500,
 })
 
+/**
+ * Ainda pode disputar: não foi eliminado e tem fichas para a aposta mínima
+ * (spec §6, "apto" — sentado ou não). Mora aqui, num lugar só, porque o placar
+ * e a regra de fim de partida precisam concordar sempre: com a regra escrita
+ * duas vezes, mudar o limiar num lado fazia a tela de fim discordar em
+ * silêncio de quem o motor considera vivo.
+ */
+export function aindaEmJogo(jogador: Jogador): boolean {
+  return jogador.eliminadoEm === null && jogador.fichas >= REGRAS.apostaMin
+}
+
 export function dealerDeveComprar(cartas: Carta[]): boolean {
   return avaliar(cartas).total < REGRAS.dealerParaEm
 }

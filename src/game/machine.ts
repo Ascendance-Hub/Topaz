@@ -1,6 +1,8 @@
 import { criarSapata, precisaReembaralhar } from './shoe'
 import { avaliar, estourou } from './hand'
-import { REGRAS, acoesDisponiveis, dealerDeveComprar, pagamento, resultadoDe } from './rules'
+import {
+  REGRAS, acoesDisponiveis, aindaEmJogo, dealerDeveComprar, pagamento, resultadoDe,
+} from './rules'
 import type { Acao, Carta, EstadoJogo, Jogador, Mao, Rng } from './types'
 
 export interface Contexto {
@@ -41,9 +43,7 @@ function sentados(estado: EstadoJogo): Jogador[] {
 function podeSentar(estado: EstadoJogo, jogador: Jogador): boolean {
   if (estado.fase === 'aguardando') return true
   if (estado.fase === 'fim') return false
-  return estado.naPartida.includes(jogador.peerId)
-    && jogador.eliminadoEm === null
-    && jogador.fichas >= REGRAS.apostaMin
+  return estado.naPartida.includes(jogador.peerId) && aindaEmJogo(jogador)
 }
 
 /**
@@ -54,9 +54,7 @@ function podeSentar(estado: EstadoJogo, jogador: Jogador): boolean {
  */
 function aptos(estado: EstadoJogo): Jogador[] {
   return estado.jogadores.filter(
-    (j) => estado.naPartida.includes(j.peerId)
-      && j.eliminadoEm === null
-      && j.fichas >= REGRAS.apostaMin,
+    (j) => estado.naPartida.includes(j.peerId) && aindaEmJogo(j),
   )
 }
 

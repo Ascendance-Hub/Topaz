@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { REGRAS, acoesDisponiveis, pagamento, resultadoDe, dealerDeveComprar } from './rules'
+import {
+  REGRAS, acoesDisponiveis, aindaEmJogo, pagamento, resultadoDe, dealerDeveComprar,
+} from './rules'
 import type { Carta, Jogador, Mao } from './types'
 
 const c = (valor: Carta['valor']): Carta => ({ valor, naipe: 'copas' })
@@ -30,6 +32,24 @@ describe('REGRAS', () => {
     expect(REGRAS.maxMaos).toBe(3)
     expect(REGRAS.segundosTurno).toBe(30)
     expect(REGRAS.fichas).toEqual([25, 100, 500])
+  })
+})
+
+describe('aindaEmJogo', () => {
+  it('vale para quem tem exatamente a aposta mínima', () => {
+    expect(aindaEmJogo(jogador({ fichas: REGRAS.apostaMin }))).toBe(true)
+  })
+
+  it('não vale para quem está abaixo da aposta mínima', () => {
+    expect(aindaEmJogo(jogador({ fichas: REGRAS.apostaMin - 1 }))).toBe(false)
+  })
+
+  it('não vale para eliminado, mesmo com fichas de sobra', () => {
+    expect(aindaEmJogo(jogador({ fichas: 1000, eliminadoEm: 4 }))).toBe(false)
+  })
+
+  it('vale para quem perdeu a cadeira mas continua com fichas (spec §6)', () => {
+    expect(aindaEmJogo(jogador({ cadeira: null, fichas: 600 }))).toBe(true)
   })
 })
 
