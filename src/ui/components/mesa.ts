@@ -179,6 +179,30 @@ function areaDealer(estado: EstadoJogo, anteriores: ContagensCartas): HTMLElemen
   return area
 }
 
+/**
+ * Barra do relógio de turno (spec §7). `renderizar` só roda quando o estado
+ * muda, e durante um turno nada muda — uma largura calculada na hora do
+ * render ficava parada em 100% até o jogador ser parado automaticamente,
+ * sem nenhum aviso de que o tempo estava correndo.
+ *
+ * Aqui a barra é uma animação CSS semeada pelo prazo: a duração é a do turno
+ * inteiro e o atraso NEGATIVO pula direto para o ponto em que ela já está,
+ * então ela anda sozinha, sem novo render e sem `setInterval` de UI. A
+ * largura inline é o mesmo valor em forma estática — é o que sobra, e
+ * continua correto, quando `prefers-reduced-motion` desliga a animação.
+ */
+function barraPrazo(prazoTurno: number, agora: number): HTMLElement {
+  const total = REGRAS.segundosTurno * 1000
+  const restante = Math.min(total, Math.max(0, prazoTurno - agora))
+  const barra = div('barra-prazo')
+  const preenchida = document.createElement('div')
+  preenchida.style.width = `${(restante / total) * 100}%`
+  preenchida.style.animationDuration = `${total}ms`
+  preenchida.style.animationDelay = `${restante - total}ms`
+  barra.append(preenchida)
+  return barra
+}
+
 function painelProprio(
   estado: EstadoJogo, eu: Jogador, aoAgir: (acao: Acao) => void, anteriores: ContagensCartas,
 ): HTMLElement {
@@ -228,13 +252,8 @@ function painelProprio(
 
   painel.append(acoes)
 
-  if (estado.prazoTurno !== null && estado.vezDe === eu.peerId) {
-    const barra = div('barra-prazo')
-    const preenchida = document.createElement('div')
-    const restante = Math.max(0, estado.prazoTurno - Date.now())
-    preenchida.style.width = `${(restante / (REGRAS.segundosTurno * 1000)) * 100}%`
-    barra.append(preenchida)
-    painel.append(barra)
+  if (estado.prazoTurno !== null && vezDele) {
+    painel.append(barraPrazo(estado.prazoTurno, Date.now()))
   }
 
   return painel

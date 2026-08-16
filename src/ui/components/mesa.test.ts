@@ -599,3 +599,56 @@ describe('fixtures vindas do motor', () => {
     expect(minhaMao.querySelector('.total')!.textContent).toContain('estourou')
   })
 })
+
+describe('barra do relógio de turno', () => {
+  const AGORA = 1_700_000_000_000
+  const TOTAL = REGRAS.segundosTurno * 1000
+
+  function mesaComPrazo(restante: number): HTMLElement {
+    const estado = criarEstado({
+      fase: 'turnos', vezDe: 'eu', prazoTurno: AGORA + restante,
+      jogadores: [
+        criarJogador({
+          peerId: 'eu', cadeira: 0,
+          maos: [criarMao({ id: 'm1', cartas: [carta('10', 'copas'), carta('9', 'paus')] })],
+        }),
+      ],
+    })
+    return renderizarMesa(estado, 'eu', semAcao)
+  }
+
+  it('anda sozinha: a animação é semeada pelo prazo em vez de uma largura parada', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(AGORA)
+      const preenchida = mesaComPrazo(TOTAL / 3)
+        .querySelector<HTMLElement>('.barra-prazo > div')!
+
+      // Sem isto a barra ficava em 100% do começo ao fim do turno: nada
+      // muda no estado enquanto o relógio corre, então nada re-renderiza.
+      expect(preenchida.style.animationDuration).toBe(`${TOTAL}ms`)
+      // Atraso negativo = a animação já começou faz tempo; ela entra em cena
+      // exatamente no ponto em que deveria estar.
+      expect(preenchida.style.animationDelay).toBe(`${TOTAL / 3 - TOTAL}ms`)
+      expect(parseFloat(preenchida.style.width)).toBeCloseTo(100 / 3, 4)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('não passa de 100% nem cai abaixo de zero com prazos fora da faixa', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(AGORA)
+      const cheia = mesaComPrazo(TOTAL * 5).querySelector<HTMLElement>('.barra-prazo > div')!
+      expect(parseFloat(cheia.style.width)).toBe(100)
+      expect(cheia.style.animationDelay).toBe('0ms')
+
+      const vazia = mesaComPrazo(-5000).querySelector<HTMLElement>('.barra-prazo > div')!
+      expect(parseFloat(vazia.style.width)).toBe(0)
+      expect(vazia.style.animationDelay).toBe(`${-TOTAL}ms`)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
