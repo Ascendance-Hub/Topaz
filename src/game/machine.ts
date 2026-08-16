@@ -107,6 +107,11 @@ export function aplicar(
       if (acao.cadeira < 0 || acao.cadeira >= REGRAS.maxCadeiras) break
       if (estado.jogadores.some((j) => j.cadeira === acao.cadeira)) break
       jogador.cadeira = acao.cadeira
+      // Sentar é ação manual e recomeço: sem zerar isto, quem foi rebaixado
+      // por inatividade (contador já no limite) perderia a cadeira de novo
+      // na primeira janela de apostas em que não apostasse. A spec §7 diz
+      // que ele "pode voltar a sentar quando quiser".
+      jogador.rodadasInativo = 0
       // Quem re-senta com o stack curto (ou zerado) é reabastecido aqui —
       // não mais silenciosamente a cada acerto enquanto está de pé.
       if (jogador.fichas < REGRAS.apostaMin) jogador.fichas = REGRAS.stackInicial

@@ -497,6 +497,21 @@ describe('cadeira de quem não aposta', () => {
     expect(ctx.estado.jogadores.every((j) => j.cadeira === null)).toBe(true)
   })
 
+  it('quem volta a sentar recomeça com a inatividade zerada', () => {
+    let ctx = comDoisJogadores()
+    const p2 = ctx.estado.jogadores.find((j) => j.peerId === 'p2')!
+    p2.rodadasInativo = REGRAS.rodadasParaEspectador
+    p2.cadeira = null
+
+    ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 3 }, 0, RNG())
+
+    // Sem zerar, ele perderia a cadeira já na primeira janela de apostas em
+    // que não apostasse — a spec §7 diz que ele pode voltar a sentar.
+    const depois = ctx.estado.jogadores.find((j) => j.peerId === 'p2')!
+    expect(depois.cadeira).toBe(3)
+    expect(depois.rodadasInativo).toBe(0)
+  })
+
   it('não libera a cadeira de quem apostou nessa janela', () => {
     let ctx = comDoisJogadores()
     ctx.estado.jogadores[0]!.rodadasInativo = REGRAS.rodadasParaEspectador - 1
