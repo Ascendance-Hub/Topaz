@@ -13,17 +13,20 @@ export const REGRAS = Object.freeze({
   segundosReconexao: 60,
   rodadasParaEspectador: 2,
   pagaBlackjack: 1.5,
+  pagaVitoria: 1,
   pagaSeguro: 2,
+  dealerParaEm: 17,
 })
 
 export function dealerDeveComprar(cartas: Carta[]): boolean {
-  return avaliar(cartas).total < 17
+  return avaliar(cartas).total < REGRAS.dealerParaEm
 }
 
 export function acoesDisponiveis(mao: Mao, jogador: Jogador): TipoAcao[] {
   if (mao.encerrada) return []
 
   const { total } = avaliar(mao.cartas)
+  // 21 não é uma regra da casa mas a própria definição do jogo; alterar quebraria avaliar.
   if (total > 21) return []
 
   // Ás dividido recebe exatamente uma carta e encerra.
@@ -70,7 +73,7 @@ export function pagamento(mao: Mao, cartasDealer: Carta[]): number {
     case 'blackjack':
       return mao.aposta + Math.floor(mao.aposta * REGRAS.pagaBlackjack)
     case 'ganhou':
-      return mao.aposta * 2
+      return mao.aposta + mao.aposta * REGRAS.pagaVitoria
     case 'empatou':
       return mao.aposta
     case 'perdeu':

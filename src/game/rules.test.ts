@@ -49,6 +49,12 @@ describe('dealerDeveComprar', () => {
   it('para com 21', () => {
     expect(dealerDeveComprar([c('A'), c('K')])).toBe(false)
   })
+
+  it('para no limite definido em REGRAS', () => {
+    const abaixo = REGRAS.dealerParaEm - 1
+    expect(dealerDeveComprar([c('10'), c(String(abaixo - 10) as Carta['valor'])])).toBe(true)
+    expect(dealerDeveComprar([c('10'), c(String(REGRAS.dealerParaEm - 10) as Carta['valor'])])).toBe(false)
+  })
 })
 
 describe('acoesDisponiveis', () => {
