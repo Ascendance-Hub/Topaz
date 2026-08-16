@@ -77,6 +77,26 @@ describe('apelido em branco', () => {
     // à toa antes da rejeição por falta de apelido.
     expect(location.hash).toBe(hashAntes)
   })
+
+  it('entrar com código digitado e apelido vazio não mexe no hash', () => {
+    const aoEntrar = vi.fn()
+    const lobby = renderizarLobby(aoEntrar)
+    const hashAntes = location.hash
+    const campoCodigo = lobby.querySelector<HTMLInputElement>(
+      'input[placeholder="Código da sala"]',
+    )!
+    campoCodigo.value = 'K7X2QW9F'
+    const entrarBotao = [...lobby.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Entrar',
+    )!
+    entrarBotao.click()
+    expect(aoEntrar).not.toHaveBeenCalled()
+    // Mesmo defeito do caminho de criar sala: antes da correção o hash era
+    // escrito antes de checar o apelido, então digitar um código válido com
+    // apelido em branco reescrevia a URL e só depois recusava por falta de
+    // apelido.
+    expect(location.hash).toBe(hashAntes)
+  })
 })
 
 describe('normalização do código digitado à mão', () => {

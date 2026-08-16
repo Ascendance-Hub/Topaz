@@ -103,10 +103,14 @@ export function renderizarLobby(
     entrarBotao.textContent = 'Entrar'
     entrarBotao.onclick = () => {
       const codigo = normalizarCodigoDigitado(campoCodigo.value)
-      if (codigo.length === TAMANHO_CODIGO) {
-        location.hash = `sala=${codigo}`
-        entrar(codigo)
-      }
+      if (codigo.length !== TAMANHO_CODIGO) return
+      // Mesma ordem do caminho de criar sala: valida o apelido antes de
+      // qualquer efeito colateral. Sem isso, digitar um código válido com o
+      // apelido em branco reescrevia o hash e só depois barrava por falta
+      // de apelido — a URL mudava para nada.
+      if (!apelidoValido()) return
+      location.hash = `sala=${codigo}`
+      entrar(codigo)
     }
 
     lobby.append(criar, ou, campoCodigo, entrarBotao)
