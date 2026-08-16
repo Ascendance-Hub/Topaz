@@ -3,9 +3,16 @@ import { classificacao } from './classificacao'
 import { REGRAS } from './rules'
 import type { EstadoJogo, Jogador } from './types'
 
+/**
+ * Cadeira derivada do id, uma por jogador: `cadeira: 0` para todos punha três
+ * sobreviventes na mesma cadeira, estado que o motor nunca produz. Nenhuma
+ * das funções aqui lê `cadeira` — mas é esse hábito de fixture impossível que
+ * escondeu dois defeitos críticos por 199 testes na entrega anterior.
+ */
 function jogador(peerId: string, fichas: number, eliminadoEm: number | null): Jogador {
   return {
-    peerId, apelido: peerId.toUpperCase(), cadeira: eliminadoEm === null ? 0 : null,
+    peerId, apelido: peerId.toUpperCase(),
+    cadeira: eliminadoEm === null ? Number(peerId.slice(1)) - 1 : null,
     fichas, maos: [], maoAtiva: 0, seguro: 0, rodadasInativo: 0,
     desconectadoEm: null, decidiuSeguro: false, eliminadoEm,
   }
@@ -71,7 +78,11 @@ describe('classificacao', () => {
 
   it('quem está em jogadores mas não em naPartida fica de fora', () => {
     const estado = estadoCom([jogador('p1', 500, null)], null)
-    estado.jogadores.push(jogador('p9', 1000, null))
+    // Espectador de verdade: entrou na sala, nunca sentou nem entrou na
+    // partida.
+    const forasteiro = jogador('p5', 1000, null)
+    forasteiro.cadeira = null
+    estado.jogadores.push(forasteiro)
     const r = classificacao(estado)
     expect(r.flatMap((c) => c.jogadores).map((j) => j.peerId)).toEqual(['p1'])
   })

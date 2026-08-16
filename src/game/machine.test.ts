@@ -934,10 +934,17 @@ describe('nenhuma fase gira para sempre sem ninguém que possa jogar', () => {
 })
 
 describe('decidirFim', () => {
+  /**
+   * Cadeira derivada do id, uma por jogador: `cadeira: 0` para todos sentava
+   * a mesa inteira na mesma cadeira, estado que o motor nunca produz.
+   * `decidirFim` não lê `cadeira` — mas é essa mesma fixture impossível que
+   * já deixou defeitos passarem por centenas de testes.
+   */
   function jogador(peerId: string, fichas: number, eliminadoEm: number | null): Jogador {
     return {
-      peerId, apelido: peerId, cadeira: eliminadoEm === null ? 0 : null, fichas,
-      maos: [], maoAtiva: 0, seguro: 0, rodadasInativo: 0,
+      peerId, apelido: peerId,
+      cadeira: eliminadoEm === null ? Number(peerId.slice(1)) - 1 : null,
+      fichas, maos: [], maoAtiva: 0, seguro: 0, rodadasInativo: 0,
       desconectadoEm: null, decidiuSeguro: false, eliminadoEm,
     }
   }
