@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { criarContexto, aplicar, avancar, cartasVisiveis } from './machine'
+import { criarContexto, aplicar, avancar, cartasVisiveis, decidirFim } from './machine'
 import { rngSemente } from './shoe'
 import { REGRAS } from './rules'
 import type { Contexto } from './machine'
+import type { EstadoJogo, Jogador } from './types'
 
 const RNG = () => rngSemente(1234)
 
@@ -156,6 +157,14 @@ describe('sala de espera', () => {
     ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 999, RNG())
     expect(ctx.estado.naPartida).toEqual(antes.naPartida)
     expect(ctx.estado.prazoTurno).toBe(antes.prazo)
+  })
+
+  it('ninguém senta com a partida acabada', () => {
+    let ctx = comDoisJogadores()
+    ctx = aplicar(ctx, 'p1', { tipo: 'levantar' }, 0, RNG())
+    ctx.estado.fase = 'fim'
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    expect(ctx.estado.jogadores.find((j) => j.peerId === 'p1')!.cadeira).toBeNull()
   })
 })
 
@@ -716,5 +725,146 @@ describe('eliminação', () => {
     ctx.estado.jogadores[0]!.fichas = 10
     ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
     expect(ctx.estado.jogadores[0]!.fichas).toBe(10)
+  })
+})
+
+describe('decidirFim', () => {
+  function jogador(peerId: string, fichas: number, eliminadoEm: number | null): Jogador {
+    return {
+      peerId, apelido: peerId, cadeira: eliminadoEm === null ? 0 : null, fichas,
+      maos: [], maoAtiva: 0, seguro: 0, rodadasInativo: 0,
+      desconectadoEm: null, decidiuSeguro: false, eliminadoEm,
+    }
+  }
+
+  function estado(jogadores: Jogador[], naPartida?: string[]): EstadoJogo {
+    return {
+      fase: 'acerto', jogadores, vezDe: null, prazoTurno: null, maoDealer: [],
+      dealerTemOculta: false, cartasRestantes: 100, hostAtual: 'p1', rodada: 5,
+      proximoIdMao: 1, vencedor: null,
+      naPartida: naPartida ?? jogadores.map((j) => j.peerId),
+    }
+  }
+
+  it('quem atinge o alvo vence', () => {
+    expect(decidirFim(estado([
+      jogador('p1', REGRAS.alvoVitoria, null), jogador('p2', 400, null),
+    ]))).toEqual({ acabou: true, vencedor: 'p1' })
+  })
+
+  it('entre dois no alvo, vence quem tem mais fichas', () => {
+    expect(decidirFim(estado([
+      jogador('p1', REGRAS.alvoVitoria + 200, null),
+      jogador('p2', REGRAS.alvoVitoria + 50, null),
+    ]))).toEqual({ acabou: true, vencedor: 'p1' })
+  })
+
+  it('empate exato no alvo acaba a partida sem vencedor', () => {
+    expect(decidirFim(estado([
+      jogador('p1', REGRAS.alvoVitoria, null), jogador('p2', REGRAS.alvoVitoria, null),
+    ]))).toEqual({ acabou: true, vencedor: null })
+  })
+
+  it('sobrando um único apto, ele vence', () => {
+    expect(decidirFim(estado([
+      jogador('p1', 600, null), jogador('p2', 0, 4),
+    ]))).toEqual({ acabou: true, vencedor: 'p1' })
+  })
+
+  it('ninguém apto acaba sem vencedor', () => {
+    expect(decidirFim(estado([
+      jogador('p1', 0, 5), jogador('p2', 0, 5),
+    ]))).toEqual({ acabou: true, vencedor: null })
+  })
+
+  it('com dois aptos a partida continua', () => {
+    expect(decidirFim(estado([
+      jogador('p1', 600, null), jogador('p2', 400, null),
+    ]))).toEqual({ acabou: false, vencedor: null })
+  })
+
+  it('jogando sozinho, a regra do último sobrevivente não dispara', () => {
+    expect(decidirFim(estado([jogador('p1', 600, null)]))).toEqual({
+      acabou: false, vencedor: null,
+    })
+  })
+
+  it('jogando sozinho, quebrar encerra pela regra de ninguém apto', () => {
+    expect(decidirFim(estado([jogador('p1', 0, 5)]))).toEqual({
+      acabou: true, vencedor: null,
+    })
+  })
+
+  it('quem perdeu a cadeira mas tem fichas continua apto', () => {
+    const semCadeira = jogador('p2', 600, null)
+    semCadeira.cadeira = null
+    expect(decidirFim(estado([
+      jogador('p1', 600, null), semCadeira,
+    ]))).toEqual({ acabou: false, vencedor: null })
+  })
+
+  it('quem está na sala mas não entrou na partida não conta', () => {
+    expect(decidirFim(estado([
+      jogador('p1', 600, null), jogador('p2', 900, null),
+    ], ['p1']))).toEqual({ acabou: true, vencedor: 'p1' })
+  })
+})
+
+describe('fim de partida ligado à rodada', () => {
+  it('uma rodada que zera o único adversário leva a fase para fim', () => {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
+    // Bruno entra na rodada com o mínimo; perdendo ou empatando ele fica
+    // abaixo do mínimo e é eliminado no acerto.
+    ctx.estado.jogadores.find((j) => j.peerId === 'p2')!.fichas = REGRAS.apostaMin
+
+    const depois = limparRodadaParaTeste(ctx)
+
+    const bruno = depois.estado.jogadores.find((j) => j.peerId === 'p2')!
+    if (bruno.eliminadoEm !== null) {
+      expect(depois.estado.fase).toBe('fim')
+      expect(depois.estado.vencedor).toBe('p1')
+    } else {
+      // Bruno ganhou a mão e segue no jogo — a partida continua.
+      expect(depois.estado.fase).not.toBe('fim')
+    }
+  })
+
+  it('novaPartida devolve todo mundo à sala de espera com o stack cheio', () => {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
+    ctx.estado.fase = 'fim'
+    ctx.estado.vencedor = 'p1'
+    ctx.estado.jogadores.find((j) => j.peerId === 'p2')!.eliminadoEm = 3
+
+    ctx = aplicar(ctx, 'p1', { tipo: 'novaPartida' }, 0, RNG())
+
+    expect(ctx.estado.fase).toBe('aguardando')
+    expect(ctx.estado.vencedor).toBeNull()
+    expect(ctx.estado.naPartida).toEqual([])
+    expect(ctx.estado.rodada).toBe(1)
+    for (const jogador of ctx.estado.jogadores) {
+      expect(jogador.fichas).toBe(REGRAS.stackInicial)
+      expect(jogador.eliminadoEm).toBeNull()
+      expect(jogador.cadeira).toBeNull()
+    }
+  })
+
+  it('quem não é anfitrião não reinicia', () => {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+    ctx.estado.fase = 'fim'
+
+    ctx = aplicar(ctx, 'p2', { tipo: 'novaPartida' }, 0, RNG())
+
+    expect(ctx.estado.fase).toBe('fim')
   })
 })

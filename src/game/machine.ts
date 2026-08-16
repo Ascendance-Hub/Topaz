@@ -46,6 +46,45 @@ function podeSentar(estado: EstadoJogo, jogador: Jogador): boolean {
     && jogador.fichas >= REGRAS.apostaMin
 }
 
+/**
+ * Quem ainda pode disputar: entrou na partida, não foi eliminado e tem
+ * fichas para apostar — sentado ou não. Quem perdeu a cadeira por
+ * inatividade continua contando porque pode voltar; se fechar a aba, a
+ * purga de desconectados o remove de `jogadores` e a contagem se resolve.
+ */
+function aptos(estado: EstadoJogo): Jogador[] {
+  return estado.jogadores.filter(
+    (j) => estado.naPartida.includes(j.peerId)
+      && j.eliminadoEm === null
+      && j.fichas >= REGRAS.apostaMin,
+  )
+}
+
+/** Exportada para teste direto: a lógica é pura e não precisa de rodada. */
+export function decidirFim(estado: EstadoJogo): { acabou: boolean; vencedor: string | null } {
+  const emJogo = aptos(estado)
+
+  const noAlvo = emJogo.filter((j) => j.fichas >= REGRAS.alvoVitoria)
+  if (noAlvo.length > 0) {
+    const maior = Math.max(...noAlvo.map((j) => j.fichas))
+    const lideres = noAlvo.filter((j) => j.fichas === maior)
+    return { acabou: true, vencedor: lideres.length === 1 ? lideres[0]!.peerId : null }
+  }
+
+  if (emJogo.length === 0) return { acabou: true, vencedor: null }
+
+  // Sobrar um só não encerra partida de um jogador só — ele estaria
+  // sozinho desde o início e venceria antes de jogar. A checagem é sobre
+  // `jogadores`, não `naPartida`: quem está na sala mas não entrou na
+  // partida não conta como apto, mas sua presença já prova que não foi
+  // uma partida solo desde o início.
+  if (emJogo.length === 1 && estado.jogadores.length >= 2) {
+    return { acabou: true, vencedor: emJogo[0]!.peerId }
+  }
+
+  return { acabou: false, vencedor: null }
+}
+
 /** Cunha um novo id de mão a partir do contador que viaja no próprio estado —
  *  assim uma migração de host (nova aba, contador de módulo zerado) nunca
  *  gera ids que colidem com mãos já existentes. */
@@ -159,6 +198,33 @@ export function aplicar(
       estado.naPartida = naMesa.map((j) => j.peerId)
       estado.fase = 'apostas'
       estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
+      break
+    }
+
+    case 'novaPartida': {
+      if (estado.fase !== 'fim') break
+      if (peerId !== estado.hostAtual) break
+      for (const j of estado.jogadores) {
+        j.fichas = REGRAS.stackInicial
+        j.eliminadoEm = null
+        // As cadeiras são liberadas de propósito: sentar de novo é o sinal
+        // de que a pessoa quer jogar a próxima, em vez de ser arrastada
+        // para uma partida que talvez não queira.
+        j.cadeira = null
+        j.maos = []
+        j.maoAtiva = 0
+        j.seguro = 0
+        j.decidiuSeguro = false
+        j.rodadasInativo = 0
+      }
+      estado.naPartida = []
+      estado.vencedor = null
+      estado.rodada = 1
+      estado.vezDe = null
+      estado.prazoTurno = null
+      estado.maoDealer = []
+      estado.dealerTemOculta = false
+      estado.fase = 'aguardando'
       break
     }
 
@@ -369,10 +435,19 @@ function limparRodada(ctx: Contexto, agora: number, rng: Rng): void {
   estado.maoDealer = []
   estado.dealerTemOculta = false
   estado.rodada += 1
-  estado.fase = sentados(estado).length >= 1 ? 'apostas' : 'aguardando'
-  estado.prazoTurno = estado.fase === 'apostas'
-    ? agora + REGRAS.segundosTurno * 1000
-    : null
+
+  const fim = decidirFim(estado)
+  if (fim.acabou) {
+    estado.fase = 'fim'
+    estado.vencedor = fim.vencedor
+    estado.vezDe = null
+    estado.prazoTurno = null
+  } else {
+    estado.fase = sentados(estado).length >= 1 ? 'apostas' : 'aguardando'
+    estado.prazoTurno = estado.fase === 'apostas'
+      ? agora + REGRAS.segundosTurno * 1000
+      : null
+  }
 
   if (precisaReembaralhar(ctx.sapata.length, REGRAS.numBaralhos)) {
     ctx.sapata = criarSapata(REGRAS.numBaralhos, rng)
