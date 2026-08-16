@@ -89,6 +89,31 @@ WebRTC, não uma falha desta implementação. O código de sala de 8 caracteres
 (gerado com `crypto.getRandomValues`, ~8,5 × 10¹¹ combinações) é o que impede um
 estranho de entrar. Mande o link só para quem você quer na mesa.
 
+## Limitações da partida com eliminação
+
+Vieram com as regras de eliminação e fim de partida. Nenhuma é defeito a
+corrigir; são consequências assumidas, listadas para você não estranhar.
+
+**Se todo mundo que estava jogando fechar a aba**, a partida termina em vez de
+congelar — mas o placar final aparece vazio, porque ele só lista quem estava na
+partida, e todos foram embora. Quem sobrou vê "Fim de partida", uma mesa vazia e
+um botão de nova partida funcionando.
+
+**Se o jogador da vez sumir no meio da mão** e mais ninguém tiver cartas para
+jogar, a rodada pula direto para o dealer. Quem estava sentado mas ainda não
+tinha apostado não é chamado de volta naquela rodada.
+
+**Quem levanta da mesa bem no fim de uma rodada, já sem fichas para apostar**,
+recebe a recusa com a mensagem "Partida em andamento" em vez de uma que fale de
+fichas. O botão é recusado corretamente; só o motivo exibido é impreciso.
+
+**A mesa pode ficar parada na tela de apostas** se um participante continuar
+conectado mas nunca voltar a sentar. Isso é proposital — ele tem direito de
+voltar — e se resolve sozinho cerca de um minuto depois de ele fechar a aba.
+
+**A nova disposição da sala de espera, a tela de fim e o painel de ajuda nunca
+foram vistos num navegador de verdade**, só em DOM de teste.
+
 ## Decisões em aberto
 
 Coisas deliberadamente não implementadas, para você decidir:
