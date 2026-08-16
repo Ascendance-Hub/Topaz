@@ -179,6 +179,20 @@ body {
 .barra-prazo { height: 3px; background: rgba(0,0,0,0.3); border-radius: 2px; overflow: hidden; margin-top: 8px; }
 .barra-prazo > div { height: 100%; background: var(--topazio-500); transition: width 250ms linear; }
 
+.conexao {
+  max-width: 520px;
+  margin: 8vh auto 0;
+  padding: 26px 24px;
+  background: var(--carvao-700);
+  border: 1px solid var(--topazio-900);
+  border-radius: 14px;
+  text-align: center;
+}
+.conexao-titulo { color: var(--topazio-500); font-size: 18px; margin-bottom: 8px; }
+.conexao-detalhe { color: var(--texto-fraco); font-size: 13px; line-height: 1.5; }
+.conexao.falhou { border-color: var(--naipe-vermelho); }
+.conexao.falhou .conexao-titulo { color: var(--texto); }
+
 .lobby {
   max-width: 420px;
   margin: 12vh auto 0;

@@ -11,7 +11,8 @@ vi.mock('./net/transport', () => ({
 
 import { criarTransporteTrystero } from './net/transport'
 import { criarRedeFalsa } from './net/transport.fake'
-import { MS_DESCOBERTA, Sessao } from './net/sessao'
+import { MS_DESCOBERTA, MS_SEM_CONEXAO, Sessao } from './net/sessao'
+import { TITULO_SEM_CONEXAO } from './ui/components/conexao'
 import { rngSemente } from './game/shoe'
 import { iniciarApp, iniciarPartida, MENSAGEM_ERRO_INICIAL } from './main'
 
@@ -69,6 +70,56 @@ describe('iniciarPartida — barra de sala continua atualizando o DOM real', () 
     expect(app.contains(barraDepois)).toBe(true)
     expect(barraDepois.textContent).toContain('você é o anfitrião')
   }
+})
+
+describe('iniciarPartida — estado da conexão em vez de mesa travada', () => {
+  it('mostra "conectando" antes de a sala ter anfitrião e a mesa depois', () => {
+    vi.useFakeTimers()
+    try {
+      const rede = criarRedeFalsa({ conexaoDiferida: true })
+      vi.mocked(criarTransporteTrystero).mockImplementation(() => rede.conectar('pb'))
+
+      const app = document.createElement('div')
+      iniciarPartida(app, 'Bruno', 'CODIGO01')
+
+      // Sem anfitrião ainda: nada de mesa nem de "Aguardando jogadores…",
+      // que seria a mesma tela de uma conexão que nunca vai acontecer.
+      expect(app.querySelector('.conexao')?.getAttribute('data-status')).toBe('conectando')
+      expect(app.querySelector('.mesa')).toBeNull()
+
+      vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+
+      expect(app.querySelector('.conexao')).toBeNull()
+      expect(app.querySelector('.mesa')).not.toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('mostra falha de conexão quando a sala nunca resolve quem manda', () => {
+    vi.useFakeTimers()
+    try {
+      const rede = criarRedeFalsa({ conexaoDiferida: true })
+      // 'pa' é um transporte sem Sessao: existe na sala, ordena antes de
+      // 'pb' na eleição e nunca publica nada — é o relay fora do ar / a rede
+      // que bloqueia WebRTC da spec §14.
+      rede.conectar('pa')
+      vi.mocked(criarTransporteTrystero).mockImplementation(() => rede.conectar('pb'))
+
+      const app = document.createElement('div')
+      iniciarPartida(app, 'Bruno', 'CODIGO01')
+      rede.bombear()
+
+      vi.advanceTimersByTime(MS_SEM_CONEXAO + 600)
+
+      const caixa = app.querySelector('.conexao')!
+      expect(caixa.getAttribute('data-status')).toBe('sem-conexao')
+      expect(caixa.textContent).toContain(TITULO_SEM_CONEXAO)
+      expect(app.querySelector('.mesa')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('iniciarApp — fallback de erro na inicialização', () => {

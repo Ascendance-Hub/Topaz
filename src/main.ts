@@ -2,6 +2,7 @@ import { Sessao } from './net/sessao'
 import { criarTransporteTrystero } from './net/transport'
 import { renderizarLobby } from './ui/components/lobby'
 import { renderizarBarraSala } from './ui/components/barra-sala'
+import { renderizarConexao } from './ui/components/conexao'
 import { renderizar } from './ui/render'
 import { rngSemente } from './game/shoe'
 
@@ -31,7 +32,16 @@ export function iniciarPartida(app: HTMLElement, apelido: string, codigo: string
     const novaBarra = renderizarBarraSala(codigo, sessao.souHost())
     barra.replaceWith(novaBarra)
     barra = novaBarra
-    renderizar(palco, sessao.estado(), sessao.meuId(), (acao) => sessao.despachar(acao))
+
+    // Enquanto ninguém é anfitrião a mesa ainda não existe: mostrar a mesa
+    // vazia com "Aguardando jogadores…" confundiria "ninguém entrou ainda"
+    // com "a conexão falhou" (spec §14).
+    const status = sessao.statusConexao()
+    if (status === 'conectado') {
+      renderizar(palco, sessao.estado(), sessao.meuId(), (acao) => sessao.despachar(acao))
+    } else {
+      palco.replaceChildren(renderizarConexao(status))
+    }
   }
 
   sessao.aoMudar(desenhar)
