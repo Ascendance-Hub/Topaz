@@ -414,3 +414,101 @@ describe('acerto', () => {
     }
   })
 })
+
+describe('a vez nunca volta para quem já jogou', () => {
+  function comTresJogadores(): Contexto {
+    let ctx = criarContexto('p1', RNG())
+    const nomes: [string, string][] = [['p1', 'Alex'], ['p2', 'Bruno'], ['p3', 'Carla']]
+    nomes.forEach(([id, apelido], cadeira) => {
+      ctx = aplicar(ctx, id, { tipo: 'entrar', apelido }, 0, RNG())
+      ctx = aplicar(ctx, id, { tipo: 'sentar', cadeira }, 0, RNG())
+    })
+    for (const [id] of nomes) {
+      ctx = aplicar(ctx, id, { tipo: 'apostar', valor: 100 }, 0, RNG())
+    }
+    ctx = avancar(ctx, 0, RNG())
+    if (ctx.estado.fase === 'seguro') {
+      for (const [id] of nomes) {
+        ctx = aplicar(ctx, id, { tipo: 'seguro', aceitar: false }, 0, RNG())
+      }
+    }
+    return ctx
+  }
+
+  it('passa para o próximo da mesa quando o jogador da vez perde a cadeira por inatividade', () => {
+    let ctx = comTresJogadores()
+    expect(ctx.estado.fase).toBe('turnos')
+
+    // 'p1' joga e passa a vez para 'p2', que está a um passo de virar
+    // espectador.
+    ctx = aplicar(ctx, 'p1', { tipo: 'parar', maoId: ctx.estado.jogadores[0]!.maos[0]!.id }, 0, RNG())
+    expect(ctx.estado.vezDe).toBe('p2')
+    ctx.estado.jogadores[1]!.rodadasInativo = REGRAS.rodadasParaEspectador - 1
+
+    ctx = avancar(ctx, REGRAS.segundosTurno * 1000 + 1, RNG())
+
+    // 'p2' saiu da lista de sentados; a vez tem de seguir para 'p3'. Com o
+    // findIndex devolvendo -1, `indice + 1` apontava para o primeiro da
+    // mesa e devolvia a vez ao 'p1', que já tinha parado.
+    expect(ctx.estado.jogadores[1]!.cadeira).toBeNull()
+    expect(ctx.estado.vezDe).toBe('p3')
+  })
+
+  it('quem levanta no meio do próprio turno passa a vez em vez de congelar a mesa', () => {
+    let ctx = comTresJogadores()
+    expect(ctx.estado.vezDe).toBe('p1')
+
+    ctx = aplicar(ctx, 'p1', { tipo: 'levantar' }, 0, RNG())
+
+    // Antes, `levantar` limpava cadeira e mãos sem mexer na vez: a mesa
+    // inteira esperava os 30s do prazo por alguém que já tinha saído.
+    expect(ctx.estado.vezDe).toBe('p2')
+    expect(ctx.estado.prazoTurno).toBe(REGRAS.segundosTurno * 1000)
+  })
+
+  it('o último da mesa levantando encerra os turnos em vez de dar a vez a alguém encerrado', () => {
+    let ctx = comTresJogadores()
+    ctx = aplicar(ctx, 'p1', { tipo: 'parar', maoId: ctx.estado.jogadores[0]!.maos[0]!.id }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'parar', maoId: ctx.estado.jogadores[1]!.maos[0]!.id }, 0, RNG())
+    expect(ctx.estado.vezDe).toBe('p3')
+
+    ctx = aplicar(ctx, 'p3', { tipo: 'levantar' }, 0, RNG())
+
+    expect(ctx.estado.vezDe).toBeNull()
+    expect(ctx.estado.fase).toBe('dealer')
+  })
+})
+
+describe('cadeira de quem não aposta', () => {
+  it('libera a cadeira depois de duas janelas de aposta sem apostar', () => {
+    let ctx = comDoisJogadores()
+    const prazo = REGRAS.segundosTurno * 1000
+
+    // Primeira janela vence sem nenhuma aposta: só conta inatividade.
+    ctx = avancar(ctx, prazo + 1, RNG())
+    expect(ctx.estado.fase).toBe('apostas')
+    expect(ctx.estado.jogadores.map((j) => j.rodadasInativo)).toEqual([1, 1])
+    expect(ctx.estado.jogadores.every((j) => j.cadeira !== null)).toBe(true)
+
+    // Segunda janela: spec §7 manda liberar a cadeira. Sem isto, uma aba
+    // esquecida fazia toda rodada esperar os 30s inteiros, para sempre.
+    ctx = avancar(ctx, prazo * 2 + 2, RNG())
+
+    expect(ctx.estado.jogadores.every((j) => j.cadeira === null)).toBe(true)
+  })
+
+  it('não libera a cadeira de quem apostou nessa janela', () => {
+    let ctx = comDoisJogadores()
+    ctx.estado.jogadores[0]!.rodadasInativo = REGRAS.rodadasParaEspectador - 1
+    ctx = aplicar(ctx, 'p1', { tipo: 'apostar', valor: 100 }, 0, RNG())
+
+    ctx = avancar(ctx, REGRAS.segundosTurno * 1000 + 1, RNG())
+
+    const p1 = ctx.estado.jogadores.find((j) => j.peerId === 'p1')!
+    const p2 = ctx.estado.jogadores.find((j) => j.peerId === 'p2')!
+    expect(p1.cadeira).toBe(0)
+    expect(p1.rodadasInativo).toBe(0)
+    // 'p2' deixou a janela passar: é ele quem acumula inatividade.
+    expect(p2.rodadasInativo).toBe(1)
+  })
+})

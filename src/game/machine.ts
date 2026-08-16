@@ -115,8 +115,14 @@ export function aplicar(
 
     case 'levantar': {
       if (!jogador) break
+      const cadeiraAnterior = jogador.cadeira
+      const eraSuaVez = estado.vezDe === peerId
       jogador.cadeira = null
       jogador.maos = []
+      jogador.maoAtiva = 0
+      // Sem isto a vez ficava presa em quem acabou de sair: a mesa inteira
+      // esperava os 30 segundos do prazo por alguém que já não está lá.
+      if (eraSuaVez) passarVez(novo, agora, cadeiraAnterior)
       break
     }
 
@@ -128,6 +134,8 @@ export function aplicar(
       jogador.fichas -= acao.valor
       jogador.maos = [maoNova(estado, acao.valor)]
       jogador.maoAtiva = 0
+      // Apostar é ação manual: quem aposta não está com o celular bloqueado.
+      jogador.rodadasInativo = 0
       break
     }
 
@@ -198,7 +206,14 @@ export function aplicar(
   return transicionar(novo, agora, rng)
 }
 
-function avancarTurnoSeNecessario(ctx: Contexto, agora: number): void {
+/**
+ * `cadeiraAtual` é a cadeira de quem estava jogando. Passada explicitamente
+ * porque quem acabou de levantar (ou de ser rebaixado a espectador por
+ * inatividade) já não aparece na lista de sentados para ser encontrado ali.
+ */
+function avancarTurnoSeNecessario(
+  ctx: Contexto, agora: number, cadeiraAtual?: number | null,
+): void {
   const estado = ctx.estado
   const jogador = estado.jogadores.find((j) => j.peerId === estado.vezDe)
   if (!jogador) return
@@ -209,14 +224,27 @@ function avancarTurnoSeNecessario(ctx: Contexto, agora: number): void {
     jogador.maoAtiva += 1
   }
 
-  passarVez(ctx, agora)
+  passarVez(ctx, agora, cadeiraAtual === undefined ? jogador.cadeira : cadeiraAtual)
 }
 
-function passarVez(ctx: Contexto, agora: number): void {
+/**
+ * Passa a vez para o próximo em ordem de cadeira. Procura pela cadeira, não
+ * pela posição de quem está jogando dentro da lista: quando esse jogador
+ * perdeu o lugar (levantou, ou virou espectador por inatividade) ele não
+ * está mais na lista, e um `findIndex` devolvendo -1 fazia `indice + 1`
+ * apontar para o PRIMEIRO jogador — a vez voltava para alguém que já tinha
+ * jogado, com a mão fechada, sem botões, até o prazo de 30s vencer e ainda
+ * levar um incremento de inatividade.
+ *
+ * Sem cadeira conhecida não há "próximo" possível: a fase de turnos encerra,
+ * que é seguro — nunca devolve a vez a quem já jogou.
+ */
+function passarVez(ctx: Contexto, agora: number, cadeiraAtual: number | null): void {
   const estado = ctx.estado
   const naMesa = sentados(estado).filter((j) => j.maos.length > 0)
-  const indice = naMesa.findIndex((j) => j.peerId === estado.vezDe)
-  const proximo = naMesa[indice + 1]
+  const proximo = cadeiraAtual === null
+    ? undefined
+    : naMesa.find((j) => j.cadeira! > cadeiraAtual)
 
   if (proximo) {
     estado.vezDe = proximo.peerId
@@ -359,7 +387,16 @@ export function avancar(ctx: Contexto, agora: number, rng: Rng): Contexto {
     } else {
       estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
     }
-    for (const jogador of semAposta) jogador.rodadasInativo += 1
+    for (const jogador of semAposta) {
+      jogador.rodadasInativo += 1
+      // Spec §7: duas rodadas seguidas sem ação manual liberam a cadeira.
+      // Só o prazo de turno aplicava isso, e aquele caminho exige ter
+      // apostado — então um celular bloqueado ficava sentado para sempre,
+      // fazendo TODA rodada esperar os 30s inteiros da fase de apostas.
+      if (jogador.rodadasInativo >= REGRAS.rodadasParaEspectador) {
+        jogador.cadeira = null
+      }
+    }
     return transicionar(novo, agora, rng)
   }
 
@@ -372,12 +409,15 @@ export function avancar(ctx: Contexto, agora: number, rng: Rng): Contexto {
   if (estado.fase === 'turnos' && venceu) {
     const jogador = estado.jogadores.find((j) => j.peerId === estado.vezDe)
     if (jogador) {
+      // A cadeira é lida ANTES de um eventual rebaixamento: é ela que diz
+      // quem é o próximo, e quem perde o lugar some da lista de sentados.
+      const cadeiraAtual = jogador.cadeira
       for (const mao of jogador.maos) mao.encerrada = true
       jogador.rodadasInativo += 1
       if (jogador.rodadasInativo >= REGRAS.rodadasParaEspectador) {
         jogador.cadeira = null
       }
-      avancarTurnoSeNecessario(novo, agora)
+      avancarTurnoSeNecessario(novo, agora, cadeiraAtual)
     }
     return transicionar(novo, agora, rng)
   }
