@@ -35,6 +35,7 @@ function criarJogador(over: Partial<Jogador> & Pick<Jogador, 'peerId'>): Jogador
     rodadasInativo: 0,
     desconectadoEm: null,
     decidiuSeguro: false,
+    eliminadoEm: null,
     ...over,
   }
 }
@@ -51,6 +52,8 @@ function criarEstado(over: Partial<EstadoJogo> = {}): EstadoJogo {
     hostAtual: 'p1',
     rodada: 1,
     proximoIdMao: 1,
+    vencedor: null,
+    naPartida: [],
     ...over,
   }
 }

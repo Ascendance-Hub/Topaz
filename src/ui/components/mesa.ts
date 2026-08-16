@@ -7,6 +7,7 @@ const ROTULO_ACAO: Record<TipoAcao, string> = {
   entrar: 'Entrar', sentar: 'Sentar', levantar: 'Levantar',
   apostar: 'Apostar', seguro: 'Seguro',
   pedir: 'Pedir', parar: 'Parar', dobrar: 'Dobrar', dividir: 'Dividir',
+  iniciar: 'Iniciar', novaPartida: 'Nova Partida',
 }
 
 const ROTULO_RESULTADO: Record<ResultadoMao, string> = {

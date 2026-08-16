@@ -127,7 +127,7 @@ describe('sapata nunca vaza no estado', () => {
     expect(Object.keys(ctx.estado).sort()).toEqual([
       'cartasRestantes', 'dealerTemOculta', 'fase', 'hostAtual',
       'maoDealer', 'jogadores', 'prazoTurno', 'proximoIdMao',
-      'rodada', 'vezDe',
+      'rodada', 'vezDe', 'vencedor', 'naPartida',
     ].sort())
   })
 })

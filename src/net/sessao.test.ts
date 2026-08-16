@@ -40,7 +40,8 @@ function estadoFalso(over: Partial<EstadoJogo> = {}): EstadoJogo {
   return {
     fase: 'apostas', jogadores: [], vezDe: null, prazoTurno: null,
     maoDealer: [], dealerTemOculta: false, cartasRestantes: 312,
-    hostAtual: 'px', rodada: 1, proximoIdMao: 1, ...over,
+    hostAtual: 'px', rodada: 1, proximoIdMao: 1,
+    vencedor: null, naPartida: [], ...over,
   }
 }
 
@@ -63,7 +64,7 @@ describe('mesaPrevalece', () => {
     Array.from({ length: n }, (_, i) => ({
       peerId: `p${i}`, apelido: `p${i}`, cadeira: null, fichas: 1000,
       maos: [], maoAtiva: 0, seguro: 0, rodadasInativo: 0,
-      desconectadoEm: null, decidiuSeguro: false,
+      desconectadoEm: null, decidiuSeguro: false, eliminadoEm: null,
     }))
 
   it('a rodada mais alta vence', () => {

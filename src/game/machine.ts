@@ -60,6 +60,8 @@ export function criarContexto(hostId: string, rng: Rng): Contexto {
       hostAtual: hostId,
       rodada: 1,
       proximoIdMao: 1,
+      vencedor: null,
+      naPartida: [],
     },
   }
 }
@@ -98,6 +100,7 @@ export function aplicar(
         fichas: REGRAS.stackInicial, maos: [], maoAtiva: 0,
         seguro: 0, rodadasInativo: 0, desconectadoEm: null,
         decidiuSeguro: false,
+        eliminadoEm: null,
       })
       break
     }

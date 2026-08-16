@@ -4,6 +4,7 @@ import type { Carta, Jogador, Mao, ResultadoMao, TipoAcao } from './types'
 export const REGRAS = Object.freeze({
   numBaralhos: 6,
   stackInicial: 1000,
+  alvoVitoria: 1500,
   apostaMin: 25,
   apostaMax: 500,
   fichas: [25, 100, 500] as const,

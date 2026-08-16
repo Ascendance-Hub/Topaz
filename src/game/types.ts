@@ -37,6 +37,8 @@ export type Jogador = {
   desconectadoEm: number | null
   /** Se já respondeu à oferta de seguro nesta rodada. */
   decidiuSeguro: boolean
+  /** Rodada em que quebrou. `null` = nunca eliminado nesta partida. */
+  eliminadoEm: number | null
 }
 
 export type Fase =
@@ -47,6 +49,7 @@ export type Fase =
   | 'turnos'
   | 'dealer'
   | 'acerto'
+  | 'fim'
 
 export type EstadoJogo = {
   fase: Fase
@@ -61,6 +64,10 @@ export type EstadoJogo = {
   /** Contador de ids de mão — vive no estado (não no módulo) para que uma
    *  migração de host nunca reinicie do zero e colida com mãos existentes. */
   proximoIdMao: number
+  /** peerId de quem venceu. `null` fora de `fim`, ou quando ninguém venceu. */
+  vencedor: string | null
+  /** peerIds de quem estava sentado quando o anfitrião iniciou a partida. */
+  naPartida: string[]
 }
 
 export type Acao =
@@ -73,5 +80,7 @@ export type Acao =
   | { tipo: 'parar'; maoId: string }
   | { tipo: 'dobrar'; maoId: string }
   | { tipo: 'dividir'; maoId: string }
+  | { tipo: 'iniciar' }
+  | { tipo: 'novaPartida' }
 
 export type TipoAcao = Acao['tipo']
