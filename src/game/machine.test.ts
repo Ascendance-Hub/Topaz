@@ -728,6 +728,135 @@ describe('eliminação', () => {
   })
 })
 
+/**
+ * Joga a partida inteira, rodada após rodada, só pela API pública: aposta o
+ * máximo que cada um pode, dispensa seguro e para em todas as mãos, deixando
+ * o relógio andar entre os passos. É o que faltava para que qualquer coisa
+ * atravessasse uma fronteira de rodada — `limparRodadaParaTeste` para na
+ * primeira, e era por isso que ninguém via a mesa entrar em `apostas` sem
+ * jogador nenhum sentado.
+ */
+function jogarPartidaInteira(
+  inicial: Contexto,
+  aposta: (jogador: Jogador) => number = (j) => Math.min(REGRAS.apostaMax, j.fichas),
+): Contexto {
+  let ctx = inicial
+  let agora = 0
+  let guarda = 0
+  const passo = REGRAS.msEntreCartasDealer + 1
+
+  while (ctx.estado.fase !== 'fim' && guarda++ < 3000) {
+    const estado = ctx.estado
+
+    if (estado.fase === 'apostas') {
+      const semAposta = estado.jogadores.filter(
+        (j) => j.cadeira !== null && j.maos.length === 0 && j.fichas >= REGRAS.apostaMin,
+      )
+      if (semAposta.length > 0) {
+        for (const jogador of semAposta) {
+          ctx = aplicar(ctx, jogador.peerId, { tipo: 'apostar', valor: aposta(jogador) }, agora, RNG())
+        }
+        continue
+      }
+    }
+
+    if (estado.fase === 'seguro') {
+      const indecisos = estado.jogadores.filter((j) => j.maos.length > 0 && !j.decidiuSeguro)
+      if (indecisos.length > 0) {
+        for (const jogador of indecisos) {
+          ctx = aplicar(ctx, jogador.peerId, { tipo: 'seguro', aceitar: false }, agora, RNG())
+        }
+        continue
+      }
+    }
+
+    if (estado.fase === 'turnos' && estado.vezDe !== null) {
+      const jogador = estado.jogadores.find((j) => j.peerId === estado.vezDe)!
+      const mao = jogador.maos[jogador.maoAtiva]
+      if (mao) {
+        ctx = aplicar(ctx, jogador.peerId, { tipo: 'parar', maoId: mao.id }, agora, RNG())
+        continue
+      }
+    }
+
+    agora += passo
+    ctx = avancar(ctx, agora, RNG())
+  }
+  return ctx
+}
+
+describe('partida inteira e partida seguinte', () => {
+  function mesaDeDois(): Contexto {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
+    return ctx
+  }
+
+  it('atravessa várias rodadas até a eliminação encerrar a partida', () => {
+    let ctx = mesaDeDois()
+    // Pilhas curtas e aposta mínima: a partida termina por eliminação (spec
+    // §6 regra 2) em poucas rodadas, sem ninguém chegar perto do alvo.
+    ctx.estado.jogadores.find((j) => j.peerId === 'p1')!.fichas = 300
+    ctx.estado.jogadores.find((j) => j.peerId === 'p2')!.fichas = 100
+
+    ctx = jogarPartidaInteira(ctx, () => REGRAS.apostaMin)
+    const estado = ctx.estado
+
+    expect(estado.fase).toBe('fim')
+    // Várias rodadas de verdade: a fronteira de rodada foi atravessada mais
+    // de uma vez, coisa que nenhum teste fazia antes.
+    expect(estado.rodada).toBeGreaterThan(2)
+    expect(estado.vezDe).toBeNull()
+    expect(estado.prazoTurno).toBeNull()
+
+    const eliminados = estado.jogadores.filter((j) => j.eliminadoEm !== null)
+    expect(eliminados).toHaveLength(1)
+    expect(estado.vencedor).not.toBeNull()
+
+    const campeao = estado.jogadores.find((j) => j.peerId === estado.vencedor)!
+    expect(campeao.eliminadoEm).toBeNull()
+    expect(campeao.fichas).toBeGreaterThanOrEqual(REGRAS.apostaMin)
+    // Ninguém joga mais nada em `fim`: as mãos da última rodada já foram
+    // limpas por `limparRodada`.
+    expect(estado.jogadores.every((j) => j.maos.length === 0)).toBe(true)
+  })
+
+  it('novaPartida devolve a mesa à sala de espera e a partida seguinte começa na rodada 1', () => {
+    let ctx = jogarPartidaInteira(mesaDeDois())
+    expect(ctx.estado.fase).toBe('fim')
+
+    ctx = aplicar(ctx, 'p1', { tipo: 'novaPartida' }, 0, RNG())
+    expect(ctx.estado.fase).toBe('aguardando')
+    expect(ctx.estado.naPartida).toEqual([])
+    for (const jogador of ctx.estado.jogadores) {
+      expect(jogador.fichas).toBe(REGRAS.stackInicial)
+      expect(jogador.eliminadoEm).toBeNull()
+      expect(jogador.cadeira).toBeNull()
+    }
+
+    // Quem foi eliminado na partida anterior volta a sentar normalmente.
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+    expect(ctx.estado.jogadores.every((j) => j.cadeira !== null)).toBe(true)
+
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
+    expect(ctx.estado.fase).toBe('apostas')
+    expect(ctx.estado.rodada).toBe(1)
+    expect([...ctx.estado.naPartida].sort()).toEqual(['p1', 'p2'])
+    expect(ctx.estado.vencedor).toBeNull()
+    expect(ctx.estado.jogadores.every((j) => j.maos.length === 0)).toBe(true)
+
+    // E a partida nova roda de verdade: a primeira rodada distribui cartas.
+    ctx = aplicar(ctx, 'p1', { tipo: 'apostar', valor: REGRAS.apostaMin }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'apostar', valor: REGRAS.apostaMin }, 0, RNG())
+    expect(ctx.estado.jogadores.every((j) => j.maos[0]!.cartas.length === 2)).toBe(true)
+  })
+})
+
 describe('nenhuma fase gira para sempre sem ninguém que possa jogar', () => {
   /** Leva a mesa até `turnos` com os dois jogadores apostados. */
   function emTurnosComDois(): Contexto {
