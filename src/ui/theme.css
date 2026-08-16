@@ -178,3 +178,39 @@ body {
 
 .barra-prazo { height: 3px; background: rgba(0,0,0,0.3); border-radius: 2px; overflow: hidden; margin-top: 8px; }
 .barra-prazo > div { height: 100%; background: var(--topazio-500); transition: width 250ms linear; }
+
+.lobby {
+  max-width: 420px;
+  margin: 12vh auto 0;
+  padding: 32px 28px;
+  background: var(--carvao-700);
+  border: 1px solid var(--topazio-900);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.lobby h1 {
+  margin: 0 0 4px;
+  font-size: 30px;
+  letter-spacing: 0.06em;
+  color: var(--topazio-500);
+}
+
+.lobby .sub { color: var(--texto-fraco); font-size: 13px; margin-bottom: 26px; }
+
+.campo {
+  width: 100%;
+  padding: 11px 13px;
+  margin-bottom: 12px;
+  border-radius: 7px;
+  background: var(--carvao-900);
+  border: 1px solid var(--carvao-500);
+  color: var(--texto);
+  font-family: var(--serif);
+  font-size: 15px;
+  text-align: center;
+}
+.campo:focus { outline: none; border-color: var(--topazio-600); }
+
+.lobby .botao { width: 100%; padding: 12px; font-size: 14px; margin-top: 4px; }
+.ou { color: var(--texto-fraco); font-size: 11px; margin: 16px 0 12px; letter-spacing: 0.14em; }
