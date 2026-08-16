@@ -634,3 +634,87 @@ describe('cadeira de quem não aposta', () => {
     expect(p2.rodadasInativo).toBe(1)
   })
 })
+
+/** Leva a rodada até o fim usando só a API pública, avançando o relógio. */
+function limparRodadaParaTeste(inicial: Contexto): Contexto {
+  let ctx = inicial
+  let agora = 0
+  const passo = REGRAS.msEntreCartasDealer + 1
+  for (const jogador of ctx.estado.jogadores) {
+    if (jogador.cadeira !== null && jogador.fichas >= REGRAS.apostaMin) {
+      ctx = aplicar(ctx, jogador.peerId, { tipo: 'apostar', valor: REGRAS.apostaMin }, agora, RNG())
+    }
+  }
+  let guarda = 0
+  while (ctx.estado.rodada === inicial.estado.rodada && ctx.estado.fase !== 'fim' && guarda++ < 200) {
+    if (ctx.estado.fase === 'turnos' && ctx.estado.vezDe) {
+      const jogador = ctx.estado.jogadores.find((j) => j.peerId === ctx.estado.vezDe)!
+      const mao = jogador.maos[jogador.maoAtiva]
+      if (mao) {
+        ctx = aplicar(ctx, jogador.peerId, { tipo: 'parar', maoId: mao.id }, agora, RNG())
+        continue
+      }
+    }
+    if (ctx.estado.fase === 'seguro') {
+      for (const jogador of ctx.estado.jogadores) {
+        if (!jogador.decidiuSeguro && jogador.maos.length > 0) {
+          ctx = aplicar(ctx, jogador.peerId, { tipo: 'seguro', aceitar: false }, agora, RNG())
+        }
+      }
+      continue
+    }
+    agora += passo
+    ctx = avancar(ctx, agora, RNG())
+  }
+  return ctx
+}
+
+describe('eliminação', () => {
+  function mesaIniciada(fichasP2: number): Contexto {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
+    ctx.estado.jogadores.find((j) => j.peerId === 'p2')!.fichas = fichasP2
+    return ctx
+  }
+
+  it('não repõe mais fichas de quem quebrou no acerto', () => {
+    const ctx = mesaIniciada(10)
+    const depois = limparRodadaParaTeste(ctx)
+    expect(depois.estado.jogadores.find((j) => j.peerId === 'p2')!.fichas).toBe(10)
+  })
+
+  it('elimina quem fica abaixo da aposta mínima', () => {
+    const ctx = mesaIniciada(10)
+    const depois = limparRodadaParaTeste(ctx)
+    const p2 = depois.estado.jogadores.find((j) => j.peerId === 'p2')!
+    expect(p2.cadeira).toBeNull()
+    expect(p2.eliminadoEm).toBe(1)
+  })
+
+  it('não elimina quem tem exatamente a aposta mínima', () => {
+    const ctx = mesaIniciada(REGRAS.apostaMin)
+    const depois = limparRodadaParaTeste(ctx)
+    const p2 = depois.estado.jogadores.find((j) => j.peerId === 'p2')!
+    expect(p2.cadeira).toBe(1)
+    expect(p2.eliminadoEm).toBeNull()
+  })
+
+  it('eliminado não consegue sentar de novo na mesma partida', () => {
+    let ctx = mesaIniciada(10)
+    ctx = limparRodadaParaTeste(ctx)
+    ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+    expect(ctx.estado.jogadores.find((j) => j.peerId === 'p2')!.cadeira).toBeNull()
+  })
+
+  it('sentar não repõe mais fichas', () => {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx.estado.jogadores[0]!.fichas = 10
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    expect(ctx.estado.jogadores[0]!.fichas).toBe(10)
+  })
+})

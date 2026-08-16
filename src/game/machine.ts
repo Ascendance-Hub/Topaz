@@ -42,6 +42,8 @@ function podeSentar(estado: EstadoJogo, jogador: Jogador): boolean {
   if (estado.fase === 'aguardando') return true
   if (estado.fase === 'fim') return false
   return estado.naPartida.includes(jogador.peerId)
+    && jogador.eliminadoEm === null
+    && jogador.fichas >= REGRAS.apostaMin
 }
 
 /** Cunha um novo id de mão a partir do contador que viaja no próprio estado —
@@ -133,9 +135,6 @@ export function aplicar(
       // na primeira janela de apostas em que não apostasse. A spec §7 diz
       // que ele "pode voltar a sentar quando quiser".
       jogador.rodadasInativo = 0
-      // Quem re-senta com o stack curto (ou zerado) é reabastecido aqui —
-      // não mais silenciosamente a cada acerto enquanto está de pé.
-      if (jogador.fichas < REGRAS.apostaMin) jogador.fichas = REGRAS.stackInicial
       break
     }
 
@@ -358,10 +357,12 @@ function limparRodada(ctx: Contexto, agora: number, rng: Rng): void {
     jogador.maoAtiva = 0
     jogador.seguro = 0
     jogador.decidiuSeguro = false
-    // Só quem está sentado é reabastecido — quem levantou fica com o
-    // stack que tinha; o reabastecimento dele acontece ao sentar de novo.
+    // Abaixo da aposta mínima o jogador não consegue mais apostar — está
+    // fora na prática, mesmo sem estar exatamente em zero. `estado.rodada`
+    // ainda é a rodada que acabou de ser jogada; o incremento vem depois.
     if (jogador.cadeira !== null && jogador.fichas < REGRAS.apostaMin) {
-      jogador.fichas = REGRAS.stackInicial
+      jogador.cadeira = null
+      jogador.eliminadoEm = estado.rodada
     }
   }
 
