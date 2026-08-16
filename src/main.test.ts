@@ -11,24 +11,42 @@ vi.mock('./net/transport', () => ({
 
 import { criarTransporteTrystero } from './net/transport'
 import { criarRedeFalsa } from './net/transport.fake'
-import { Sessao } from './net/sessao'
+import { MS_DESCOBERTA, Sessao } from './net/sessao'
 import { rngSemente } from './game/shoe'
 import { iniciarApp, iniciarPartida, MENSAGEM_ERRO_INICIAL } from './main'
 
 describe('iniciarPartida — barra de sala continua atualizando o DOM real', () => {
   it('reflete a migração de anfitrião mesmo depois de vários desenhar()', () => {
-    const rede = criarRedeFalsa()
+    // Relógio falso: é o `setInterval` de main.ts que faz a janela de
+    // descoberta de host vencer, exatamente como no navegador.
+    vi.useFakeTimers()
+    try {
+      correrMigracao()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 
-    // 'pa' entra primeiro e sozinho, então se autodeclara host.
+  function correrMigracao(): void {
+    // Conexão diferida: nenhum dos dois enxerga o outro no construtor, que
+    // é a condição real do Trystero.
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+
     const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
     outraAba.entrar('Alex')
 
-    // 'pb' é a aba sob teste: conecta depois de 'pa', então nasce sem saber
-    // quem manda até receber o primeiro snapshot — igual ao fluxo real.
+    // 'pb' é a aba sob teste: nasce sem saber quem manda e só descobre pelo
+    // primeiro snapshot do host — igual ao fluxo real.
     vi.mocked(criarTransporteTrystero).mockImplementation(() => rede.conectar('pb'))
 
     const app = document.createElement('div')
     iniciarPartida(app, 'Bruno', 'CODIGO01')
+
+    rede.bombear()
+    // O tique periódico de 'pb' vence a janela sem reivindicar nada ('pa'
+    // tem o menor id); o tique de 'pa' faz ele assumir e publicar.
+    vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+    outraAba.tique(Date.now())
 
     // Depois do primeiro round-trip (entrar + snapshot do host), 'pb' já
     // sabe que 'pa' manda — isso já passou por pelo menos duas trocas de
@@ -50,7 +68,7 @@ describe('iniciarPartida — barra de sala continua atualizando o DOM real', () 
     const barraDepois = barrasNaPagina[0]!
     expect(app.contains(barraDepois)).toBe(true)
     expect(barraDepois.textContent).toContain('você é o anfitrião')
-  })
+  }
 })
 
 describe('iniciarApp — fallback de erro na inicialização', () => {
