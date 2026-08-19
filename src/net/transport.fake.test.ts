@@ -27,6 +27,30 @@ describe('rede falsa', () => {
     expect(recebido).not.toHaveBeenCalled()
   })
 
+  it('entrega mensagem de chat de um peer a outro', () => {
+    const rede = criarRedeFalsa()
+    const a = rede.conectar('p1')
+    const b = rede.conectar('p2')
+    const recebido = vi.fn()
+    b.aoReceberMensagem(recebido)
+
+    a.enviarMensagem('boa mão')
+
+    expect(recebido).toHaveBeenCalledWith('boa mão', 'p1')
+  })
+
+  it('não entrega a própria mensagem de chat de volta ao remetente', () => {
+    const rede = criarRedeFalsa()
+    const a = rede.conectar('p1')
+    rede.conectar('p2')
+    const recebido = vi.fn()
+    a.aoReceberMensagem(recebido)
+
+    a.enviarMensagem('boa mão')
+
+    expect(recebido).not.toHaveBeenCalled()
+  })
+
   it('avisa os existentes quando um peer entra', () => {
     const rede = criarRedeFalsa()
     const a = rede.conectar('p1')

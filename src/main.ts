@@ -3,8 +3,12 @@ import { criarTransporteTrystero } from './net/transport'
 import { renderizarLobby } from './ui/components/lobby'
 import { renderizarBarraSala } from './ui/components/barra-sala'
 import { renderizarConexao } from './ui/components/conexao'
+import { criarChat } from './ui/components/chat'
 import { renderizar } from './ui/render'
 import { rngSemente } from './game/shoe'
+
+/** Quem falou antes de a mesa saber o nome dele. */
+export const APELIDO_DESCONHECIDO = 'Alguém'
 
 function rngDaSessao() {
   return rngSemente(Date.now() ^ Math.floor(Math.random() * 1e9))
@@ -22,11 +26,35 @@ function rngDaSessao() {
  * página, nunca um órfão de uma rodada anterior.
  */
 export function iniciarPartida(app: HTMLElement, apelido: string, codigo: string): void {
-  const sessao = new Sessao(criarTransporteTrystero(codigo), rngDaSessao)
+  const transporte = criarTransporteTrystero(codigo)
+  const sessao = new Sessao(transporte, rngDaSessao)
+
+  /**
+   * O apelido sai do `EstadoJogo` pelo peerId, não do payload do chat: assim
+   * ninguém digita o próprio nome e, portanto, ninguém se passa por outro. Um
+   * peer que falou antes do primeiro snapshot do host chegar ainda não tem
+   * nome conhecido aqui — daí o genérico em vez de exibir um peerId cru.
+   */
+  function apelidoDe(peerId: string): string {
+    const jogador = sessao.estado().jogadores.find((j) => j.peerId === peerId)
+    return jogador?.apelido || APELIDO_DESCONHECIDO
+  }
+
+  // O chat é criado uma única vez e nunca substituído: `renderizar` troca
+  // todos os filhos do `palco` a cada mudança de estado, e um campo de texto
+  // ali dentro perderia foco e conteúdo a cada broadcast do host. Por isso
+  // ele é irmão do palco, não filho.
+  const chat = criarChat((texto) => {
+    transporte.enviarMensagem(texto)
+    // A rede não devolve ao remetente o que ele mesmo mandou; sem este eco,
+    // eu seria o único da sala a não ver a própria mensagem.
+    chat.receber(apelido, texto)
+  })
+  transporte.aoReceberMensagem((texto, peerId) => chat.receber(apelidoDe(peerId), texto))
 
   let barra = renderizarBarraSala(codigo, sessao.souHost())
   const palco = document.createElement('div')
-  app.replaceChildren(barra, palco)
+  app.replaceChildren(barra, palco, chat.raiz)
 
   function desenhar(): void {
     const novaBarra = renderizarBarraSala(codigo, sessao.souHost())

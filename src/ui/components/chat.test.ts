@@ -1,0 +1,161 @@
+// @vitest-environment happy-dom
+import { describe, it, expect, vi } from 'vitest'
+import { criarChat, LIMITE_TEXTO, MAX_LINHAS } from './chat'
+import type { Chat } from './chat'
+
+/** Digita `texto` e submete, como quem aperta Enter no campo. */
+function digitarEEnviar(chat: Chat, texto: string): HTMLInputElement {
+  const campo = chat.raiz.querySelector('input')!
+  campo.value = texto
+  chat.raiz.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }))
+  return campo
+}
+
+describe('envio', () => {
+  it('manda o texto digitado e limpa o campo', () => {
+    const enviado = vi.fn()
+    const chat = criarChat(enviado)
+
+    const campo = digitarEEnviar(chat, 'boa mão')
+
+    expect(enviado).toHaveBeenCalledWith('boa mão')
+    expect(campo.value).toBe('')
+  })
+
+  it('ignora mensagem vazia ou só de espaços', () => {
+    const enviado = vi.fn()
+    const chat = criarChat(enviado)
+
+    digitarEEnviar(chat, '   ')
+
+    expect(enviado).not.toHaveBeenCalled()
+  })
+
+  it('corta o texto no limite em vez de mandar mensagem sem fim', () => {
+    const enviado = vi.fn()
+    const chat = criarChat(enviado)
+
+    digitarEEnviar(chat, 'a'.repeat(LIMITE_TEXTO + 50))
+
+    expect(enviado).toHaveBeenCalledWith('a'.repeat(LIMITE_TEXTO))
+  })
+})
+
+describe('recepção', () => {
+  it('mostra o apelido e o texto de quem falou', () => {
+    const chat = criarChat(vi.fn())
+
+    chat.receber('Alex', 'boa mão')
+
+    const linha = chat.raiz.querySelector('.chat-linha')!
+    expect(linha.textContent).toContain('Alex')
+    expect(linha.textContent).toContain('boa mão')
+  })
+
+  it('nunca interpreta a mensagem como HTML — o texto chega de outro navegador', () => {
+    const chat = criarChat(vi.fn())
+    const malicioso = '<img src=x onerror="window.__xss = true">'
+
+    chat.receber('Alex', malicioso)
+
+    expect(chat.raiz.querySelector('img')).toBeNull()
+    expect(chat.raiz.textContent).toContain(malicioso)
+  })
+
+  it('nunca interpreta o apelido como HTML — ele também chega de fora', () => {
+    const chat = criarChat(vi.fn())
+
+    chat.receber('<img src=x onerror="window.__xss = true">', 'oi')
+
+    expect(chat.raiz.querySelector('img')).toBeNull()
+  })
+
+  it('descarta as linhas mais antigas em vez de crescer sem limite', () => {
+    const chat = criarChat(vi.fn())
+
+    for (let i = 0; i < MAX_LINHAS + 10; i++) chat.receber('Alex', `msg ${i}`)
+
+    expect(chat.raiz.querySelectorAll('.chat-linha')).toHaveLength(MAX_LINHAS)
+    expect(chat.raiz.textContent).not.toContain('msg 0')
+    expect(chat.raiz.textContent).toContain(`msg ${MAX_LINHAS + 9}`)
+  })
+})
+
+describe('rolagem', () => {
+  /** happy-dom não faz layout: `scrollHeight` é sempre 0 se não for forjado. */
+  function forjarAltura(log: Element, altura: number): void {
+    Object.defineProperty(log, 'scrollHeight', { value: altura, configurable: true })
+  }
+
+  it('rola até a mensagem mais nova em vez de deixar a conversa parada no topo', () => {
+    const chat = criarChat(vi.fn())
+    const log = chat.raiz.querySelector('.chat-log')!
+    forjarAltura(log, 500)
+
+    chat.receber('Alex', 'oi')
+
+    expect(log.scrollTop).toBe(500)
+  })
+
+  it('ao abrir a gaveta, mostra o fim da conversa e não o começo', () => {
+    const chat = criarChat(vi.fn())
+    const log = chat.raiz.querySelector('.chat-log')!
+    chat.receber('Alex', 'oi')
+    forjarAltura(log, 800)
+
+    chat.raiz.querySelector<HTMLButtonElement>('.chat-gatilho')!.click()
+
+    expect(log.scrollTop).toBe(800)
+  })
+})
+
+describe('gaveta', () => {
+  function gatilho(chat: Chat): HTMLButtonElement {
+    return chat.raiz.querySelector<HTMLButtonElement>('.chat-gatilho')!
+  }
+
+  it('começa fechada para não roubar a tela da mesa', () => {
+    const chat = criarChat(vi.fn())
+
+    expect(chat.raiz.dataset['aberto']).toBe('0')
+    expect(gatilho(chat).getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('o gatilho abre e fecha', () => {
+    const chat = criarChat(vi.fn())
+
+    gatilho(chat).click()
+    expect(chat.raiz.dataset['aberto']).toBe('1')
+    expect(gatilho(chat).getAttribute('aria-expanded')).toBe('true')
+
+    gatilho(chat).click()
+    expect(chat.raiz.dataset['aberto']).toBe('0')
+  })
+
+  it('conta as mensagens que chegam com a gaveta fechada', () => {
+    const chat = criarChat(vi.fn())
+
+    chat.receber('Alex', 'oi')
+    chat.receber('Bruno', 'e aí')
+
+    expect(chat.raiz.querySelector('.chat-nao-lidas')!.textContent).toBe('2')
+  })
+
+  it('zera o contador ao abrir', () => {
+    const chat = criarChat(vi.fn())
+    chat.receber('Alex', 'oi')
+
+    gatilho(chat).click()
+
+    expect(chat.raiz.querySelector('.chat-nao-lidas')).toBeNull()
+  })
+
+  it('não acumula não-lidas enquanto a gaveta está aberta', () => {
+    const chat = criarChat(vi.fn())
+    gatilho(chat).click()
+
+    chat.receber('Alex', 'oi')
+
+    expect(chat.raiz.querySelector('.chat-nao-lidas')).toBeNull()
+  })
+})

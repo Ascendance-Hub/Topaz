@@ -26,6 +26,19 @@ reivindica o posto de anfitrião se ninguém aparecer e a eleição cair nele.
 Se o anfitrião cair, outro jogador já conectado assume automaticamente e a
 partida continua; quem entra depois não vira anfitrião só por entrar.
 
+### Chat
+
+Um painel no canto abre a conversa da mesa. Todo mundo na sala fala — sentados,
+espectadores e quem já quebrou — e o nome que aparece é o apelido registrado na
+partida, não um texto que o remetente escolhe, então ninguém se passa por outro.
+
+As mensagens trafegam por um canal próprio, direto entre os navegadores: não
+passam pelo anfitrião nem entram no estado do jogo, de modo que nada que
+aconteça no chat pode atrapalhar a partida. Em troca, **não existe histórico**:
+quem entra depois começa em branco, e recarregar a página apaga a conversa. Não
+há como moderar nem bloquear alguém — sem servidor, não haveria onde. Mande o
+link só para quem você conhece.
+
 ### Privacidade
 
 Entrar numa sala expõe o endereço IP dos participantes uns aos outros. Isso é
