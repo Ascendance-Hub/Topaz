@@ -148,3 +148,91 @@ describe('iniciarApp — fallback de erro na inicialização', () => {
     expect(app.querySelector('.lobby')).not.toBeNull()
   })
 })
+
+describe('iniciarPartida — chat da sala', () => {
+  /**
+   * Sobe 'pb' (a aba sob teste) numa sala onde 'pa' já é anfitrião com o
+   * apelido Alex, e devolve o transporte de 'pa' para simular alguém falando.
+   */
+  function salaComDoisJogadores() {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const transporteA = rede.conectar('pa')
+    const outraAba = new Sessao(transporteA, () => rngSemente(1))
+    outraAba.entrar('Alex')
+
+    vi.mocked(criarTransporteTrystero).mockImplementation(() => rede.conectar('pb'))
+    const app = document.createElement('div')
+    iniciarPartida(app, 'Bruno', 'CODIGO01')
+
+    rede.bombear()
+    vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+    outraAba.tique(Date.now())
+
+    return { app, transporteA, outraAba }
+  }
+
+  function digitar(app: HTMLElement, texto: string): HTMLInputElement {
+    const campo = app.querySelector<HTMLInputElement>('.chat-campo')!
+    campo.value = texto
+    return campo
+  }
+
+  function submeter(app: HTMLElement): void {
+    app.querySelector('.chat-form')!.dispatchEvent(new Event('submit', { cancelable: true }))
+  }
+
+  it('mostra na própria tela a mensagem que eu mandei', () => {
+    vi.useFakeTimers()
+    try {
+      const { app } = salaComDoisJogadores()
+
+      digitar(app, 'boa mão')
+      submeter(app)
+
+      const linha = app.querySelector('.chat-linha')!
+      expect(linha.textContent).toContain('Bruno')
+      expect(linha.textContent).toContain('boa mão')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('mostra a mensagem de outro peer com o apelido dele, e não com o peerId', () => {
+    vi.useFakeTimers()
+    try {
+      const { app, transporteA } = salaComDoisJogadores()
+
+      transporteA.enviarMensagem('e aí')
+
+      const linha = app.querySelector('.chat-linha')!
+      expect(linha.textContent).toContain('Alex')
+      expect(linha.textContent).not.toContain('pa')
+      expect(linha.textContent).toContain('e aí')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('sobrevive aos re-renders da mesa sem apagar o que estava sendo digitado', () => {
+    vi.useFakeTimers()
+    try {
+      const { app, transporteA, outraAba } = salaComDoisJogadores()
+      transporteA.enviarMensagem('e aí')
+      const campo = digitar(app, 'ainda estou escrevend')
+
+      // Cada despacho do host publica um snapshot novo, e cada snapshot
+      // adotado redesenha a mesa inteira — no navegador isso acontece de
+      // 700 em 700ms durante a compra do dealer. Se o chat morasse dentro da
+      // árvore que `renderizar` substitui, era aqui que o texto sumia.
+      for (let i = 0; i < 3; i++) outraAba.entrar('Alex')
+
+      expect(app.querySelectorAll('.chat')).toHaveLength(1)
+      expect(app.querySelector<HTMLInputElement>('.chat-campo')!.value)
+        .toBe('ainda estou escrevend')
+      expect(app.contains(campo)).toBe(true)
+      expect(app.querySelector('.chat-linha')!.textContent).toContain('e aí')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

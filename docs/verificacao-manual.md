@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (245, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (338, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -40,6 +40,22 @@ simular um navegador separado.
 > memória. Ela imita o comportamento do Trystero de perto, inclusive a demora
 > para os peers aparecerem — mas continua sendo uma imitação. Se algo tiver
 > escapado, é aqui.
+
+## Chat
+
+- [ ] Mensagem enviada de uma aba aparece nas outras, com o apelido de quem
+      mandou — e na própria aba de quem enviou também
+- [ ] Com o painel fechado, o gatilho mostra o número de mensagens não lidas, e
+      abrir zera a contagem
+- [ ] Digitar uma mensagem longa e **não** enviar: o texto continua no campo
+      enquanto a mesa se movimenta (durante a compra do dealer, que redesenha a
+      cada 700ms) — este é o ponto que a arquitetura do painel existe para
+      garantir
+- [ ] O log rola sozinho para a mensagem mais nova
+- [ ] Uma mensagem de 200 caracteres sem espaço nenhum não estica o painel para
+      fora da tela
+- [ ] No celular, o painel aberto não cobre a mesa a ponto de impedir de jogar,
+      e o teclado não esconde o campo
 
 ## Aparência
 
@@ -113,6 +129,32 @@ voltar — e se resolve sozinho cerca de um minuto depois de ele fechar a aba.
 
 **A nova disposição da sala de espera, a tela de fim e o painel de ajuda nunca
 foram vistos num navegador de verdade**, só em DOM de teste.
+
+## Limitações do chat
+
+Consequências assumidas de manter a conversa fora do estado do jogo.
+
+**Não há histórico.** Quem entra depois só vê o que for dito dali em diante, e
+recarregar a página apaga a conversa. Foi escolha explícita: guardar histórico
+significaria replicá-lo no estado do host, fazê-lo sobreviver à migração de
+anfitrião e resolvê-lo no encontro de duas mesas — custo alto para papo de mesa.
+
+**A ordem das mensagens pode diferir entre navegadores.** Cada um mostra na
+ordem em que recebeu, e não há relógio comum. Duas falas quase simultâneas podem
+aparecer trocadas em telas diferentes.
+
+**Uma mensagem enviada para alguém que ainda não completou a conexão se perde.**
+Não há reenvio: o canal é o mesmo caminho direto que a partida usa, sem fila.
+
+**Não dá para silenciar nem bloquear ninguém**, e não há limite de frequência —
+nada impede alguém de inundar o painel. Sem servidor não existe onde moderar; a
+proteção é o link só ir para quem você conhece.
+
+**Quem falar antes de o primeiro snapshot do host chegar aparece como
+"Alguém"**, porque o apelido vem do estado da partida e ele ainda não está lá.
+Dura o tempo de um round-trip.
+
+**O painel nunca foi visto num navegador de verdade**, só em DOM de teste.
 
 ## Decisões em aberto
 

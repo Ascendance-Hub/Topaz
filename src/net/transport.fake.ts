@@ -7,6 +7,7 @@ interface No {
   aoEstado: ((estado: EstadoJogo, peerId: string) => void)[]
   aoEntrar: ((peerId: string) => void)[]
   aoSair: ((peerId: string) => void)[]
+  aoMensagem: ((texto: string, peerId: string) => void)[]
 }
 
 export interface OpcoesRedeFalsa {
@@ -59,7 +60,7 @@ export function criarRedeFalsa(opcoes: OpcoesRedeFalsa = {}) {
   }
 
   function conectar(id: string): Transporte {
-    const no: No = { id, aoAcao: [], aoEstado: [], aoEntrar: [], aoSair: [] }
+    const no: No = { id, aoAcao: [], aoEstado: [], aoEntrar: [], aoSair: [], aoMensagem: [] }
 
     // Insere primeiro, depois avisa — assim `peers()` já enxerga o novo
     // peer de dentro do próprio callback `aoEntrarPeer`, igual ao Trystero
@@ -92,6 +93,14 @@ export function criarRedeFalsa(opcoes: OpcoesRedeFalsa = {}) {
       },
       aoReceberEstado: (cb) => {
         no.aoEstado.push(cb)
+      },
+      enviarMensagem: (texto) => {
+        for (const outro of destinatarios()) {
+          for (const cb of outro.aoMensagem) cb(texto, id)
+        }
+      },
+      aoReceberMensagem: (cb) => {
+        no.aoMensagem.push(cb)
       },
       aoEntrarPeer: (cb) => {
         no.aoEntrar.push(cb)

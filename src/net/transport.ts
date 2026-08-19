@@ -10,6 +10,14 @@ export interface Transporte {
   aoReceberAcao(cb: (acao: Acao, peerId: string) => void): void
   enviarEstado(estado: EstadoJogo): void
   aoReceberEstado(cb: (estado: EstadoJogo, peerId: string) => void): void
+  /**
+   * Conversa da mesa. Canal à parte de propósito: o chat não passa pelo
+   * anfitrião, não entra no `EstadoJogo` e não é conceito de blackjack — por
+   * isso o texto é só uma string aqui, e não um tipo em `game/types.ts`.
+   * Mensagem perdida não tem como corromper partida nenhuma.
+   */
+  enviarMensagem(texto: string): void
+  aoReceberMensagem(cb: (texto: string, peerId: string) => void): void
   aoEntrarPeer(cb: (peerId: string) => void): void
   aoSairPeer(cb: (peerId: string) => void): void
   sair(): void
@@ -19,6 +27,7 @@ export function criarTransporteTrystero(codigoSala: string): Transporte {
   const sala = joinRoom({ appId: APP_ID }, codigoSala)
   const acaoAction = sala.makeAction<Acao>('acao')
   const estadoAction = sala.makeAction<EstadoJogo>('estado')
+  const chatAction = sala.makeAction<string>('chat')
 
   // Trystero só guarda um handler por slot (`onMessage`, `onPeerJoin`,
   // `onPeerLeave`) — atribuir de novo substitui o anterior em vez de somar.
@@ -29,12 +38,16 @@ export function criarTransporteTrystero(codigoSala: string): Transporte {
   const aoEstado: ((estado: EstadoJogo, peerId: string) => void)[] = []
   const aoEntrar: ((peerId: string) => void)[] = []
   const aoSair: ((peerId: string) => void)[] = []
+  const aoMensagem: ((texto: string, peerId: string) => void)[] = []
 
   acaoAction.onMessage = (acao, contexto) => {
     for (const cb of aoAcao) cb(acao, contexto.peerId)
   }
   estadoAction.onMessage = (estado, contexto) => {
     for (const cb of aoEstado) cb(estado, contexto.peerId)
+  }
+  chatAction.onMessage = (texto, contexto) => {
+    for (const cb of aoMensagem) cb(texto, contexto.peerId)
   }
   sala.onPeerJoin = (peerId) => {
     for (const cb of aoEntrar) cb(peerId)
@@ -57,6 +70,12 @@ export function criarTransporteTrystero(codigoSala: string): Transporte {
     },
     aoReceberEstado: (cb) => {
       aoEstado.push(cb)
+    },
+    enviarMensagem: (texto) => {
+      void chatAction.send(texto)
+    },
+    aoReceberMensagem: (cb) => {
+      aoMensagem.push(cb)
     },
     aoEntrarPeer: (cb) => {
       aoEntrar.push(cb)
