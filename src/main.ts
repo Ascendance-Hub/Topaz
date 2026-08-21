@@ -7,7 +7,8 @@ import { criarChat } from './ui/components/chat'
 import { renderizarNavSala, renderizarSalaParada } from './ui/components/sala'
 import { renderizarControlesCall } from './ui/components/call'
 import type { AcoesCall } from './ui/components/call'
-import { criarVideoRemoto } from './ui/components/video-remoto'
+import { criarVideoRemoto, mostrarVideo } from './ui/components/video-remoto'
+import { ehTela } from './call/classificar'
 import { criarCanalCall } from './call/canal'
 import { ProtocoloCall } from './call/protocolo'
 import { Midia } from './call/midia'
@@ -106,6 +107,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       protocolo.sair()
       midia.desligarMicrofone()
       midia.pararTela()
+      // Sair precisa calar tudo de verdade: um `<video>` escondido continua
+      // tocando, e era isso que deixava o som da tela saindo depois de sair.
+      for (const caixa of videos.querySelectorAll<HTMLElement>('[data-de]')) caixa.remove()
+      audios.replaceChildren()
     },
     compartilhar: () => {
       void midia.compartilharTela(() => {
@@ -121,6 +126,16 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     pararTela: () => {
       protocolo.definirCompartilhando(false)
       midia.pararTela()
+    },
+    alternarMeuMicrofone: () => {
+      midia.alternarMicrofone()
+      desenhar()
+    },
+    alternarSilenciarTodos: () => {
+      todosSilenciados = !todosSilenciados
+      const atual = protocolo.estado()
+      ajustarVideos(atual.assistindo, atual.compartilhando)
+      desenhar()
     },
     assistir: (peerId) => protocolo.assistir(peerId),
     pararDeAssistir: (peerId) => protocolo.pararDeAssistir(peerId),
@@ -155,6 +170,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * Ele só sai de vez quando a pessoa para de compartilhar (ou sai da sala),
    * aí sim não há mais nada para mostrar.
    */
+  let todosSilenciados = false
+
   function ajustarVideos(assistindo: string[], compartilhando: string[]): void {
     for (const caixa of videos.querySelectorAll<HTMLElement>('[data-de]')) {
       const de = caixa.dataset['de'] ?? ''
@@ -162,7 +179,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
         caixa.remove()
         continue
       }
-      caixa.hidden = !assistindo.includes(de)
+      mostrarVideo(caixa, assistindo.includes(de) && !todosSilenciados)
+    }
+    for (const el of audios.querySelectorAll<HTMLAudioElement>('audio')) {
+      el.muted = todosSilenciados
     }
   }
 
@@ -170,16 +190,19 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // A metadata vem de quem publicou (`{ tipo: 'microfone' }` ou
     // `{ tipo: 'tela' }`), e é mais confiável do que adivinhar pelo tipo da
     // faixa: uma tela sem áudio e um microfone são ambos "uma faixa só".
-    const tipo = (meta as { tipo?: string } | undefined)?.tipo
-    if (tipo === 'tela') {
+    // A classificação sai das FAIXAS do stream, não do metadado. Ver
+    // `ehTela`: a fila que pareia metadado e faixa no Trystero desalinha, e o
+    // rótulo passa a mentir — era isso que fazia alguém sumir do áudio.
+    void meta
+    if (ehTela(stream)) {
       // Uma tela por peer: se ele reabrir o compartilhamento, a nova substitui
       // a velha em vez de empilhar quadros congelados.
       // Sessão de compartilhamento nova: substitui a caixa inteira, para não
       // ficar um quadro congelado da sessão anterior.
       removerVideoDe(de)
       const caixa = criarVideoRemoto(de, stream, apelidoDe(de))
-      caixa.hidden = !protocolo.estado().assistindo.includes(de)
       videos.append(caixa)
+      mostrarVideo(caixa, protocolo.estado().assistindo.includes(de))
       return
     }
 
@@ -251,7 +274,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
 
     const novosControles =
       renderizarControlesCall(
-        protocolo.estado(), acoesCall, midia.qualidade(), midia.tipoConteudo())
+        protocolo.estado(), acoesCall, midia.qualidade(), midia.tipoConteudo(),
+        { apelidoDe, meuMicrofoneMudo: midia.microfoneMudo(), todosSilenciados })
     controles.replaceWith(novosControles)
     controles = novosControles
 
