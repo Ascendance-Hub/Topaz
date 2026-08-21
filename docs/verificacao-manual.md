@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (356, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (378, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -34,6 +34,10 @@ simular um navegador separado.
 - [ ] Quem está na sala aparece na lista mesmo sem ter sentado
 - [ ] Quem fecha a aba aparece marcado como caído antes de sumir
 - [ ] Abrir a mesa não arrasta os outros junto — cada um escolhe o que vê
+- [ ] Com a partida rolando e você na sala, o botão "Mesa" ganha uma marca
+      quando a mesa espera por você — na aposta, no seguro e na sua vez
+- [ ] A marca some assim que você responde, e não aparece com a mesa aberta
+- [ ] Com "reduzir movimento" ligado, a marca aparece sem pulsar
 
 ## Rede
 

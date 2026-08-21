@@ -7,6 +7,7 @@ import { criarChat } from './ui/components/chat'
 import { renderizarNavSala, renderizarSalaParada } from './ui/components/sala'
 import { renderizar } from './ui/render'
 import { rngSemente } from './game/shoe'
+import { mesaEsperaPor } from './game/rules'
 
 /** Quem falou antes de a mesa saber o nome dele. */
 export const APELIDO_DESCONHECIDO = 'Alguém'
@@ -68,8 +69,19 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     desenhar()
   }
 
+  /**
+   * A marca só faz sentido quando a mesa está fora da tela: com a mesa
+   * aberta, os botões que ela anunciaria já estão à vista, e a bolinha viraria
+   * ruído em cima de algo que a pessoa já está olhando.
+   */
+  function mesaEspera(): boolean {
+    return !mesaAberta
+      && sessao.statusConexao() === 'conectado'
+      && mesaEsperaPor(sessao.estado(), sessao.meuId())
+  }
+
   let barra = renderizarBarraSala(codigo, sessao.souHost())
-  let nav = renderizarNavSala(mesaAberta, alternarMesa)
+  let nav = renderizarNavSala(mesaAberta, alternarMesa, mesaEspera())
   // `palco` é criado uma vez e só tem os filhos trocados: `renderizar` guarda
   // a contagem de cartas no dataset dele para decidir animação, e recriar o
   // elemento a cada ida e volta faria as cartas voarem de novo sem motivo.
@@ -81,7 +93,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     barra.replaceWith(novaBarra)
     barra = novaBarra
 
-    const novaNav = renderizarNavSala(mesaAberta, alternarMesa)
+    const novaNav = renderizarNavSala(mesaAberta, alternarMesa, mesaEspera())
     nav.replaceWith(novaNav)
     nav = novaNav
 

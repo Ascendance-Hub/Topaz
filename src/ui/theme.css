@@ -446,3 +446,25 @@ body {
 .sala-quem[data-eu="1"] { border-color: var(--topazio-600); }
 .sala-quem[data-caiu="1"] { opacity: 0.5; font-style: italic; }
 .sala-aviso { color: var(--texto-fraco); font-size: 13px; margin-top: 16px; }
+
+/* Marca de "a mesa espera por você". O botão vira relativo só quando marcado,
+   para não mexer no posicionamento dos outros. */
+.nav-sala-item[data-espera="1"] {
+  position: relative;
+  border-color: var(--topazio-500);
+}
+.nav-sala-marca {
+  position: absolute;
+  top: -4px; right: -4px;
+  width: 10px; height: 10px; border-radius: 999px;
+  background: var(--topazio-400);
+  box-shadow: 0 0 0 2px var(--carvao-900);
+}
+/* A pulsação chama o olho de quem está conversando e não olhando a mesa —
+   mas quem pediu menos movimento no sistema não deve receber isso. */
+@media (prefers-reduced-motion: no-preference) {
+  .nav-sala-marca { animation: marca-pulsa 1.6s ease-in-out infinite; }
+}
+@keyframes marca-pulsa {
+  50% { transform: scale(1.35); }
+}

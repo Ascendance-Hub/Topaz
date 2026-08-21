@@ -429,3 +429,80 @@ describe('entrarNaSala — várias pessoas na mesma sala', () => {
   })
 })
 
+
+describe('entrarNaSala — a sala avisa quando a mesa espera por você', () => {
+  function mesaEmTurnos() {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const ids = ['pa', 'pb']
+    let proximo = 0
+    vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+    vi.mocked(criarTransporte).mockImplementation(() => rede.conectar(ids[proximo++]!))
+
+    const appA = document.createElement('div')
+    const appB = document.createElement('div')
+    entrarNaSala(appA, 'Alex', 'CODIGO01')
+    entrarNaSala(appB, 'Bruno', 'CODIGO01')
+    rede.bombear()
+    vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+
+    const nav = (app: HTMLElement, alvo: string) =>
+      app.querySelector<HTMLButtonElement>(`[data-nav="${alvo}"]`)!.click()
+    const agir = (app: HTMLElement, sel: string) =>
+      app.querySelector<HTMLButtonElement>(`[data-acao="${sel}"]`)!.click()
+
+    nav(appA, 'mesa'); agir(appA, 'sentar')
+    nav(appB, 'mesa'); agir(appB, 'sentar')
+    vi.advanceTimersByTime(600)
+    agir(appA, 'iniciar')
+    vi.advanceTimersByTime(600)
+    return { appA, appB, nav, agir }
+  }
+
+  const marcado = (app: HTMLElement) =>
+    app.querySelector<HTMLElement>('[data-nav="mesa"]')!.dataset['espera'] === '1'
+
+  it('marca a mesa na fase de apostas para quem ainda não apostou', () => {
+    vi.useFakeTimers()
+    try {
+      const { appB, nav } = mesaEmTurnos()
+
+      nav(appB, 'sala')
+
+      expect(marcado(appB)).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a marca some assim que a aposta entra', () => {
+    vi.useFakeTimers()
+    try {
+      const { appB, nav, agir } = mesaEmTurnos()
+
+      agir(appB, 'apostar')
+      nav(appB, 'sala')
+
+      expect(marcado(appB)).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('volta a marcar quando chega a vez dele nos turnos, mesmo com a sala aberta', () => {
+    vi.useFakeTimers()
+    try {
+      const { appA, appB, nav, agir } = mesaEmTurnos()
+      agir(appA, 'apostar'); agir(appB, 'apostar')
+      vi.advanceTimersByTime(2000)
+
+      nav(appB, 'sala')
+
+      // Um dos dois tem a vez. Quem tiver, precisa estar marcado; e quem não
+      // tiver, não pode estar — senão a marca vira ruído que ninguém olha.
+      const vezDeB = appA.querySelector('[data-acao="pedir"]') === null
+      expect(marcado(appB)).toBe(vezDeB)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest'
-import { renderizarNavSala, renderizarSalaParada, AVISO_SOZINHO } from './sala'
+import { renderizarNavSala, renderizarSalaParada, AVISO_SOZINHO, ROTULO_ESPERANDO } from './sala'
 import type { EstadoJogo, Jogador } from '../../game/types'
 
 function jogador(peerId: string, apelido: string): Jogador {
@@ -86,5 +86,43 @@ describe('renderizarSalaParada', () => {
 
     expect(tela.querySelector('img')).toBeNull()
     expect(tela.textContent).toContain(malicioso)
+  })
+})
+
+describe('a marca de "a mesa espera por você"', () => {
+  it('não marca nada quando a mesa não precisa de você', () => {
+    const nav = renderizarNavSala(false, vi.fn(), false)
+
+    const mesa = nav.querySelector<HTMLElement>('[data-nav="mesa"]')!
+    expect(mesa.dataset['espera']).toBeUndefined()
+    expect(nav.querySelector('.nav-sala-marca')).toBeNull()
+  })
+
+  it('marca o botão da mesa quando ela está esperando você', () => {
+    const nav = renderizarNavSala(false, vi.fn(), true)
+
+    const mesa = nav.querySelector<HTMLElement>('[data-nav="mesa"]')!
+    expect(mesa.dataset['espera']).toBe('1')
+    expect(nav.querySelector('.nav-sala-marca')).not.toBeNull()
+  })
+
+  it('diz em texto o que a marca significa, para quem não vê a cor', () => {
+    const nav = renderizarNavSala(false, vi.fn(), true)
+
+    const mesa = nav.querySelector<HTMLElement>('[data-nav="mesa"]')!
+    expect(mesa.getAttribute('aria-label')).toContain(ROTULO_ESPERANDO)
+  })
+
+  it('nunca marca a sala — só a mesa espera por alguém', () => {
+    const nav = renderizarNavSala(false, vi.fn(), true)
+
+    expect(nav.querySelector<HTMLElement>('[data-nav="sala"]')!.dataset['espera'])
+      .toBeUndefined()
+  })
+
+  it('some assim que a mesa deixa de esperar', () => {
+    const semEspera = renderizarNavSala(true, vi.fn(), false)
+
+    expect(semEspera.querySelector('.nav-sala-marca')).toBeNull()
   })
 })

@@ -2,8 +2,11 @@ import type { EstadoJogo } from '../../game/types'
 
 export const AVISO_SOZINHO = 'Você é o único aqui. Mande o link para alguém.'
 
+export const ROTULO_ESPERANDO = 'a mesa está esperando você'
+
 function botaoNav(
   chave: string, rotulo: string, atual: boolean, aoClicar: () => void,
+  esperando = false,
 ): HTMLElement {
   const botao = document.createElement('button')
   botao.type = 'button'
@@ -13,6 +16,18 @@ function botaoNav(
   // `aria-current` em vez de só uma classe: é o que um leitor de tela usa
   // para dizer onde a pessoa está, e a marcação visual sai dele no CSS.
   if (atual) botao.setAttribute('aria-current', 'page')
+
+  if (esperando) {
+    botao.dataset['espera'] = '1'
+    // A bolinha é decorativa; quem não enxerga cor precisa do rótulo. Sem
+    // isto, o aviso existiria só para parte das pessoas.
+    botao.setAttribute('aria-label', `${rotulo} — ${ROTULO_ESPERANDO}`)
+    const marca = document.createElement('span')
+    marca.className = 'nav-sala-marca'
+    marca.setAttribute('aria-hidden', 'true')
+    botao.append(marca)
+  }
+
   botao.onclick = aoClicar
   return botao
 }
@@ -24,15 +39,21 @@ function botaoNav(
  * mesa está sempre disponível na sala, e quem decide se ela ocupa a tela é
  * cada um. Sentar, esse sim, é compartilhado — e já era antes desta tela
  * existir.
+ *
+ * `mesaEspera` marca o botão da mesa. Poder sair de perto da mesa criou um
+ * jeito novo de perder a vez em silêncio: o prazo do turno vence, o anfitrião
+ * passa a vez, e quem estava na sala descobre depois que parou numa mão que
+ * nunca escolheu parar. A marca é o aviso — e não abre a mesa sozinha, para
+ * não arrancar ninguém da conversa sem pedir licença.
  */
 export function renderizarNavSala(
-  mesaAberta: boolean, aoAlternar: (aberta: boolean) => void,
+  mesaAberta: boolean, aoAlternar: (aberta: boolean) => void, mesaEspera = false,
 ): HTMLElement {
   const nav = document.createElement('nav')
   nav.className = 'nav-sala'
   nav.append(
     botaoNav('sala', 'Sala', !mesaAberta, () => aoAlternar(false)),
-    botaoNav('mesa', 'Mesa', mesaAberta, () => aoAlternar(true)),
+    botaoNav('mesa', 'Mesa', mesaAberta, () => aoAlternar(true), mesaEspera),
   )
   return nav
 }
