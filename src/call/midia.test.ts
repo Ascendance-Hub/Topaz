@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest'
 import { Midia } from './midia'
 import type { SalaTrystero } from '../net/transport'
@@ -77,10 +78,92 @@ describe('Midia — publicação da tela', () => {
     const { sala, publicados } = criarSalaFalsa()
     const midia = new Midia(sala)
 
-    midia.publicarTelaPara('pa')
+    midia.sincronizarTela(['pa'])
 
     // Sem tela capturada, não há o que publicar — e é isso que garante que o
     // codificador só liga depois do pedido.
     expect(publicados).toHaveLength(0)
+  })
+})
+
+/** Só o `getUserMedia` é falsificado; o resto do caminho é o de verdade. */
+function fingirMicrofone(): MediaStream {
+  const stream = { id: 'mic', getTracks: () => [] } as unknown as MediaStream
+  Object.defineProperty(navigator, 'mediaDevices', {
+    value: { getUserMedia: vi.fn().mockResolvedValue(stream) },
+    configurable: true,
+  })
+  return stream
+}
+
+describe('Midia — sincronização do microfone', () => {
+  it('publica para quem está na call assim que o microfone fica pronto', async () => {
+    const { sala, publicados } = criarSalaFalsa()
+    const midia = new Midia(sala)
+    fingirMicrofone()
+
+    await midia.ligarMicrofone()
+    midia.sincronizarMicrofone(['pa'])
+
+    expect(publicados).toHaveLength(1)
+    expect(publicados[0]!.opcoes).toMatchObject({ target: ['pa'] })
+  })
+
+  it('não publica duas vezes para o mesmo peer', async () => {
+    const { sala, publicados } = criarSalaFalsa()
+    const midia = new Midia(sala)
+    fingirMicrofone()
+    await midia.ligarMicrofone()
+
+    midia.sincronizarMicrofone(['pa'])
+    midia.sincronizarMicrofone(['pa'])
+
+    expect(publicados).toHaveLength(1)
+  })
+
+  it('publica para quem entrou depois, sem repetir para quem já tinha', async () => {
+    const { sala, publicados } = criarSalaFalsa()
+    const midia = new Midia(sala)
+    fingirMicrofone()
+    await midia.ligarMicrofone()
+    midia.sincronizarMicrofone(['pa'])
+
+    midia.sincronizarMicrofone(['pa', 'pb'])
+
+    expect(publicados).toHaveLength(2)
+    expect(publicados[1]!.opcoes).toMatchObject({ target: ['pb'] })
+  })
+
+  it('quem foi pedido ANTES do microfone existir ainda recebe depois', async () => {
+    const { sala, publicados } = criarSalaFalsa()
+    const midia = new Midia(sala)
+    fingirMicrofone()
+
+    // É o caso real: os dois clicam "Entrar na call" juntos, e o anúncio do
+    // outro chega durante a janela de permissão do microfone. Com detecção de
+    // borda, esta publicação era descartada e nunca mais tentada — e ninguém
+    // ouvia ninguém.
+    midia.sincronizarMicrofone(['pa'])
+    expect(publicados).toHaveLength(0)
+
+    await midia.ligarMicrofone()
+    midia.sincronizarMicrofone(['pa'])
+
+    expect(publicados).toHaveLength(1)
+  })
+
+  it('para de mandar o microfone para quem saiu da call', async () => {
+    const { sala, bruta, publicados } = criarSalaFalsa()
+    const midia = new Midia(sala)
+    fingirMicrofone()
+    await midia.ligarMicrofone()
+    midia.sincronizarMicrofone(['pa'])
+
+    midia.sincronizarMicrofone([])
+
+    expect(bruta.removeStream).toHaveBeenCalledWith(expect.anything(), { target: ['pa'] })
+    // E se ele voltar, publica de novo em vez de achar que já mandou.
+    midia.sincronizarMicrofone(['pa'])
+    expect(publicados).toHaveLength(2)
   })
 })
