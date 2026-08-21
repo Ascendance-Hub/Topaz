@@ -1,5 +1,5 @@
 import { avaliar, ehBlackjackNatural, valorCarta } from './hand'
-import type { Carta, Jogador, Mao, ResultadoMao, TipoAcao } from './types'
+import type { Carta, EstadoJogo, Jogador, Mao, ResultadoMao, TipoAcao } from './types'
 
 export const REGRAS = Object.freeze({
   numBaralhos: 6,
@@ -30,6 +30,38 @@ export const REGRAS = Object.freeze({
  */
 export function aindaEmJogo(jogador: Jogador): boolean {
   return jogador.eliminadoEm === null && jogador.fichas >= REGRAS.apostaMin
+}
+
+/**
+ * A mesa está parada esperando uma ação DESTE jogador agora?
+ *
+ * Existe porque a mesa deixou de ser a tela inteira: quem está na sala (ou,
+ * mais tarde, numa call) não vê o painel e perde a vez em silêncio quando o
+ * prazo vence — parando numa mão que ele nunca escolheu parar.
+ *
+ * As três condições espelham exatamente as que fazem `painelProprio` mostrar
+ * botões. Ficam aqui, e não na camada de UI, para não haver duas respostas
+ * possíveis à mesma pergunta: um aviso que aparece sem botão embaixo, ou um
+ * botão esperando sem aviso nenhum, seriam os dois piores que não ter aviso.
+ */
+export function mesaEsperaPor(estado: EstadoJogo, peerId: string): boolean {
+  const jogador = estado.jogadores.find((j) => j.peerId === peerId)
+  // De pé não há o que responder: quem não tem cadeira não recebe painel.
+  if (!jogador || jogador.cadeira === null) return false
+
+  switch (estado.fase) {
+    case 'apostas':
+      // `aindaEmJogo` e não só `maos.length === 0`: sem fichas para a aposta
+      // mínima os botões nascem desabilitados, e avisar seria mandar a pessoa
+      // largar a conversa para olhar uma tela onde não há nada a fazer.
+      return jogador.maos.length === 0 && aindaEmJogo(jogador)
+    case 'seguro':
+      return jogador.maos.length > 0 && !jogador.decidiuSeguro
+    case 'turnos':
+      return estado.vezDe === peerId && jogador.maos[jogador.maoAtiva] !== undefined
+    default:
+      return false
+  }
 }
 
 export function dealerDeveComprar(cartas: Carta[]): boolean {

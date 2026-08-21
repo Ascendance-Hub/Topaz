@@ -1,4 +1,4 @@
-import { montarLinkSala } from '../sala'
+import { montarLinkSala } from '../codigo'
 
 export const ROTULO_COPIAR = 'Copiar link'
 export const ROTULO_COPIADO = 'Copiado!'

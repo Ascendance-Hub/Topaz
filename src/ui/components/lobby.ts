@@ -1,6 +1,6 @@
 import {
   ehCodigoValido, gerarCodigoSala, haCodigoNaUrl, lerCodigoDaUrl, TAMANHO_CODIGO,
-} from '../sala'
+} from '../codigo'
 
 const CHAVE_APELIDO = 'topaz:apelido'
 

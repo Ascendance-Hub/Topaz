@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest'
 import { renderizarBarraSala, ROTULO_FALHA_COPIA } from './barra-sala'
-import { montarLinkSala } from '../sala'
+import { montarLinkSala } from '../codigo'
 
 describe('renderizarBarraSala', () => {
   it('mostra o código da sala e nenhuma marca de anfitrião quando não sou host', () => {

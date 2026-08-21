@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
-  REGRAS, acoesDisponiveis, aindaEmJogo, pagamento, resultadoDe, dealerDeveComprar,
+  REGRAS, acoesDisponiveis, aindaEmJogo, mesaEsperaPor, pagamento, resultadoDe,
+  dealerDeveComprar,
 } from './rules'
-import type { Carta, Jogador, Mao } from './types'
+import type { Carta, EstadoJogo, Jogador, Mao } from './types'
 
 const c = (valor: Carta['valor']): Carta => ({ valor, naipe: 'copas' })
 const c2 = (valor: Carta['valor']): Carta => ({ valor, naipe: 'paus' })
@@ -188,5 +189,78 @@ describe('pagamento', () => {
     const pago = pagamento(mao([c('A'), c('K')], { aposta: 25 }), [c('10'), c('8')])
     expect(pago).toBe(62)
     expect(Number.isInteger(pago)).toBe(true)
+  })
+})
+
+describe('mesaEsperaPor', () => {
+  function estado(extras: Partial<EstadoJogo> = {}): EstadoJogo {
+    return {
+      fase: 'apostas', jogadores: [], vezDe: null, prazoTurno: null,
+      maoDealer: [], dealerTemOculta: false, cartasRestantes: 312,
+      hostAtual: 'p1', rodada: 1, proximoIdMao: 1, vencedor: null,
+      naPartida: ['p1'], ...extras,
+    }
+  }
+
+  it('espera na fase de apostas quem está sentado e ainda não apostou', () => {
+    const eu = jogador({ maos: [] })
+
+    expect(mesaEsperaPor(estado({ jogadores: [eu] }), 'p1')).toBe(true)
+  })
+
+  it('não espera mais depois que a aposta entrou', () => {
+    const eu = jogador({ maos: [mao([c('5')])] })
+
+    expect(mesaEsperaPor(estado({ jogadores: [eu] }), 'p1')).toBe(false)
+  })
+
+  it('não espera de quem está de pé, porque ele não tem o que responder', () => {
+    const espectador = jogador({ cadeira: null })
+
+    expect(mesaEsperaPor(estado({ jogadores: [espectador] }), 'p1')).toBe(false)
+  })
+
+  it('não espera de quem não tem fichas para a aposta mínima', () => {
+    const quebrado = jogador({ fichas: REGRAS.apostaMin - 1 })
+
+    expect(mesaEsperaPor(estado({ jogadores: [quebrado] }), 'p1')).toBe(false)
+  })
+
+  it('espera na fase de seguro de quem ainda não respondeu à oferta', () => {
+    const eu = jogador({ maos: [mao([c('5')])], decidiuSeguro: false })
+
+    expect(mesaEsperaPor(estado({ fase: 'seguro', jogadores: [eu] }), 'p1')).toBe(true)
+  })
+
+  it('não espera de quem já dispensou o seguro', () => {
+    const eu = jogador({ maos: [mao([c('5')])], decidiuSeguro: true })
+
+    expect(mesaEsperaPor(estado({ fase: 'seguro', jogadores: [eu] }), 'p1')).toBe(false)
+  })
+
+  it('espera na fase de turnos quando é a vez dele', () => {
+    const eu = jogador({ maos: [mao([c('5'), c2('9')])] })
+    const agora = estado({ fase: 'turnos', jogadores: [eu], vezDe: 'p1' })
+
+    expect(mesaEsperaPor(agora, 'p1')).toBe(true)
+  })
+
+  it('não espera na fase de turnos quando a vez é de outro', () => {
+    const eu = jogador({ maos: [mao([c('5'), c2('9')])] })
+    const agora = estado({ fase: 'turnos', jogadores: [eu], vezDe: 'p2' })
+
+    expect(mesaEsperaPor(agora, 'p1')).toBe(false)
+  })
+
+  it('não espera nas fases em que ninguém age', () => {
+    const eu = jogador({ maos: [mao([c('5')])] })
+
+    for (const fase of ['aguardando', 'distribuindo', 'dealer', 'acerto', 'fim'] as const) {
+      expect(mesaEsperaPor(estado({ fase, jogadores: [eu], vezDe: 'p1' }), 'p1')).toBe(false)
+    }
+  })
+
+  it('não espera de quem nem está na mesa', () => {
+    expect(mesaEsperaPor(estado({ jogadores: [] }), 'p1')).toBe(false)
   })
 })
