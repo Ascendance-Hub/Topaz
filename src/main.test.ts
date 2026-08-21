@@ -8,6 +8,9 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('./net/transport', () => ({
   criarSalaTrystero: vi.fn(),
   criarTransporte: vi.fn(),
+  // Sinalização saudável por padrão: estes testes são sobre a sala, não sobre
+  // rede bloqueada, e zero relays mudaria a mensagem de falha.
+  relaysConectados: vi.fn(() => 3),
 }))
 
 import { criarSalaTrystero, criarTransporte } from './net/transport'
