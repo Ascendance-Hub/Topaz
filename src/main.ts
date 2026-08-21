@@ -158,8 +158,13 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       return
     }
 
+    // Um elemento por peer. Cada republicação (sair e voltar da call) traz um
+    // stream novo, e sem trocar o elemento os antigos se acumulavam segurando
+    // streams mortos.
+    audios.querySelector(`[data-de="${de}"]`)?.remove()
     const el = document.createElement('audio')
     el.autoplay = true
+    el.dataset['de'] = de
     el.srcObject = stream
     // O navegador pode recusar tocar sem gesto do usuário. Entrar na call é um
     // clique, então quase sempre há permissão — mas engolir a rejeição faria a

@@ -121,7 +121,24 @@ export class Midia {
     if (!stream) return
     const faltando = alvos.filter((id) => !publicado.has(id))
     if (faltando.length === 0) return
-    this.sala.addStream(stream, { target: faltando, metadata: { tipo } })
+
+    // Invólucro NOVO a cada publicação, e nunca o mesmo objeto duas vezes.
+    //
+    // O Trystero indexa o stream remoto por uma chave derivada do OBJETO do
+    // stream, num WeakMap. Republicar o mesmo objeto depois de um
+    // `removeStream` faz o receptor achar que já conhece aquele stream:
+    // `receiveStreamMeta` acha no cache, reentrega o stream ANTIGO — que
+    // morreu no remove — e o `ontrack` novo é descartado por não ter meta
+    // pendente. O áudio some de um lado só.
+    //
+    // Foi assim que sair e voltar para a call quebrava a conversa de forma
+    // assimétrica: quem saía criava captura nova (chave nova, funcionava),
+    // quem ficava republicava o mesmo objeto (chave repetida, morria).
+    //
+    // Remover continua usando o stream original: o Trystero casa os senders
+    // pelas FAIXAS, não pelo objeto.
+    this.sala.addStream(new MediaStream(stream.getTracks()),
+      { target: faltando, metadata: { tipo } })
     for (const id of faltando) publicado.add(id)
     if (tipo === 'tela') {
       for (const id of faltando) {

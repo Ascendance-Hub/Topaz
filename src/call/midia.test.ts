@@ -167,3 +167,41 @@ describe('Midia — sincronização do microfone', () => {
     expect(publicados).toHaveLength(2)
   })
 })
+
+describe('Midia — republicar depois de sair e voltar', () => {
+  it('publica um objeto de stream NOVO a cada republicação', async () => {
+    const { sala, publicados } = criarSalaFalsa()
+    const midia = new Midia(sala)
+    fingirMicrofone()
+    await midia.ligarMicrofone()
+
+    midia.sincronizarMicrofone(['pa'])
+    // O peer sai da call e volta — do lado de quem FICOU, o microfone é o
+    // mesmo objeto o tempo todo.
+    midia.sincronizarMicrofone([])
+    midia.sincronizarMicrofone(['pa'])
+
+    expect(publicados).toHaveLength(2)
+    // O Trystero indexa o stream remoto por uma chave derivada do OBJETO do
+    // stream, num WeakMap. Republicar o mesmo objeto faz o receptor achar que
+    // já conhece aquele stream, reentregar o antigo — que morreu no
+    // `removeStream` — e descartar o `ontrack` novo. O áudio some de um lado
+    // só, que foi exatamente o relato.
+    expect(publicados[0]!.stream).not.toBe(publicados[1]!.stream)
+  })
+
+  it('publica um MediaStream de verdade, não o objeto guardado', async () => {
+    const { sala, publicados } = criarSalaFalsa()
+    const midia = new Midia(sala)
+    const mic = fingirMicrofone()
+    await midia.ligarMicrofone()
+
+    midia.sincronizarMicrofone(['pa'])
+
+    // A identidade do objeto é o que importa aqui: é dela que sai a chave que
+    // o receptor usa para cachear. (Que as faixas viajam junto não dá para
+    // afirmar sob happy-dom, cujo `MediaStream` descarta faixas falsas.)
+    expect(publicados[0]!.stream).toBeInstanceOf(MediaStream)
+    expect(publicados[0]!.stream).not.toBe(mic)
+  })
+})
