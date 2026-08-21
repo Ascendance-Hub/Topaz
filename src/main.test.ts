@@ -6,10 +6,11 @@ import { describe, it, expect, vi } from 'vitest'
 // outra aba/navegador) na mesma rede em memória usada pelos testes de
 // `Sessao`. `vi.mock` é hoisted para antes dos imports abaixo.
 vi.mock('./net/transport', () => ({
-  criarTransporteTrystero: vi.fn(),
+  criarSalaTrystero: vi.fn(),
+  criarTransporte: vi.fn(),
 }))
 
-import { criarTransporteTrystero } from './net/transport'
+import { criarSalaTrystero, criarTransporte } from './net/transport'
 import { criarRedeFalsa } from './net/transport.fake'
 import { MS_DESCOBERTA, MS_SEM_CONEXAO, Sessao } from './net/sessao'
 import { TITULO_SEM_CONEXAO } from './ui/components/conexao'
@@ -38,7 +39,8 @@ describe('iniciarPartida — barra de sala continua atualizando o DOM real', () 
 
     // 'pb' é a aba sob teste: nasce sem saber quem manda e só descobre pelo
     // primeiro snapshot do host — igual ao fluxo real.
-    vi.mocked(criarTransporteTrystero).mockImplementation(() => rede.conectar('pb'))
+    vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+    vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
     const app = document.createElement('div')
     iniciarPartida(app, 'Bruno', 'CODIGO01')
@@ -77,7 +79,8 @@ describe('iniciarPartida — estado da conexão em vez de mesa travada', () => {
     vi.useFakeTimers()
     try {
       const rede = criarRedeFalsa({ conexaoDiferida: true })
-      vi.mocked(criarTransporteTrystero).mockImplementation(() => rede.conectar('pb'))
+      vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+      vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
       const app = document.createElement('div')
       iniciarPartida(app, 'Bruno', 'CODIGO01')
@@ -104,7 +107,8 @@ describe('iniciarPartida — estado da conexão em vez de mesa travada', () => {
       // 'pb' na eleição e nunca publica nada — é o relay fora do ar / a rede
       // que bloqueia WebRTC da spec §14.
       rede.conectar('pa')
-      vi.mocked(criarTransporteTrystero).mockImplementation(() => rede.conectar('pb'))
+      vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+      vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
       const app = document.createElement('div')
       iniciarPartida(app, 'Bruno', 'CODIGO01')
@@ -160,7 +164,8 @@ describe('iniciarPartida — chat da sala', () => {
     const outraAba = new Sessao(transporteA, () => rngSemente(1))
     outraAba.entrar('Alex')
 
-    vi.mocked(criarTransporteTrystero).mockImplementation(() => rede.conectar('pb'))
+    vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+    vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
     const app = document.createElement('div')
     iniciarPartida(app, 'Bruno', 'CODIGO01')
 

@@ -1,5 +1,5 @@
 import { Sessao } from './net/sessao'
-import { criarTransporteTrystero } from './net/transport'
+import { criarSalaTrystero, criarTransporte } from './net/transport'
 import { renderizarLobby } from './ui/components/lobby'
 import { renderizarBarraSala } from './ui/components/barra-sala'
 import { renderizarConexao } from './ui/components/conexao'
@@ -26,7 +26,7 @@ function rngDaSessao() {
  * página, nunca um órfão de uma rodada anterior.
  */
 export function iniciarPartida(app: HTMLElement, apelido: string, codigo: string): void {
-  const transporte = criarTransporteTrystero(codigo)
+  const transporte = criarTransporte(criarSalaTrystero(codigo))
   const sessao = new Sessao(transporte, rngDaSessao)
 
   /**

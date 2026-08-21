@@ -23,8 +23,22 @@ export interface Transporte {
   sair(): void
 }
 
-export function criarTransporteTrystero(codigoSala: string): Transporte {
-  const sala = joinRoom({ appId: APP_ID }, codigoSala)
+/** A conexão crua do Trystero. Dados e mídia viajam por ela. */
+export type SalaTrystero = ReturnType<typeof joinRoom>
+
+/**
+ * Abre a conexão. Fica separada de `criarTransporte` porque a mesma conexão
+ * carrega dados do jogo e, no módulo de call, mídia — abrir uma segunda seria
+ * um handshake inteiro a mais para os mesmos peers.
+ *
+ * Separar também torna `criarTransporte` testável com uma sala falsa: antes,
+ * verificar que cada canal vai para o lugar certo exigia navegador.
+ */
+export function criarSalaTrystero(codigoSala: string): SalaTrystero {
+  return joinRoom({ appId: APP_ID }, codigoSala)
+}
+
+export function criarTransporte(sala: SalaTrystero): Transporte {
   const acaoAction = sala.makeAction<Acao>('acao')
   const estadoAction = sala.makeAction<EstadoJogo>('estado')
   const chatAction = sala.makeAction<string>('chat')
