@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (525, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (532, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -85,6 +85,11 @@ exercitam o caminho real de rede.
 - [ ] Plugar ou arrancar um fone no meio da call atualiza a lista sozinho
 - [ ] No celular, o seletor deixa escolher entre os microfones do aparelho
 - [ ] Trocar de microfone estando mudo **não** reabre o microfone
+- [ ] **Com 4 pessoas**, todo mundo ouve todo mundo — inclusive quem entrou na
+      call por último
+- [ ] Quem está na call **aparece na lista da sala**, sem exceção
+- [ ] Alguém que entra atrasado aparece sozinho em alguns segundos, sem
+      ninguém precisar recarregar
 
 ## Rede
 

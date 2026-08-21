@@ -345,8 +345,17 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   desenhar()
 
   // O host avalia prazos vencidos (turno, reconexão); nos clientes o tique
-  // não faz nada — só o host tem efeito colateral (ver Sessao.tique).
-  setInterval(() => sessao.tique(Date.now()), 500)
+  // resolve a descoberta e reanuncia a presença quando ela se perde.
+  //
+  // `sincronizarMidia` entra no mesmo ritmo porque é idempotente e porque a
+  // publicação para um peer que ainda não completou o handshake é descartada
+  // pelo Trystero: sem uma nova tentativa periódica, quem entrou na call
+  // enquanto o par ainda se formava nunca seria ouvido. Quando está tudo em
+  // dia, a chamada não faz nada.
+  setInterval(() => {
+    sessao.tique(Date.now())
+    sincronizarMidia()
+  }, 500)
 
   window.addEventListener('beforeunload', () => sessao.encerrar())
 }

@@ -85,6 +85,37 @@ removeStream: (stream) => pc.getSenders()
 Ou seja: dá para remover passando **qualquer** `MediaStream` que contenha as
 mesmas faixas. Útil quando se publica invólucros diferentes (ver abaixo).
 
+### Publicar para um peer que ainda não conectou é DESCARTADO em silêncio
+
+```js
+const peer = includePending ? peerMap[id] : activePeerMap[id]
+if (!peer) {
+  console.warn(`${libName}: no peer with id ${id} found`)
+  return []                    // ← some por aqui
+}
+```
+
+**Sintoma:** com duas pessoas funciona; com três ou quatro, alguém nunca é
+ouvido. E "às vezes dá bom" — depende de quem entrou primeiro.
+
+**Causa:** `addStream` só alcança quem está em `activePeerMap`. Com duas
+pessoas o par quase sempre já está pronto quando alguém entra na call; com
+mais gente, alguém entra enquanto o par ainda se forma, e a publicação é
+jogada fora com um `console.warn`.
+
+**A armadilha real** não é o descarte — é marcar como feito depois dele.
+Qualquer bookkeeping do tipo "já publiquei para X" precisa conferir se X
+estava ativo, senão a tentativa some para sempre.
+
+**Conserto:** publicar só para quem está em `getPeers()`, e chamar a
+sincronização periodicamente. Idempotente, então quando está tudo em dia não
+faz nada.
+
+**A mesma armadilha vale para `enviarAcao`:** um `entrar` despachado antes de o
+par com o anfitrião ficar ativo some do mesmo jeito, e o jogador fica invisível
+para todo mundo enquanto conversa normalmente na call. Cada peer conferir a
+própria presença e se reanunciar conserta sem coordenação nenhuma.
+
 ### O receptor cacheia o stream remoto pelo OBJETO do remetente
 
 **Sintoma:** sair e voltar da call quebrava a conversa de forma **assimétrica**
