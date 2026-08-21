@@ -538,3 +538,18 @@ body {
   border: 1px solid var(--carvao-500);
   font-family: var(--serif); font-size: 12px; cursor: pointer;
 }
+
+/* Em tela cheia a caixa vira o palco inteiro, e o vídeo ocupa o que sobra
+   depois da barra — sem esticar, para não distorcer a tela compartilhada. */
+.video-remoto:fullscreen {
+  display: flex;
+  flex-direction: column;
+  width: 100vw; height: 100vh;
+  background: #000;
+}
+.video-remoto:fullscreen video {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  object-fit: contain;
+}

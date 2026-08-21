@@ -39,9 +39,14 @@ export function criarVideoRemoto(
   const video = document.createElement('video') as VideoComPiP
   video.autoplay = true
   video.playsInline = true
-  // Mudo de propósito: a voz dele já chega pelo microfone, e o elemento de
-  // vídeo com som duplicaria a fala com um pequeno atraso.
-  video.muted = true
+  // Este elemento carrega só as faixas da TELA. A voz da pessoa chega por
+  // outro caminho, o do microfone, então tocar o som daqui não duplica fala —
+  // só entrega o áudio do que ela está compartilhando.
+  //
+  // Sem áudio na tela, mudo: um `<video>` sem som que se declara com som é
+  // motivo de o navegador recusar o autoplay à toa.
+  const temAudio = stream.getAudioTracks().length > 0
+  video.muted = !temAudio
   video.srcObject = stream
 
   const barra = document.createElement('div')
@@ -54,6 +59,31 @@ export function criarVideoRemoto(
     nome.textContent = apelido
     barra.append(nome)
   }
+
+  if (temAudio) {
+    const som = botao('som', 'Silenciar')
+    som.onclick = () => {
+      video.muted = !video.muted
+      som.textContent = video.muted ? 'Ouvir' : 'Silenciar'
+      // O clique é um gesto do usuário: se o autoplay tinha sido recusado, é
+      // aqui que o som finalmente começa.
+      if (!video.muted) void video.play?.().catch(() => {})
+    }
+    barra.append(som)
+  }
+
+  const telaCheia = botao('tela-cheia', 'Tela cheia')
+  telaCheia.onclick = () => {
+    // A CAIXA, não o `<video>`: em tela cheia a barra de controles continua
+    // acessível, e dá para sair, recolher ou abrir o PiP sem sair antes.
+    const promessa = document.fullscreenElement === caixa
+      ? document.exitFullscreen()
+      : caixa.requestFullscreen?.()
+    void promessa?.catch((erro) => {
+      console.warn('tela cheia recusada:', erro)
+    })
+  }
+  barra.append(telaCheia)
 
   const expandir = botao('expandir', ROTULO_EXPANDIR)
   expandir.onclick = () => {

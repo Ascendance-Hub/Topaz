@@ -13,7 +13,7 @@ function estado(extras: Partial<EstadoCall> = {}): EstadoCall {
 const acoes = () => ({
   entrar: vi.fn(), sair: vi.fn(), compartilhar: vi.fn(),
   pararTela: vi.fn(), assistir: vi.fn(), pararDeAssistir: vi.fn(),
-  definirQualidade: vi.fn(),
+  definirQualidade: vi.fn(), definirTipoConteudo: vi.fn(),
 })
 
 describe('controles da call', () => {
@@ -153,5 +153,35 @@ describe('seletor de qualidade da tela', () => {
     select.dispatchEvent(new Event('change'))
 
     expect(a.definirQualidade).toHaveBeenCalledWith(1080)
+  })
+})
+
+describe('seletor de tipo de conteúdo', () => {
+  it('só aparece para quem está compartilhando', () => {
+    const semTela = renderizarControlesCall(estado({ euNaCall: true }), acoes())
+    const comTela = renderizarControlesCall(
+      estado({ euNaCall: true, euCompartilhando: true }), acoes())
+
+    expect(semTela.querySelector('[data-call="conteudo"]')).toBeNull()
+    expect(comTela.querySelector('[data-call="conteudo"]')).not.toBeNull()
+  })
+
+  it('trocar pede o novo tipo', () => {
+    const a = acoes()
+    const c = renderizarControlesCall(
+      estado({ euNaCall: true, euCompartilhando: true }), a, 720, 'motion')
+    const select = c.querySelector<HTMLSelectElement>('[data-call="conteudo"]')!
+
+    select.value = 'detail'
+    select.dispatchEvent(new Event('change'))
+
+    expect(a.definirTipoConteudo).toHaveBeenCalledWith('detail')
+  })
+
+  it('nasce no tipo em uso', () => {
+    const c = renderizarControlesCall(
+      estado({ euNaCall: true, euCompartilhando: true }), acoes(), 720, 'detail')
+
+    expect(c.querySelector<HTMLSelectElement>('[data-call="conteudo"]')!.value).toBe('detail')
   })
 })

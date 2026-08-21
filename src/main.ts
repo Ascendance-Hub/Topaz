@@ -128,6 +128,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       midia.definirQualidade(altura)
       desenhar()
     },
+    definirTipoConteudo: (tipo) => {
+      midia.definirTipoConteudo(tipo)
+      desenhar()
+    },
   }
 
   // Área de áudio remoto: criada uma vez e nunca substituída, pelo mesmo motivo
@@ -142,6 +146,26 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     videos.querySelector(`[data-de="${peerId}"]`)?.remove()
   }
 
+  /**
+   * O stream de tela chega UMA vez por sessão de compartilhamento — depois
+   * disso, assistir e parar só ligam e desligam o codificador do outro lado,
+   * sem renegociar. Então o elemento é escondido, nunca removido: removê-lo
+   * faria a tela não voltar, porque não haveria stream novo para recriá-lo.
+   *
+   * Ele só sai de vez quando a pessoa para de compartilhar (ou sai da sala),
+   * aí sim não há mais nada para mostrar.
+   */
+  function ajustarVideos(assistindo: string[], compartilhando: string[]): void {
+    for (const caixa of videos.querySelectorAll<HTMLElement>('[data-de]')) {
+      const de = caixa.dataset['de'] ?? ''
+      if (!compartilhando.includes(de)) {
+        caixa.remove()
+        continue
+      }
+      caixa.hidden = !assistindo.includes(de)
+    }
+  }
+
   midia.aoReceberMidia((stream, de, meta) => {
     // A metadata vem de quem publicou (`{ tipo: 'microfone' }` ou
     // `{ tipo: 'tela' }`), e é mais confiável do que adivinhar pelo tipo da
@@ -150,8 +174,12 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     if (tipo === 'tela') {
       // Uma tela por peer: se ele reabrir o compartilhamento, a nova substitui
       // a velha em vez de empilhar quadros congelados.
+      // Sessão de compartilhamento nova: substitui a caixa inteira, para não
+      // ficar um quadro congelado da sessão anterior.
       removerVideoDe(de)
-      videos.append(criarVideoRemoto(de, stream, apelidoDe(de)))
+      const caixa = criarVideoRemoto(de, stream, apelidoDe(de))
+      caixa.hidden = !protocolo.estado().assistindo.includes(de)
+      videos.append(caixa)
       return
     }
 
@@ -176,8 +204,6 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * Quem entra na call depois de mim precisa receber meu microfone: o
    * `addStream` inicial só alcançou quem já estava lá.
    */
-  let assistindoAntes: string[] = []
-
   /**
    * Uma função só, idempotente, chamada a cada mudança E depois de cada
    * captura ficar pronta. Não guarda "o que mudou": descreve o que deveria
@@ -196,10 +222,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // último e o codificador desliga — que é o ponto de todo o desenho.
     midia.sincronizarTela(atual.assistidoPor)
 
-    for (const peerId of assistindoAntes) {
-      if (!atual.assistindo.includes(peerId)) removerVideoDe(peerId)
-    }
-    assistindoAntes = atual.assistindo
+    ajustarVideos(atual.assistindo, atual.compartilhando)
   }
 
   protocolo.aoMudar(() => {
@@ -209,7 +232,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
 
   let barra = renderizarBarraSala(codigo, sessao.souHost())
   let nav = renderizarNavSala(mesaAberta, alternarMesa, mesaEspera())
-  let controles = renderizarControlesCall(protocolo.estado(), acoesCall, midia.qualidade())
+  let controles = renderizarControlesCall(
+    protocolo.estado(), acoesCall, midia.qualidade(), midia.tipoConteudo())
   // `palco` é criado uma vez e só tem os filhos trocados: `renderizar` guarda
   // a contagem de cartas no dataset dele para decidir animação, e recriar o
   // elemento a cada ida e volta faria as cartas voarem de novo sem motivo.
@@ -226,7 +250,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     nav = novaNav
 
     const novosControles =
-      renderizarControlesCall(protocolo.estado(), acoesCall, midia.qualidade())
+      renderizarControlesCall(
+        protocolo.estado(), acoesCall, midia.qualidade(), midia.tipoConteudo())
     controles.replaceWith(novosControles)
     controles = novosControles
 
