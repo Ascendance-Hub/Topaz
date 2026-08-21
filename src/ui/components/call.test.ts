@@ -15,6 +15,7 @@ const acoes = () => ({
   pararTela: vi.fn(), assistir: vi.fn(), pararDeAssistir: vi.fn(),
   definirQualidade: vi.fn(), definirTipoConteudo: vi.fn(),
   alternarMeuMicrofone: vi.fn(), alternarSilenciarTodos: vi.fn(),
+  trocarMicrofone: vi.fn(),
 })
 
 describe('controles da call', () => {
@@ -250,5 +251,66 @@ describe('controles de mudo', () => {
     c.querySelector<HTMLButtonElement>('[data-call="silenciar-todos"]')!.click()
 
     expect(a.alternarSilenciarTodos).toHaveBeenCalled()
+  })
+})
+
+describe('seletor de microfone', () => {
+  const doisMicrofones = [
+    { id: 'padrao', nome: 'Padrão do sistema' },
+    { id: 'fone', nome: 'Fone USB' },
+  ]
+
+  it('aparece na call quando há mais de um microfone', () => {
+    const c = renderizarControlesCall(
+      estado({ euNaCall: true }), acoes(), 720, 'motion',
+      { apelidoDe: (i) => i, microfones: doisMicrofones })
+
+    expect(c.querySelector('[data-call="microfone"]')).not.toBeNull()
+  })
+
+  it('não aparece com um microfone só, que não há o que escolher', () => {
+    const c = renderizarControlesCall(
+      estado({ euNaCall: true }), acoes(), 720, 'motion',
+      { apelidoDe: (i) => i, microfones: [doisMicrofones[0]!] })
+
+    expect(c.querySelector('[data-call="microfone"]')).toBeNull()
+  })
+
+  it('não aparece fora da call', () => {
+    const c = renderizarControlesCall(
+      estado(), acoes(), 720, 'motion',
+      { apelidoDe: (i) => i, microfones: doisMicrofones })
+
+    expect(c.querySelector('[data-call="microfone"]')).toBeNull()
+  })
+
+  it('mostra os nomes dos aparelhos', () => {
+    const c = renderizarControlesCall(
+      estado({ euNaCall: true }), acoes(), 720, 'motion',
+      { apelidoDe: (i) => i, microfones: doisMicrofones })
+
+    const opcoes = [...c.querySelectorAll('[data-call="microfone"] option')]
+    expect(opcoes.map((o) => o.textContent)).toEqual(['Padrão do sistema', 'Fone USB'])
+  })
+
+  it('nasce no aparelho em uso', () => {
+    const c = renderizarControlesCall(
+      estado({ euNaCall: true }), acoes(), 720, 'motion',
+      { apelidoDe: (i) => i, microfones: doisMicrofones, microfoneAtual: 'fone' })
+
+    expect(c.querySelector<HTMLSelectElement>('[data-call="microfone"]')!.value).toBe('fone')
+  })
+
+  it('trocar pede o aparelho novo', () => {
+    const a = acoes()
+    const c = renderizarControlesCall(
+      estado({ euNaCall: true }), a, 720, 'motion',
+      { apelidoDe: (i) => i, microfones: doisMicrofones, microfoneAtual: 'padrao' })
+    const select = c.querySelector<HTMLSelectElement>('[data-call="microfone"]')!
+
+    select.value = 'fone'
+    select.dispatchEvent(new Event('change'))
+
+    expect(a.trocarMicrofone).toHaveBeenCalledWith('fone')
   })
 })

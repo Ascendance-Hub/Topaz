@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (491, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (525, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -79,6 +79,12 @@ exercitam o caminho real de rede.
       e voltar da call
 - [ ] "Silenciar todos" cala vozes e telas de uma vez
 - [ ] O som de um jogo compartilhado não chega abafado nem chiado
+- [ ] Com dois microfones no PC, o seletor aparece e trocar **não corta a
+      conversa** de quem está ouvindo
+- [ ] A escolha do microfone sobrevive a recarregar a página
+- [ ] Plugar ou arrancar um fone no meio da call atualiza a lista sozinho
+- [ ] No celular, o seletor deixa escolher entre os microfones do aparelho
+- [ ] Trocar de microfone estando mudo **não** reabre o microfone
 
 ## Rede
 

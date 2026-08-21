@@ -1,5 +1,6 @@
 import type { EstadoCall } from '../../call/protocolo'
 import type { TipoConteudo } from '../../call/midia'
+import type { Dispositivo } from '../../call/dispositivos'
 
 export interface AcoesCall {
   entrar(): void
@@ -12,6 +13,7 @@ export interface AcoesCall {
   definirTipoConteudo(tipo: TipoConteudo): void
   alternarMeuMicrofone(): void
   alternarSilenciarTodos(): void
+  trocarMicrofone(deviceId: string): void
 }
 
 /** O que a barra precisa saber além do estado da call. */
@@ -19,6 +21,8 @@ export interface ContextoCall {
   apelidoDe: (peerId: string) => string
   meuMicrofoneMudo?: boolean
   todosSilenciados?: boolean
+  microfones?: Dispositivo[]
+  microfoneAtual?: string | null
 }
 
 /**
@@ -77,6 +81,27 @@ export function renderizarControlesCall(
   )
   meuMic.dataset['mudo'] = contexto.meuMicrofoneMudo ? '1' : '0'
   barra.append(meuMic)
+
+  // Só aparece com mais de um aparelho: com um só não há o que escolher, e o
+  // seletor viraria ruído. Os nomes só existem depois da permissão concedida,
+  // o que combina com ele viver dentro da call.
+  const aparelhos = contexto.microfones ?? []
+  if (aparelhos.length > 1) {
+    const seletor = document.createElement('select')
+    seletor.className = 'call-qualidade'
+    seletor.dataset['call'] = 'microfone'
+    seletor.setAttribute('aria-label', 'Microfone')
+    for (const aparelho of aparelhos) {
+      const opcao = document.createElement('option')
+      opcao.value = aparelho.id
+      // `textContent`: o nome vem do sistema operacional.
+      opcao.textContent = aparelho.nome
+      if (aparelho.id === contexto.microfoneAtual) opcao.selected = true
+      seletor.append(opcao)
+    }
+    seletor.onchange = () => acoes.trocarMicrofone(seletor.value)
+    barra.append(seletor)
+  }
 
   const silenciar = botao(
     'silenciar-todos',
