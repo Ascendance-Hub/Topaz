@@ -55,6 +55,11 @@ permite várias pessoas compartilharem ao mesmo tempo sem derreter a máquina de
 ninguém, e a barra avisa quando ninguém está assistindo, para não parecer que o
 compartilhamento falhou.
 
+Quem assiste pode expandir a tela recebida ou jogá-la numa janela flutuante do
+sistema (Picture-in-Picture), que continua visível mesmo fora do navegador. Quem
+compartilha escolhe entre 720p e 1080p — o salto de custo entre as duas é de
+cerca de 3× na codificação, então 720p é o padrão.
+
 Não tem câmera, não captura o áudio do sistema (então assistir vídeo junto
 entrega imagem sem som) e não funciona em celular.
 

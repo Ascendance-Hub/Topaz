@@ -58,6 +58,7 @@ export class Midia {
    */
   private micPara = new Set<string>()
   private telaPara = new Set<string>()
+  private altura: number = ALTURA_PADRAO
 
   /**
    * `onPeerStream` e NÃO `onPeerTrack`: em `media.mjs` do Trystero, quem
@@ -121,7 +122,24 @@ export class Midia {
     if (!stream) return
     const faltando = alvos.filter((id) => !publicado.has(id))
     if (faltando.length === 0) return
-    this.sala.addStream(stream, { target: faltando, metadata: { tipo } })
+
+    // Invólucro NOVO a cada publicação, e nunca o mesmo objeto duas vezes.
+    //
+    // O Trystero indexa o stream remoto por uma chave derivada do OBJETO do
+    // stream, num WeakMap. Republicar o mesmo objeto depois de um
+    // `removeStream` faz o receptor achar que já conhece aquele stream:
+    // `receiveStreamMeta` acha no cache, reentrega o stream ANTIGO — que
+    // morreu no remove — e o `ontrack` novo é descartado por não ter meta
+    // pendente. O áudio some de um lado só.
+    //
+    // Foi assim que sair e voltar para a call quebrava a conversa de forma
+    // assimétrica: quem saía criava captura nova (chave nova, funcionava),
+    // quem ficava republicava o mesmo objeto (chave repetida, morria).
+    //
+    // Remover continua usando o stream original: o Trystero casa os senders
+    // pelas FAIXAS, não pelo objeto.
+    this.sala.addStream(new MediaStream(stream.getTracks()),
+      { target: faltando, metadata: { tipo } })
     for (const id of faltando) publicado.add(id)
     if (tipo === 'tela') {
       for (const id of faltando) {
@@ -174,8 +192,12 @@ export class Midia {
   private ajustarEnvio(peerId: string): void {
     const pc = this.sala.getPeers()[peerId]
     if (!pc) return
-    const h264 = RTCRtpSender.getCapabilities?.('video')?.codecs
-      .find((c) => c.mimeType.toLowerCase() === 'video/h264')
+    // `RTCRtpSender` pode não existir (navegador antigo), e uma exceção aqui
+    // derrubaria o compartilhamento inteiro por causa de um ajuste opcional.
+    const h264 = typeof RTCRtpSender === 'undefined'
+      ? undefined
+      : RTCRtpSender.getCapabilities?.('video')?.codecs
+        .find((c) => c.mimeType.toLowerCase() === 'video/h264')
 
     for (const sender of pc.getSenders()) {
       if (sender.track?.kind !== 'video') continue
@@ -183,12 +205,26 @@ export class Midia {
       const encoding: EncodingComCodec | undefined = params.encodings?.[0]
       if (!encoding) continue
       encoding.maxBitrate = BITRATE_PADRAO
-      encoding.scaleResolutionDownBy = Math.max(1, 1080 / ALTURA_PADRAO)
+      encoding.scaleResolutionDownBy = Math.max(1, 1080 / this.altura)
       if (h264) encoding.codec = h264
       // Falhar aqui degrada a qualidade, não a conversa: um ajuste de
       // codificação nunca deve derrubar uma call que já está de pé.
       void sender.setParameters(params).catch(() => {})
     }
+  }
+
+  qualidade(): number {
+    return this.altura
+  }
+
+  /**
+   * Troca a altura e reaplica em quem já está recebendo. `setParameters` vale
+   * na conexão de pé, então a mudança é imediata: não espera republicação nem
+   * renegociação, e quem está assistindo vê a qualidade mudar sem corte.
+   */
+  definirQualidade(altura: number): void {
+    this.altura = altura
+    for (const peerId of this.telaPara) this.ajustarEnvio(peerId)
   }
 
   aoReceberMidia(cb: (stream: MediaStream, de: string, meta?: unknown) => void): void {

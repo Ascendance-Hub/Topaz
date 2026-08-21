@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (420, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (447, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -57,6 +57,12 @@ exercitam o caminho real de rede.
 - [ ] Fechar a aba de quem compartilhava limpa o vídeo do outro lado
 - [ ] O anfitrião cair no meio da call não interrompe a conversa
 - [ ] Jogar uma rodada de blackjack com a call aberta, falando ao mesmo tempo
+- [ ] **Sair da call e entrar de novo, dos dois lados, e continuar se ouvindo**
+      (era o bug do stream republicado com o mesmo objeto)
+- [ ] "Expandir" aumenta a tela recebida sem cobrir a mesa
+- [ ] "Janela flutuante" abre o PiP do sistema, que dá para mover e
+      redimensionar fora do navegador
+- [ ] Trocar a qualidade de 720p para 1080p muda a nitidez sem cortar o vídeo
 
 ## Rede
 

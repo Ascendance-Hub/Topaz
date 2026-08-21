@@ -13,6 +13,7 @@ function estado(extras: Partial<EstadoCall> = {}): EstadoCall {
 const acoes = () => ({
   entrar: vi.fn(), sair: vi.fn(), compartilhar: vi.fn(),
   pararTela: vi.fn(), assistir: vi.fn(), pararDeAssistir: vi.fn(),
+  definirQualidade: vi.fn(),
 })
 
 describe('controles da call', () => {
@@ -122,5 +123,35 @@ describe('controles de tela', () => {
       estado({ euNaCall: true, euCompartilhando: true, assistidoPor: ['pb'] }), acoes())
 
     expect(c.querySelector('.call-sem-espectador')).toBeNull()
+  })
+})
+
+describe('seletor de qualidade da tela', () => {
+  it('só aparece quando você está compartilhando', () => {
+    const semTela = renderizarControlesCall(estado({ euNaCall: true }), acoes())
+    const comTela = renderizarControlesCall(
+      estado({ euNaCall: true, euCompartilhando: true }), acoes())
+
+    expect(semTela.querySelector('[data-call="qualidade"]')).toBeNull()
+    expect(comTela.querySelector('[data-call="qualidade"]')).not.toBeNull()
+  })
+
+  it('nasce na altura que está em uso', () => {
+    const c = renderizarControlesCall(
+      estado({ euNaCall: true, euCompartilhando: true }), acoes(), 1080)
+
+    expect(c.querySelector<HTMLSelectElement>('[data-call="qualidade"]')!.value).toBe('1080')
+  })
+
+  it('trocar a opção pede a nova altura', () => {
+    const a = acoes()
+    const c = renderizarControlesCall(
+      estado({ euNaCall: true, euCompartilhando: true }), a, 720)
+    const select = c.querySelector<HTMLSelectElement>('[data-call="qualidade"]')!
+
+    select.value = '1080'
+    select.dispatchEvent(new Event('change'))
+
+    expect(a.definirQualidade).toHaveBeenCalledWith(1080)
   })
 })

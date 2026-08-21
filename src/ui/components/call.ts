@@ -7,7 +7,15 @@ export interface AcoesCall {
   pararTela(): void
   assistir(peerId: string): void
   pararDeAssistir(peerId: string): void
+  definirQualidade(altura: number): void
 }
+
+/**
+ * As duas alturas que o probe de 2026-08-20 separou: até 720p o custo de
+ * codificação quase não se mexe, e em 1080p ele salta cerca de 3×. Oferecer um
+ * meio-termo aqui seria escolha sem consequência medida.
+ */
+export const ALTURAS = [720, 1080] as const
 
 export const AVISO_SEM_ESPECTADOR =
   'ninguém está assistindo — sua tela não está sendo codificada'
@@ -30,7 +38,9 @@ function botao(chave: string, rotulo: string, aoClicar: () => void): HTMLElement
  * Entrar na call é um ato explícito, separado de entrar na sala: é o que
  * impede um microfone aberto sem a pessoa ter pedido.
  */
-export function renderizarControlesCall(estado: EstadoCall, acoes: AcoesCall): HTMLElement {
+export function renderizarControlesCall(
+  estado: EstadoCall, acoes: AcoesCall, alturaAtual = 720,
+): HTMLElement {
   const barra = document.createElement('div')
   barra.className = 'call-controles'
 
@@ -49,6 +59,20 @@ export function renderizarControlesCall(estado: EstadoCall, acoes: AcoesCall): H
 
   if (estado.euCompartilhando) {
     barra.append(botao('parar-tela', 'Parar de compartilhar', () => acoes.pararTela()))
+
+    const qualidade = document.createElement('select')
+    qualidade.className = 'call-qualidade'
+    qualidade.dataset['call'] = 'qualidade'
+    qualidade.setAttribute('aria-label', 'Qualidade da tela compartilhada')
+    for (const altura of ALTURAS) {
+      const opcao = document.createElement('option')
+      opcao.value = String(altura)
+      opcao.textContent = `${altura}p`
+      if (altura === alturaAtual) opcao.selected = true
+      qualidade.append(opcao)
+    }
+    qualidade.onchange = () => acoes.definirQualidade(Number(qualidade.value))
+    barra.append(qualidade)
     if (estado.assistidoPor.length === 0) {
       const aviso = document.createElement('span')
       aviso.className = 'call-sem-espectador'
