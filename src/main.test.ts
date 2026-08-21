@@ -16,6 +16,26 @@ import { MS_DESCOBERTA, MS_SEM_CONEXAO, Sessao } from './net/sessao'
 import { TITULO_SEM_CONEXAO } from './ui/components/conexao'
 import { rngSemente } from './game/shoe'
 import { entrarNaSala, iniciarApp, MENSAGEM_ERRO_INICIAL } from './main'
+import type { SalaTrystero } from './net/transport'
+
+/**
+ * Sala do Trystero de mentira. Existe porque `criarTransporte` é mockado para
+ * a rede falsa, mas o canal da call e a mídia recebem a sala CRUA — e dar
+ * `undefined` a elas obrigaria o código de produção a carregar guardas que só
+ * o teste precisa.
+ */
+function salaFalsa(): SalaTrystero {
+  return {
+    makeAction: () => ({ send: vi.fn(), onMessage: null }),
+    getPeers: () => ({}),
+    leave: vi.fn(),
+    addStream: vi.fn(),
+    removeStream: vi.fn(),
+    onPeerJoin: null,
+    onPeerLeave: null,
+    onPeerTrack: null,
+  } as unknown as SalaTrystero
+}
 
 describe('entrarNaSala — barra de sala continua atualizando o DOM real', () => {
   it('reflete a migração de anfitrião mesmo depois de vários desenhar()', () => {
@@ -39,7 +59,7 @@ describe('entrarNaSala — barra de sala continua atualizando o DOM real', () =>
 
     // 'pb' é a aba sob teste: nasce sem saber quem manda e só descobre pelo
     // primeiro snapshot do host — igual ao fluxo real.
-    vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+    vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
     vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
     const app = document.createElement('div')
@@ -79,7 +99,7 @@ describe('entrarNaSala — estado da conexão em vez de mesa travada', () => {
     vi.useFakeTimers()
     try {
       const rede = criarRedeFalsa({ conexaoDiferida: true })
-      vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+      vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
       vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
       const app = document.createElement('div')
@@ -112,7 +132,7 @@ describe('entrarNaSala — estado da conexão em vez de mesa travada', () => {
       // 'pb' na eleição e nunca publica nada — é o relay fora do ar / a rede
       // que bloqueia WebRTC da spec §14.
       rede.conectar('pa')
-      vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+      vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
       vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
       const app = document.createElement('div')
@@ -169,7 +189,7 @@ describe('entrarNaSala — chat da sala', () => {
     const outraAba = new Sessao(transporteA, () => rngSemente(1))
     outraAba.entrar('Alex')
 
-    vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+    vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
     vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
     const app = document.createElement('div')
     entrarNaSala(app, 'Bruno', 'CODIGO01')
@@ -253,7 +273,7 @@ describe('entrarNaSala — a sala é o espaço, a mesa é uma escolha', () => {
     const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
     outraAba.entrar('Alex')
 
-    vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+    vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
     vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
     const app = document.createElement('div')
@@ -341,7 +361,7 @@ describe('entrarNaSala — várias pessoas na mesma sala', () => {
     const rede = criarRedeFalsa({ conexaoDiferida: true })
     const ids = ['pa', 'pb']
     let proximo = 0
-    vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+    vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
     vi.mocked(criarTransporte).mockImplementation(() => rede.conectar(ids[proximo++]!))
 
     const appA = document.createElement('div')
@@ -435,7 +455,7 @@ describe('entrarNaSala — a sala avisa quando a mesa espera por você', () => {
     const rede = criarRedeFalsa({ conexaoDiferida: true })
     const ids = ['pa', 'pb']
     let proximo = 0
-    vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+    vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
     vi.mocked(criarTransporte).mockImplementation(() => rede.conectar(ids[proximo++]!))
 
     const appA = document.createElement('div')
@@ -501,6 +521,80 @@ describe('entrarNaSala — a sala avisa quando a mesa espera por você', () => {
       // tiver, não pode estar — senão a marca vira ruído que ninguém olha.
       const vezDeB = appA.querySelector('[data-acao="pedir"]') === null
       expect(marcado(appB)).toBe(vezDeB)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('entrarNaSala — a call convive com o jogo', () => {
+  function salaComCall() {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
+    outraAba.entrar('Alex')
+
+    vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
+    vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
+
+    const app = document.createElement('div')
+    entrarNaSala(app, 'Bruno', 'CODIGO01')
+    rede.bombear()
+    vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+    outraAba.tique(Date.now())
+    return { app, outraAba }
+  }
+
+  it('montar a call não silencia a eleição de anfitrião', () => {
+    vi.useFakeTimers()
+    try {
+      const { app } = salaComCall()
+
+      // Se a call tivesse roubado `onPeerJoin` do Trystero, a sala nunca
+      // resolveria quem manda e o palco ficaria preso em "conectando" — em
+      // silêncio, sem erro nenhum no console.
+      expect(app.querySelector('.conexao')).toBeNull()
+      expect(app.querySelector('.sala-parada')).not.toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('mostra o botão de entrar na call, e ninguém entra sozinho', () => {
+    vi.useFakeTimers()
+    try {
+      const { app } = salaComCall()
+
+      expect(app.querySelector('[data-call="entrar"]')).not.toBeNull()
+      expect(app.querySelector('[data-call="sair"]')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('os controles da call sobrevivem a alternar entre sala e mesa', () => {
+    vi.useFakeTimers()
+    try {
+      const { app } = salaComCall()
+
+      app.querySelector<HTMLButtonElement>('[data-nav="mesa"]')!.click()
+      app.querySelector<HTMLButtonElement>('[data-nav="sala"]')!.click()
+
+      expect(app.querySelectorAll('.call-controles')).toHaveLength(1)
+      expect(app.querySelector('[data-call="entrar"]')).not.toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a mesa continua funcionando com a call montada', () => {
+    vi.useFakeTimers()
+    try {
+      const { app } = salaComCall()
+
+      app.querySelector<HTMLButtonElement>('[data-nav="mesa"]')!.click()
+      app.querySelector<HTMLButtonElement>('[data-acao="sentar"]')!.click()
+
+      expect(app.querySelector('[data-sentado]')).not.toBeNull()
     } finally {
       vi.useRealTimers()
     }

@@ -25,8 +25,8 @@ function criarSalaFalsa() {
     },
     getPeers: () => ({ p2: {}, p3: {} }),
     leave: vi.fn(),
-    onPeerJoin: null,
-    onPeerLeave: null,
+    onPeerJoin: null as ((id: string) => void) | null,
+    onPeerLeave: null as ((id: string) => void) | null,
   }
   return { sala: bruta as unknown as SalaTrystero, canais, bruta }
 }
@@ -74,5 +74,23 @@ describe('criarTransporte', () => {
 
     expect(canais.get('chat')!.send).toHaveBeenCalledWith('boa mão')
     expect(canais.get('acao')!.send).not.toHaveBeenCalled()
+  })
+})
+
+describe('convivência com outros consumidores da mesma sala', () => {
+  it('continua avisando entrada de peer a todos os ouvintes, não só ao último', () => {
+    const { sala, bruta } = criarSalaFalsa()
+    const transporte = criarTransporte(sala)
+    const entrouNoJogo = vi.fn()
+    transporte.aoEntrarPeer(entrouNoJogo)
+
+    // Um segundo módulo (a call) pede a mesma notificação.
+    const entrouNaCall = vi.fn()
+    transporte.aoEntrarPeer(entrouNaCall)
+
+    bruta.onPeerJoin!('p2')
+
+    expect(entrouNoJogo).toHaveBeenCalledWith('p2')
+    expect(entrouNaCall).toHaveBeenCalledWith('p2')
   })
 })
