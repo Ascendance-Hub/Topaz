@@ -46,11 +46,13 @@ da conexão, com jogo e call como módulos opcionais e independentes por cima.
 | 5 — testes | aprovada |
 | documento em `docs/superpowers/specs/` | escrito, aguardando revisão |
 | plano de implementação | escrito (parte 1 de 2) |
-| execução do plano 1 | **feita** — 356 testes passando |
+| execução do plano 1 | **feita** |
+| plano 2 — a call | escrito |
+| execução do plano 2 | **feita** — 420 testes passando |
 
 - Spec: `docs/superpowers/specs/2026-08-21-sala-e-call-design.md`
 - Plano 1 — sala neutra: `docs/superpowers/plans/2026-08-21-sala-neutra.md`
-- Plano 2 — a call: a escrever, agora que o plano 1 está executado
+- Plano 2 — a call: `docs/superpowers/plans/2026-08-21-call-voz-e-tela.md`
 
 O plano 1 entregou: transporte partido em `criarSalaTrystero` +
 `criarTransporte` (e testável pela primeira vez), `ui/sala.ts` renomeado para
@@ -98,6 +100,12 @@ Trystero real:
   provado que o Quick Sync entra por esse caminho. É inferência a partir da
   sonda anterior, não medição. Fica para a verificação manual.
 
+## Aguardando verificação de verdade
+
+A call 1:1 está escrita e a suíte cobre a lógica, mas **nada da experiência foi
+verificado** — voz, tela, qualidade e codec só se conferem com duas pessoas em
+máquinas diferentes. A lista está na seção "Call" de `docs/verificacao-manual.md`.
+
 ## Adiado de propósito
 
 Nada aqui é defeito; são coisas que cabem depois.
@@ -105,6 +113,9 @@ Nada aqui é defeito; são coisas que cabem depois.
 - **Áudio do sistema junto com a tela** — irregular entre plataformas e cria
   eco com o microfone aberto. Custo: assistir vídeo junto não funciona direito
   (imagem sim, som não).
+- **Acabamento da call** (plano 3): seletor de microfone e de saída de áudio,
+  Picture-in-Picture, "entrar só ouvindo" quando o microfone é negado, e o resto
+  dos casos de borda da §9 do spec.
 - **RNNoise em WASM** — anti-ruído bem melhor que o do navegador, mas é
   integração de AudioWorklet e merece ciclo próprio.
 - **Câmera** — fora da primeira versão; o código de mídia fica genérico o
