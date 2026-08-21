@@ -86,10 +86,17 @@ Decisões já tomadas neste ciclo:
 - Sem trava artificial de 2 pessoas: a call funciona com 3-4 naturalmente, mas
   só 1:1 é prometido, porque só isso será testado.
 
-Risco declarado: **forçar H.264 pode não ser possível através do Trystero**,
-porque ele negocia sozinho no `addStream` e a janela para
-`setCodecPreferences` é apertada. Primeiro passo da implementação é confirmar
-isso. Se não der, fica no codec padrão — chato, não fatal para 1:1.
+Risco do H.264 **resolvido em 2026-08-21**, com sonda de duas abas ligadas por
+Trystero real:
+
+- `sender.setParameters` com `encodings[0].codec` troca o codec **com a conexão
+  de pé, sem renegociar**. VP8 → H.264 confirmado nas duas pontas.
+- `setCodecPreferences` não serve, e não pelo motivo que eu tinha registrado:
+  logo após o `addStream` não existe transceiver nenhum para configurar. A
+  janela apertada que eu supunha simplesmente não existe.
+- **Em aberto:** a sonda devolveu `encoderImplementation` vazio, então não está
+  provado que o Quick Sync entra por esse caminho. É inferência a partir da
+  sonda anterior, não medição. Fica para a verificação manual.
 
 ## Adiado de propósito
 
