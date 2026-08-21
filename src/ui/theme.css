@@ -468,3 +468,22 @@ body {
 @keyframes marca-pulsa {
   50% { transform: scale(1.35); }
 }
+
+.call-controles {
+  position: fixed;
+  left: 50%; bottom: 16px; transform: translateX(-50%);
+  z-index: 15;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; border-radius: 999px;
+  background: var(--carvao-700);
+  border: 1px solid var(--carvao-500);
+}
+.call-botao {
+  padding: 8px 16px; border-radius: 999px;
+  background: transparent; color: var(--topazio-500);
+  border: 1px solid var(--topazio-600);
+  font-family: var(--serif); font-size: 13px; cursor: pointer;
+}
+.call-contagem { color: var(--texto-fraco); font-size: 12px; }
+/* Os elementos de áudio remoto existem só para tocar; não têm nada a mostrar. */
+.call-audios { display: none; }
