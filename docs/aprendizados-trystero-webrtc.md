@@ -247,6 +247,24 @@ Engolir essa rejeição faz a call ficar muda sem nenhuma pista. Um botão de so
 resolve os dois casos de uma vez: serve para silenciar, e o clique é o gesto
 que destrava.
 
+### Trocar de microfone: `replaceTrack`, não republicar
+
+`replaceTrack` substitui a faixa nos senders existentes **sem renegociar** —
+ninguém do outro lado ouve corte. Republicar faria o outro lado passar de novo
+pelo caminho de add/remove, que é onde quase todos os bugs de mídia deste
+projeto moraram.
+
+Detalhes que mordem:
+
+- **Os nomes dos aparelhos só existem depois da permissão concedida.** Antes
+  disso `enumerateDevices()` devolve uma lista anônima, com `label` vazio. Um
+  seletor construído cedo demais mostra opções em branco.
+- **`devicechange`** avisa quando um fone é plugado ou arrancado. Sem reler,
+  a lista fica velha e a pessoa escolhe um aparelho que não existe mais.
+- **Um `deviceId` lembrado pode não existir mais** na sessão seguinte.
+  Insistir nele faz o `getUserMedia` falhar e a pessoa entrar muda sem
+  entender. Sempre confira se ainda está na lista antes de usar.
+
 ### Mudo é `track.enabled = false`, não desligar a captura
 
 Continua enviando a faixa, em silêncio. Desligar a captura acenderia e

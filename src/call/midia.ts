@@ -88,6 +88,7 @@ export class Midia {
   private altura: number = ALTURA_PADRAO
   private conteudo: TipoConteudo = 'motion'
   private mudo = false
+  private idMicrofone: string | null = null
 
   /**
    * `onPeerStream` e NÃO `onPeerTrack`: em `media.mjs` do Trystero, quem
@@ -106,10 +107,55 @@ export class Midia {
     }
   }
 
+  /** Restrições do microfone, respeitando o aparelho escolhido. */
+  private restricoesDoMicrofone(): MediaStreamConstraints {
+    const audio = RESTRICOES_MICROFONE.audio as MediaTrackConstraints
+    return {
+      video: false,
+      audio: this.idMicrofone
+        ? { ...audio, deviceId: { exact: this.idMicrofone } }
+        : audio,
+    }
+  }
+
+  microfoneAtual(): string | null {
+    return this.idMicrofone
+  }
+
+  /**
+   * Troca o aparelho de captura sem cortar a conversa.
+   *
+   * `replaceTrack` substitui a faixa nos senders que já existem, **sem
+   * renegociar** — ninguém do outro lado ouve corte. Republicar faria o outro
+   * lado passar de novo pelo caminho de add/remove, que é justamente onde os
+   * bugs de mídia moraram até aqui.
+   */
+  async trocarMicrofone(deviceId: string): Promise<void> {
+    this.idMicrofone = deviceId
+    // Fora da call ainda não há o que trocar: a escolha fica guardada e vale
+    // no próximo `ligarMicrofone`.
+    if (!this.microfone) return
+
+    const velha = this.microfone.getAudioTracks()[0]
+    const novoStream = await navigator.mediaDevices.getUserMedia(this.restricoesDoMicrofone())
+    const nova = novoStream.getAudioTracks()[0]
+    if (!nova) return
+
+    // O mudo é do usuário, não do aparelho: trocar de microfone não pode
+    // reabrir um que ele fechou.
+    nova.enabled = !this.mudo
+    if (velha) {
+      this.sala.replaceTrack(velha, nova)
+      // Encerrar a antiga apaga o indicador daquele aparelho no navegador.
+      velha.stop()
+    }
+    this.microfone = novoStream
+  }
+
   /** Só captura. Quem recebe é decidido depois, por `sincronizarMicrofone`. */
   async ligarMicrofone(): Promise<void> {
     if (this.microfone) return
-    this.microfone = await navigator.mediaDevices.getUserMedia(RESTRICOES_MICROFONE)
+    this.microfone = await navigator.mediaDevices.getUserMedia(this.restricoesDoMicrofone())
     // O mudo sobrevive a sair e voltar da call: se a pessoa se mutou, não é
     // para o microfone voltar aberto sozinho.
     for (const faixa of this.microfone.getAudioTracks()) faixa.enabled = !this.mudo

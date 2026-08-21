@@ -23,6 +23,7 @@ function criarSalaFalsa() {
       publicados.push({ stream, opcoes })
     },
     removeStream: vi.fn(),
+    replaceTrack: vi.fn(),
     getPeers: () => ({}),
   }
 
@@ -494,5 +495,97 @@ describe('Midia — o microfone não vira música', () => {
     midia.definirQualidade(720)
 
     expect(senderMicrofone.setParameters).not.toHaveBeenCalled()
+  })
+})
+
+describe('Midia — trocar de microfone', () => {
+  function fingirMicrofones(faixas: Record<string, unknown>) {
+    const capturado: string[] = []
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getUserMedia: vi.fn((r: MediaStreamConstraints) => {
+          const audio = r.audio as { deviceId?: { exact?: string } }
+          const id = audio?.deviceId?.exact ?? 'padrao'
+          capturado.push(id)
+          const faixa = faixas[id] ?? { kind: 'audio', enabled: true, stop: vi.fn() }
+          return Promise.resolve({
+            id: `stream-${id}`,
+            getTracks: () => [faixa],
+            getAudioTracks: () => [faixa],
+          } as unknown as MediaStream)
+        }),
+      },
+      configurable: true,
+    })
+    return capturado
+  }
+
+  it('pede exatamente o dispositivo escolhido', async () => {
+    const { sala } = criarSalaFalsa()
+    const midia = new Midia(sala)
+    const pedidos = fingirMicrofones({})
+    await midia.ligarMicrofone()
+
+    await midia.trocarMicrofone('fone-usb')
+
+    expect(pedidos).toContain('fone-usb')
+  })
+
+  it('substitui a faixa em vez de republicar', async () => {
+    const { sala, bruta, publicados } = criarSalaFalsa()
+    bruta.replaceTrack = vi.fn()
+    const velha = { kind: 'audio', enabled: true, stop: vi.fn() }
+    const nova = { kind: 'audio', enabled: true, stop: vi.fn() }
+    const midia = new Midia(sala)
+    fingirMicrofones({ padrao: velha, 'fone-usb': nova })
+    await midia.ligarMicrofone()
+    midia.sincronizarMicrofone(['pa'])
+    const publicadosAntes = publicados.length
+
+    await midia.trocarMicrofone('fone-usb')
+
+    // `replaceTrack` troca a faixa sem renegociar: ninguém ouve corte. Uma
+    // republicação faria o outro lado receber um stream novo e passar pelo
+    // caminho de add/remove, que é onde os bugs moram.
+    expect(bruta.replaceTrack).toHaveBeenCalledWith(velha, nova)
+    expect(publicados).toHaveLength(publicadosAntes)
+  })
+
+  it('encerra a faixa antiga, para o indicador do navegador apagar', async () => {
+    const { sala, bruta } = criarSalaFalsa()
+    bruta.replaceTrack = vi.fn()
+    const velha = { kind: 'audio', enabled: true, stop: vi.fn() }
+    const midia = new Midia(sala)
+    fingirMicrofones({ padrao: velha, outro: { kind: 'audio', enabled: true, stop: vi.fn() } })
+    await midia.ligarMicrofone()
+
+    await midia.trocarMicrofone('outro')
+
+    expect(velha.stop).toHaveBeenCalled()
+  })
+
+  it('o mudo sobrevive à troca de microfone', async () => {
+    const { sala, bruta } = criarSalaFalsa()
+    bruta.replaceTrack = vi.fn()
+    const nova = { kind: 'audio', enabled: true, stop: vi.fn() }
+    const midia = new Midia(sala)
+    fingirMicrofones({ 'fone-usb': nova })
+    await midia.ligarMicrofone()
+    midia.alternarMicrofone()
+
+    await midia.trocarMicrofone('fone-usb')
+
+    // Trocar de aparelho não pode reabrir um microfone que a pessoa fechou.
+    expect(nova.enabled).toBe(false)
+  })
+
+  it('antes de entrar na call, só guarda a escolha', async () => {
+    const { sala } = criarSalaFalsa()
+    const midia = new Midia(sala)
+    fingirMicrofones({})
+
+    await midia.trocarMicrofone('fone-usb')
+
+    expect(midia.microfoneAtual()).toBe('fone-usb')
   })
 })

@@ -12,6 +12,10 @@ import { ehTela } from './call/classificar'
 import { criarCanalCall } from './call/canal'
 import { ProtocoloCall } from './call/protocolo'
 import { Midia } from './call/midia'
+import {
+  escolherMicrofone, lembrarMicrofone, microfoneLembrado, microfones,
+} from './call/dispositivos'
+import type { Dispositivo } from './call/dispositivos'
 import { renderizar } from './ui/render'
 import { rngSemente } from './game/shoe'
 import { mesaEsperaPor } from './game/rules'
@@ -91,13 +95,48 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       && mesaEsperaPor(sessao.estado(), sessao.meuId())
   }
 
+  let aparelhos: Dispositivo[] = []
+
+  /**
+   * Relê a lista de microfones.
+   *
+   * Chamada ao entrar na call e sempre que o sistema avisa que algo mudou —
+   * um fone plugado ou arrancado no meio da conversa deixaria a lista velha, e
+   * a pessoa escolheria um aparelho que não existe mais.
+   *
+   * Os NOMES só aparecem depois da permissão concedida, então isto só rende de
+   * verdade depois de entrar na call.
+   */
+  async function relerMicrofones(): Promise<void> {
+    try {
+      aparelhos = microfones(await navigator.mediaDevices.enumerateDevices())
+    } catch {
+      aparelhos = []
+    }
+    const escolhido = escolherMicrofone(aparelhos, midia.microfoneAtual() ?? microfoneLembrado())
+    if (escolhido && escolhido !== midia.microfoneAtual()) {
+      await midia.trocarMicrofone(escolhido)
+    }
+    desenhar()
+  }
+
+  try {
+    navigator.mediaDevices.addEventListener('devicechange', () => void relerMicrofones())
+  } catch {
+    // Navegador sem `mediaDevices`: a call não vai funcionar mesmo, e a sala
+    // não pode quebrar por causa disso.
+  }
+
   const acoesCall: AcoesCall = {
     entrar: () => {
       // O microfone sobe ANTES de anunciar: anunciar primeiro faria os outros
       // esperarem um áudio que ainda não existe, e se a permissão fosse negada
       // eu apareceria na call mudo sem saber.
-      void midia.ligarMicrofone().then(() => {
+      void midia.ligarMicrofone().then(async () => {
         protocolo.entrar()
+        // Só agora os nomes dos aparelhos existem: a permissão acabou de ser
+        // concedida.
+        await relerMicrofones()
         // E sincroniza de novo depois de capturar: quem anunciou durante a
         // janela de permissão só é alcançado aqui.
         sincronizarMidia()
@@ -136,6 +175,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       const atual = protocolo.estado()
       ajustarVideos(atual.assistindo, atual.compartilhando)
       desenhar()
+    },
+    trocarMicrofone: (deviceId) => {
+      lembrarMicrofone(deviceId)
+      void midia.trocarMicrofone(deviceId).then(desenhar)
     },
     assistir: (peerId) => protocolo.assistir(peerId),
     pararDeAssistir: (peerId) => protocolo.pararDeAssistir(peerId),
@@ -275,7 +318,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     const novosControles =
       renderizarControlesCall(
         protocolo.estado(), acoesCall, midia.qualidade(), midia.tipoConteudo(),
-        { apelidoDe, meuMicrofoneMudo: midia.microfoneMudo(), todosSilenciados })
+        {
+          apelidoDe, meuMicrofoneMudo: midia.microfoneMudo(), todosSilenciados,
+          microfones: aparelhos, microfoneAtual: midia.microfoneAtual(),
+        })
     controles.replaceWith(novosControles)
     controles = novosControles
 
