@@ -205,3 +205,62 @@ describe('Midia — republicar depois de sair e voltar', () => {
     expect(publicados[0]!.stream).not.toBe(mic)
   })
 })
+
+describe('Midia — qualidade', () => {
+  it('começa em 720p, a altura que o probe mostrou barata', () => {
+    const { sala } = criarSalaFalsa()
+
+    expect(new Midia(sala).qualidade()).toBe(720)
+  })
+
+  it('lembra a altura escolhida', () => {
+    const { sala } = criarSalaFalsa()
+    const midia = new Midia(sala)
+
+    midia.definirQualidade(1080)
+
+    expect(midia.qualidade()).toBe(1080)
+  })
+
+  it('reaplica em quem já está assistindo, sem esperar republicação', async () => {
+    const { sala, bruta } = criarSalaFalsa()
+    const params = { encodings: [{} as Record<string, unknown>] }
+    const sender = {
+      track: { kind: 'video' },
+      getParameters: () => params,
+      setParameters: vi.fn().mockResolvedValue(undefined),
+    }
+    bruta.getPeers = (() => ({ pa: { getSenders: () => [sender] } })) as never
+    const midia = new Midia(sala)
+
+    // Precisa haver tela publicada para alguém: sem espectador não há envio a
+    // reajustar, e não fazer nada é o comportamento certo.
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getDisplayMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [],
+          getVideoTracks: () => [{ contentHint: '', onended: null }],
+        }),
+      },
+      configurable: true,
+    })
+    await midia.compartilharTela(() => {})
+    midia.sincronizarTela(['pa'])
+
+    midia.definirQualidade(1080)
+
+    expect(sender.setParameters).toHaveBeenCalled()
+    expect(params.encodings[0]).toMatchObject({ scaleResolutionDownBy: 1 })
+  })
+
+  it('não mexe em nada quando ninguém está assistindo', () => {
+    const { sala, bruta } = criarSalaFalsa()
+    const sender = { track: { kind: 'video' }, getParameters: vi.fn(), setParameters: vi.fn() }
+    bruta.getPeers = (() => ({ pa: { getSenders: () => [sender] } })) as never
+    const midia = new Midia(sala)
+
+    midia.definirQualidade(1080)
+
+    expect(sender.setParameters).not.toHaveBeenCalled()
+  })
+})

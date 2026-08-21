@@ -504,3 +504,37 @@ body {
   color: var(--texto-fraco); font-size: 11px;
   max-width: 190px; line-height: 1.3;
 }
+
+.video-remoto {
+  border-radius: 10px;
+  border: 1px solid var(--carvao-500);
+  background: #000;
+  overflow: hidden;
+}
+.video-remoto video {
+  display: block;
+  width: min(360px, calc(100vw - 32px));
+}
+/* Expandir não vira tela cheia: a mesa e o chat continuam acessíveis, e quem
+   quiser mais que isso tem a janela flutuante do sistema. */
+.video-remoto[data-expandido="1"] video {
+  width: min(820px, calc(100vw - 32px));
+}
+.video-barra {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px;
+  background: var(--carvao-700);
+}
+.video-nome { color: var(--texto-fraco); font-size: 12px; flex: 1; }
+.video-botao {
+  padding: 4px 10px; border-radius: 6px;
+  background: transparent; color: var(--topazio-500);
+  border: 1px solid var(--topazio-600);
+  font-family: var(--serif); font-size: 11px; cursor: pointer;
+}
+.call-qualidade {
+  padding: 6px 8px; border-radius: 8px;
+  background: var(--carvao-900); color: var(--texto);
+  border: 1px solid var(--carvao-500);
+  font-family: var(--serif); font-size: 12px; cursor: pointer;
+}

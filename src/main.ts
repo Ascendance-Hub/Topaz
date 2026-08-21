@@ -7,6 +7,7 @@ import { criarChat } from './ui/components/chat'
 import { renderizarNavSala, renderizarSalaParada } from './ui/components/sala'
 import { renderizarControlesCall } from './ui/components/call'
 import type { AcoesCall } from './ui/components/call'
+import { criarVideoRemoto } from './ui/components/video-remoto'
 import { criarCanalCall } from './call/canal'
 import { ProtocoloCall } from './call/protocolo'
 import { Midia } from './call/midia'
@@ -123,6 +124,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     },
     assistir: (peerId) => protocolo.assistir(peerId),
     pararDeAssistir: (peerId) => protocolo.pararDeAssistir(peerId),
+    definirQualidade: (altura) => {
+      midia.definirQualidade(altura)
+      desenhar()
+    },
   }
 
   // Área de áudio remoto: criada uma vez e nunca substituída, pelo mesmo motivo
@@ -146,15 +151,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       // Uma tela por peer: se ele reabrir o compartilhamento, a nova substitui
       // a velha em vez de empilhar quadros congelados.
       removerVideoDe(de)
-      const el = document.createElement('video')
-      el.autoplay = true
-      el.playsInline = true
-      // Mudo de propósito: o áudio dele já vem pelo microfone, e o elemento de
-      // vídeo com som duplicaria a voz.
-      el.muted = true
-      el.dataset['de'] = de
-      el.srcObject = stream
-      videos.append(el)
+      videos.append(criarVideoRemoto(de, stream, apelidoDe(de)))
       return
     }
 
@@ -212,7 +209,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
 
   let barra = renderizarBarraSala(codigo, sessao.souHost())
   let nav = renderizarNavSala(mesaAberta, alternarMesa, mesaEspera())
-  let controles = renderizarControlesCall(protocolo.estado(), acoesCall)
+  let controles = renderizarControlesCall(protocolo.estado(), acoesCall, midia.qualidade())
   // `palco` é criado uma vez e só tem os filhos trocados: `renderizar` guarda
   // a contagem de cartas no dataset dele para decidir animação, e recriar o
   // elemento a cada ida e volta faria as cartas voarem de novo sem motivo.
@@ -228,7 +225,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     nav.replaceWith(novaNav)
     nav = novaNav
 
-    const novosControles = renderizarControlesCall(protocolo.estado(), acoesCall)
+    const novosControles =
+      renderizarControlesCall(protocolo.estado(), acoesCall, midia.qualidade())
     controles.replaceWith(novosControles)
     controles = novosControles
 
