@@ -46,38 +46,88 @@ type EncodingComCodec = RTCRtpEncodingParameters & { codec?: RTCRtpCodec }
 export class Midia {
   private microfone: MediaStream | null = null
   private tela: MediaStream | null = null
-  private aoFaixa: ((faixa: MediaStreamTrack, de: string) => void)[] = []
+  private aoMidia: ((stream: MediaStream, de: string, meta?: unknown) => void)[] = []
+  /**
+   * Para quem cada mídia já foi publicada.
+   *
+   * Isto existe para a publicação ser RECONCILIAÇÃO e não detecção de borda.
+   * Com borda ("mudou de fora para dentro da lista, publica"), um pedido que
+   * chega enquanto o microfone ainda está na janela de permissão é descartado
+   * e nunca mais tentado — e como os dois lados costumam clicar "Entrar na
+   * call" ao mesmo tempo, o caso comum virava ninguém ouvir ninguém.
+   */
+  private micPara = new Set<string>()
+  private telaPara = new Set<string>()
 
+  /**
+   * `onPeerStream` e NÃO `onPeerTrack`: em `media.mjs` do Trystero, quem
+   * publica com `addStream` alimenta `pendingStreamMetas`, e essa fila só é
+   * consumida por `receiveRemoteStream`, que dispara `onPeerStream`.
+   * `onPeerTrack` vem de `pendingTrackMetas`, que só existe quando o remetente
+   * usou `addTrack`.
+   *
+   * Publicar de um jeito e escutar do outro faz a mídia sumir sem erro nenhum:
+   * os dados continuam chegando, e só áudio e vídeo somem. Foi assim que este
+   * módulo nasceu quebrado, e por isso há teste espelhando esse pareamento.
+   */
   constructor(private sala: SalaTrystero) {
-    this.sala.onPeerTrack = (faixa, _stream, peerId) => {
-      for (const cb of this.aoFaixa) cb(faixa, peerId)
+    this.sala.onPeerStream = (stream, peerId, metadata) => {
+      for (const cb of this.aoMidia) cb(stream, peerId, metadata)
     }
   }
 
-  async ligarMicrofone(alvos: string[]): Promise<void> {
+  /** Só captura. Quem recebe é decidido depois, por `sincronizarMicrofone`. */
+  async ligarMicrofone(): Promise<void> {
     if (this.microfone) return
     this.microfone = await navigator.mediaDevices.getUserMedia(RESTRICOES_MICROFONE)
-    // O microfone é dirigido: estar na sala não é estar na call, e sem `target`
-    // quem só queria jogar blackjack receberia a conversa sem ter pedido.
-    // `target` aceita lista, então uma chamada só alcança todos os alvos.
-    if (alvos.length > 0) {
-      this.sala.addStream(this.microfone, { target: alvos, metadata: { tipo: 'microfone' } })
-    }
   }
 
-  /** Um peer que entrou na call depois de mim vira alvo novo. */
-  publicarMicrofonePara(peerId: string): void {
-    if (!this.microfone) return
-    this.sala.addStream(this.microfone, { target: peerId, metadata: { tipo: 'microfone' } })
+  /**
+   * Deixa a publicação do microfone igual a `alvos`, seja qual for o estado
+   * anterior. Chamar de novo com a mesma lista não faz nada; chamar antes de o
+   * microfone existir não perde o pedido, porque a próxima chamada reconcilia.
+   *
+   * O microfone é dirigido: estar na sala não é estar na call, e sem `target`
+   * quem só queria jogar blackjack receberia a conversa sem ter pedido.
+   */
+  sincronizarMicrofone(alvos: string[]): void {
+    this.reconciliar(this.microfone, this.micPara, alvos, 'microfone')
   }
 
   desligarMicrofone(): void {
     if (!this.microfone) return
     this.sala.removeStream(this.microfone)
+    this.micPara.clear()
     // Parar as faixas também: sem isso o indicador de microfone do navegador
     // fica aceso depois de sair da call, o que assusta com razão.
     for (const faixa of this.microfone.getTracks()) faixa.stop()
     this.microfone = null
+  }
+
+  /**
+   * O laço comum de microfone e tela: publica para quem falta, despublica de
+   * quem sobra, e não faz nada quando já está igual.
+   */
+  private reconciliar(
+    stream: MediaStream | null, publicado: Set<string>, alvos: string[], tipo: string,
+  ): void {
+    const sobrando = [...publicado].filter((id) => !alvos.includes(id))
+    if (stream && sobrando.length > 0) {
+      this.sala.removeStream(stream, { target: sobrando })
+    }
+    // Esquece mesmo sem stream: se ele voltar, precisa ser publicado de novo.
+    for (const id of sobrando) publicado.delete(id)
+
+    if (!stream) return
+    const faltando = alvos.filter((id) => !publicado.has(id))
+    if (faltando.length === 0) return
+    this.sala.addStream(stream, { target: faltando, metadata: { tipo } })
+    for (const id of faltando) publicado.add(id)
+    if (tipo === 'tela') {
+      for (const id of faltando) {
+        setTimeout(() => this.ajustarEnvio(id), MS_ATE_O_SENDER_EXISTIR)
+      }
+    }
   }
 
   /**
@@ -99,20 +149,15 @@ export class Midia {
     faixa.onended = () => aoEncerrarPeloNavegador()
   }
 
-  publicarTelaPara(peerId: string): void {
-    if (!this.tela) return
-    this.sala.addStream(this.tela, { target: peerId, metadata: { tipo: 'tela' } })
-    setTimeout(() => this.ajustarEnvio(peerId), MS_ATE_O_SENDER_EXISTIR)
-  }
-
-  despublicarTelaDe(peerId: string): void {
-    if (!this.tela) return
-    this.sala.removeStream(this.tela, { target: peerId })
+  /** Mesma reconciliação do microfone: `alvos` é quem pediu para assistir. */
+  sincronizarTela(alvos: string[]): void {
+    this.reconciliar(this.tela, this.telaPara, alvos, 'tela')
   }
 
   pararTela(): void {
     if (!this.tela) return
     this.sala.removeStream(this.tela)
+    this.telaPara.clear()
     for (const faixa of this.tela.getTracks()) faixa.stop()
     this.tela = null
   }
@@ -146,7 +191,7 @@ export class Midia {
     }
   }
 
-  aoReceberFaixa(cb: (faixa: MediaStreamTrack, de: string) => void): void {
-    this.aoFaixa.push(cb)
+  aoReceberMidia(cb: (stream: MediaStream, de: string, meta?: unknown) => void): void {
+    this.aoMidia.push(cb)
   }
 }

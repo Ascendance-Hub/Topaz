@@ -94,8 +94,12 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       // O microfone sobe ANTES de anunciar: anunciar primeiro faria os outros
       // esperarem um áudio que ainda não existe, e se a permissão fosse negada
       // eu apareceria na call mudo sem saber.
-      void midia.ligarMicrofone(protocolo.estado().naCall)
-        .then(() => protocolo.entrar())
+      void midia.ligarMicrofone().then(() => {
+        protocolo.entrar()
+        // E sincroniza de novo depois de capturar: quem anunciou durante a
+        // janela de permissão só é alcançado aqui.
+        sincronizarMidia()
+      })
     },
     sair: () => {
       protocolo.sair()
@@ -108,7 +112,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
         // a interface continuaria dizendo que ela compartilha.
         protocolo.definirCompartilhando(false)
         midia.pararTela()
-      }).then(() => protocolo.definirCompartilhando(true))
+      }).then(() => {
+        protocolo.definirCompartilhando(true)
+        sincronizarMidia()
+      })
     },
     pararTela: () => {
       protocolo.definirCompartilhando(false)
@@ -130,60 +137,71 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     videos.querySelector(`[data-de="${peerId}"]`)?.remove()
   }
 
-  midia.aoReceberFaixa((faixa, de) => {
-    if (faixa.kind === 'audio') {
-      const el = document.createElement('audio')
+  midia.aoReceberMidia((stream, de, meta) => {
+    // A metadata vem de quem publicou (`{ tipo: 'microfone' }` ou
+    // `{ tipo: 'tela' }`), e é mais confiável do que adivinhar pelo tipo da
+    // faixa: uma tela sem áudio e um microfone são ambos "uma faixa só".
+    const tipo = (meta as { tipo?: string } | undefined)?.tipo
+    if (tipo === 'tela') {
+      // Uma tela por peer: se ele reabrir o compartilhamento, a nova substitui
+      // a velha em vez de empilhar quadros congelados.
+      removerVideoDe(de)
+      const el = document.createElement('video')
       el.autoplay = true
-      el.srcObject = new MediaStream([faixa])
-      audios.append(el)
+      el.playsInline = true
+      // Mudo de propósito: o áudio dele já vem pelo microfone, e o elemento de
+      // vídeo com som duplicaria a voz.
+      el.muted = true
+      el.dataset['de'] = de
+      el.srcObject = stream
+      videos.append(el)
       return
     }
-    // Uma tela por peer: se ele reabrir o compartilhamento, a nova substitui a
-    // velha em vez de empilhar quadros congelados.
-    removerVideoDe(de)
-    const el = document.createElement('video')
+
+    const el = document.createElement('audio')
     el.autoplay = true
-    el.playsInline = true
-    // Mudo de propósito: o áudio dele já vem pelo microfone, e o elemento de
-    // vídeo com som duplicaria a voz.
-    el.muted = true
-    el.dataset['de'] = de
-    el.srcObject = new MediaStream([faixa])
-    videos.append(el)
+    el.srcObject = stream
+    // O navegador pode recusar tocar sem gesto do usuário. Entrar na call é um
+    // clique, então quase sempre há permissão — mas engolir a rejeição faria a
+    // call ficar muda sem nenhuma pista do motivo.
+    void el.play().catch((erro) => {
+      console.warn('áudio da call bloqueado pelo navegador:', erro)
+    })
+    audios.append(el)
   })
 
   /**
    * Quem entra na call depois de mim precisa receber meu microfone: o
    * `addStream` inicial só alcançou quem já estava lá.
    */
-  let naCallAntes: string[] = []
-  let assistidoAntes: string[] = []
   let assistindoAntes: string[] = []
 
-  protocolo.aoMudar(() => {
+  /**
+   * Uma função só, idempotente, chamada a cada mudança E depois de cada
+   * captura ficar pronta. Não guarda "o que mudou": descreve o que deveria
+   * estar publicado agora, e a `Midia` faz a diferença.
+   *
+   * A versão anterior detectava borda e marcava como feito mesmo quando a
+   * publicação era descartada por a captura ainda não existir — e como as duas
+   * pessoas clicam "Entrar na call" quase juntas, o caso comum era cada uma
+   * receber o anúncio da outra durante a própria janela de permissão e nunca
+   * mais tentar.
+   */
+  function sincronizarMidia(): void {
     const atual = protocolo.estado()
-
-    for (const peerId of atual.naCall) {
-      if (!naCallAntes.includes(peerId)) midia.publicarMicrofonePara(peerId)
-    }
-    naCallAntes = atual.naCall
-
-    // A assinatura vira efeito, de forma idempotente: quem entrou na lista
-    // ganha a tela, quem saiu perde. Sem espectador nenhum, o `removeStream`
-    // do último desliga o codificador — que é o ponto de todo o desenho.
-    for (const peerId of atual.assistidoPor) {
-      if (!assistidoAntes.includes(peerId)) midia.publicarTelaPara(peerId)
-    }
-    for (const peerId of assistidoAntes) {
-      if (!atual.assistidoPor.includes(peerId)) midia.despublicarTelaDe(peerId)
-    }
-    assistidoAntes = atual.assistidoPor
+    midia.sincronizarMicrofone(atual.naCall)
+    // A assinatura vira efeito: sem espectador nenhum, a `Midia` despublica do
+    // último e o codificador desliga — que é o ponto de todo o desenho.
+    midia.sincronizarTela(atual.assistidoPor)
 
     for (const peerId of assistindoAntes) {
       if (!atual.assistindo.includes(peerId)) removerVideoDe(peerId)
     }
     assistindoAntes = atual.assistindo
+  }
 
+  protocolo.aoMudar(() => {
+    sincronizarMidia()
     desenhar()
   })
 
