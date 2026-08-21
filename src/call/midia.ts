@@ -1,4 +1,5 @@
 import type { SalaTrystero } from '../net/transport'
+import { escolherH264 } from './codec'
 
 /**
  * O supressor de ruído do próprio WebRTC, de graça. Não é Krisp, mas resolve
@@ -15,15 +16,33 @@ export const RESTRICOES_MICROFONE: MediaStreamConstraints = {
  * quase não pesa. Resolução é o botão que importa.
  */
 export const ALTURA_PADRAO = 720
-export const BITRATE_PADRAO = 3_000_000
+
+/**
+ * Bitrate por altura. Um teto único servia mal aos dois casos: 3 Mbps aperta
+ * 1080p (a tela chega borrada, que foi o relato) e sobra em 720p.
+ */
+export const BITRATE_POR_ALTURA: Record<number, number> = {
+  720: 2_500_000,
+  1080: 6_000_000,
+}
+const BITRATE_FALLBACK = 4_000_000
 
 export const RESTRICOES_TELA: DisplayMediaStreamOptions = {
-  // Sem áudio nesta versão: a captura é irregular entre plataformas, e som do
-  // sistema com microfone aberto cria eco de verdade. Custo assumido: assistir
-  // vídeo junto entrega imagem sem som.
   video: { frameRate: { ideal: 30 } },
-  audio: false,
+  /**
+   * Pede o áudio do que está sendo compartilhado. O navegador decide se
+   * oferece: no Chrome vem para aba e, no Windows, para tela inteira; no Mac e
+   * no Linux costuma não vir. Pedir e não receber é inofensivo — a tela vai
+   * sem som, como antes.
+   *
+   * Quem compartilha usando alto-falante pode gerar eco, porque o áudio do
+   * sistema inclui a voz de quem está do outro lado. Com fone, não acontece.
+   */
+  audio: true,
 }
+
+/** Como o codificador deve gastar o bitrate que tem. */
+export type TipoConteudo = 'motion' | 'detail'
 
 /** O `addStream` com alvo só cria o sender depois de renegociar. */
 const MS_ATE_O_SENDER_EXISTIR = 1500
@@ -59,6 +78,7 @@ export class Midia {
   private micPara = new Set<string>()
   private telaPara = new Set<string>()
   private altura: number = ALTURA_PADRAO
+  private conteudo: TipoConteudo = 'motion'
 
   /**
    * `onPeerStream` e NÃO `onPeerTrack`: em `media.mjs` do Trystero, quem
@@ -141,11 +161,6 @@ export class Midia {
     this.sala.addStream(new MediaStream(stream.getTracks()),
       { target: faltando, metadata: { tipo } })
     for (const id of faltando) publicado.add(id)
-    if (tipo === 'tela') {
-      for (const id of faltando) {
-        setTimeout(() => this.ajustarEnvio(id), MS_ATE_O_SENDER_EXISTIR)
-      }
-    }
   }
 
   /**
@@ -160,16 +175,42 @@ export class Midia {
     if (!faixa) return
     // Diz ao codificador o que priorizar. Escolher errado aqui é a causa
     // clássica de "tela travando", e é o botão que Discord e Meet não expõem.
-    faixa.contentHint = 'motion'
+    faixa.contentHint = this.conteudo
     // O Chrome mostra a barra dele com "Parar de compartilhar". Sem tratar o
     // fim por esse caminho, a interface continuaria dizendo que você
     // compartilha depois de você já ter parado.
     faixa.onended = () => aoEncerrarPeloNavegador()
   }
 
-  /** Mesma reconciliação do microfone: `alvos` é quem pediu para assistir. */
+  /**
+   * `alvos` é quem pediu para assistir.
+   *
+   * O envio é ESTABELECIDO uma vez por peer e nunca desmontado enquanto a tela
+   * existir — parar de assistir só desliga o codificador. O motivo é duro:
+   * `removeStream` faz `pc.removeTrack`, que não encerra o transceiver. Ao
+   * re-adicionar, o transceiver é reaproveitado, o `ontrack` do outro lado NÃO
+   * dispara de novo, e a meta fica presa em `pendingStreamMetas` para sempre —
+   * a tela nunca mais voltava, a menos que quem compartilha reiniciasse tudo
+   * (aí a faixa era nova).
+   *
+   * `encoding.active` liga e desliga a codificação sem renegociar, então o
+   * ganho de não codificar para quem não assiste continua valendo.
+   */
   sincronizarTela(alvos: string[]): void {
-    this.reconciliar(this.tela, this.telaPara, alvos, 'tela')
+    if (!this.tela) return
+    const novos = alvos.filter((id) => !this.telaPara.has(id))
+    if (novos.length > 0) {
+      this.sala.addStream(new MediaStream(this.tela.getTracks()),
+        { target: novos, metadata: { tipo: 'tela' } })
+      for (const id of novos) this.telaPara.add(id)
+    }
+    for (const id of this.telaPara) {
+      const ativo = alvos.includes(id)
+      // Quem acabou de ser publicado precisa esperar o sender existir; quem já
+      // estava é imediato.
+      if (novos.includes(id)) setTimeout(() => this.ajustarEnvio(id, ativo), MS_ATE_O_SENDER_EXISTIR)
+      else this.ajustarEnvio(id, ativo)
+    }
   }
 
   pararTela(): void {
@@ -189,23 +230,28 @@ export class Midia {
    * só escolhe entre o que já foi negociado — e o H.264 entra no SDP por
    * padrão mesmo sem ser o preferido. É ele que aciona o encoder de hardware.
    */
-  private ajustarEnvio(peerId: string): void {
+  private ajustarEnvio(peerId: string, ativo: boolean): void {
     const pc = this.sala.getPeers()[peerId]
     if (!pc) return
     // `RTCRtpSender` pode não existir (navegador antigo), e uma exceção aqui
     // derrubaria o compartilhamento inteiro por causa de um ajuste opcional.
     const h264 = typeof RTCRtpSender === 'undefined'
       ? undefined
-      : RTCRtpSender.getCapabilities?.('video')?.codecs
-        .find((c) => c.mimeType.toLowerCase() === 'video/h264')
+      : escolherH264(RTCRtpSender.getCapabilities?.('video')?.codecs ?? [])
 
     for (const sender of pc.getSenders()) {
       if (sender.track?.kind !== 'video') continue
       const params = sender.getParameters()
       const encoding: EncodingComCodec | undefined = params.encodings?.[0]
       if (!encoding) continue
-      encoding.maxBitrate = BITRATE_PADRAO
-      encoding.scaleResolutionDownBy = Math.max(1, 1080 / this.altura)
+      encoding.active = ativo
+      encoding.maxBitrate = BITRATE_POR_ALTURA[this.altura] ?? BITRATE_FALLBACK
+      // A escala sai da altura REAL da captura, não de um 1080 presumido.
+      // Numa tela 1440p ou 4K, presumir 1080 dava fator 1: mandava resolução
+      // nativa com bitrate de tela pequena, e o resultado era exatamente o
+      // "mesmo em 1080p não parece boa".
+      const alturaFonte = this.tela?.getVideoTracks()[0]?.getSettings().height
+      encoding.scaleResolutionDownBy = Math.max(1, (alturaFonte ?? this.altura) / this.altura)
       if (h264) encoding.codec = h264
       // Falhar aqui degrada a qualidade, não a conversa: um ajuste de
       // codificação nunca deve derrubar uma call que já está de pé.
@@ -217,6 +263,23 @@ export class Midia {
     return this.altura
   }
 
+  tipoConteudo(): TipoConteudo {
+    return this.conteudo
+  }
+
+  /**
+   * `motion` prioriza fluidez e `detail` prioriza nitidez — o codificador não
+   * consegue os dois com o mesmo bitrate. Para jogo, `motion`; para código ou
+   * texto, `detail`, que é o que faz letra pequena parar de embolar.
+   *
+   * Vale na hora, sem renegociar: `contentHint` é propriedade da faixa.
+   */
+  definirTipoConteudo(tipo: TipoConteudo): void {
+    this.conteudo = tipo
+    const faixa = this.tela?.getVideoTracks()[0]
+    if (faixa) faixa.contentHint = tipo
+  }
+
   /**
    * Troca a altura e reaplica em quem já está recebendo. `setParameters` vale
    * na conexão de pé, então a mudança é imediata: não espera republicação nem
@@ -224,7 +287,7 @@ export class Midia {
    */
   definirQualidade(altura: number): void {
     this.altura = altura
-    for (const peerId of this.telaPara) this.ajustarEnvio(peerId)
+    for (const peerId of this.telaPara) this.ajustarEnvio(peerId, true)
   }
 
   aoReceberMidia(cb: (stream: MediaStream, de: string, meta?: unknown) => void): void {

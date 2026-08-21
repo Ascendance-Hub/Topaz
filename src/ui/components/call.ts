@@ -1,4 +1,5 @@
 import type { EstadoCall } from '../../call/protocolo'
+import type { TipoConteudo } from '../../call/midia'
 
 export interface AcoesCall {
   entrar(): void
@@ -8,6 +9,7 @@ export interface AcoesCall {
   assistir(peerId: string): void
   pararDeAssistir(peerId: string): void
   definirQualidade(altura: number): void
+  definirTipoConteudo(tipo: TipoConteudo): void
 }
 
 /**
@@ -39,7 +41,8 @@ function botao(chave: string, rotulo: string, aoClicar: () => void): HTMLElement
  * impede um microfone aberto sem a pessoa ter pedido.
  */
 export function renderizarControlesCall(
-  estado: EstadoCall, acoes: AcoesCall, alturaAtual = 720,
+  estado: EstadoCall, acoes: AcoesCall,
+  alturaAtual = 720, conteudoAtual: TipoConteudo = 'motion',
 ): HTMLElement {
   const barra = document.createElement('div')
   barra.className = 'call-controles'
@@ -73,6 +76,22 @@ export function renderizarControlesCall(
     }
     qualidade.onchange = () => acoes.definirQualidade(Number(qualidade.value))
     barra.append(qualidade)
+
+    const conteudo = document.createElement('select')
+    conteudo.className = 'call-qualidade'
+    conteudo.dataset['call'] = 'conteudo'
+    conteudo.setAttribute('aria-label', 'O que a tela mostra')
+    for (const [valor, rotulo] of [
+      ['motion', 'Jogo / vídeo'], ['detail', 'Código / texto'],
+    ] as const) {
+      const opcao = document.createElement('option')
+      opcao.value = valor
+      opcao.textContent = rotulo
+      if (valor === conteudoAtual) opcao.selected = true
+      conteudo.append(opcao)
+    }
+    conteudo.onchange = () => acoes.definirTipoConteudo(conteudo.value as TipoConteudo)
+    barra.append(conteudo)
     if (estado.assistidoPor.length === 0) {
       const aviso = document.createElement('span')
       aviso.className = 'call-sem-espectador'

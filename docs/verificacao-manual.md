@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (447, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (472, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -63,6 +63,12 @@ exercitam o caminho real de rede.
 - [ ] "Janela flutuante" abre o PiP do sistema, que dá para mover e
       redimensionar fora do navegador
 - [ ] Trocar a qualidade de 720p para 1080p muda a nitidez sem cortar o vídeo
+- [ ] **Assistir, parar de assistir e assistir de novo** — a tela volta sem
+      quem compartilha precisar reiniciar nada
+- [ ] "Tela cheia" ocupa o monitor inteiro e a barra de controles continua lá
+- [ ] Trocar "Jogo / vídeo" para "Código / texto" deixa letra pequena legível
+- [ ] Compartilhar uma aba com som: quem assiste ouve, e o botão silencia
+- [ ] Com fone nos dois lados, o som da tela não gera eco
 
 ## Rede
 

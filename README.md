@@ -60,8 +60,13 @@ sistema (Picture-in-Picture), que continua visível mesmo fora do navegador. Que
 compartilha escolhe entre 720p e 1080p — o salto de custo entre as duas é de
 cerca de 3× na codificação, então 720p é o padrão.
 
-Não tem câmera, não captura o áudio do sistema (então assistir vídeo junto
-entrega imagem sem som) e não funciona em celular.
+Quem compartilha também escolhe se a tela é "jogo/vídeo" ou "código/texto" — o
+codificador não consegue fluidez e nitidez ao mesmo tempo com o mesmo bitrate, e
+essa é a escolha que faz letra pequena parar de embolar. O áudio do que está
+sendo compartilhado vai junto quando o navegador oferece (no Chrome, para aba e
+para tela inteira no Windows).
+
+Não tem câmera e não funciona em celular.
 
 ### Privacidade
 

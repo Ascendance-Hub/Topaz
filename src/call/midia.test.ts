@@ -26,12 +26,25 @@ function criarSalaFalsa() {
     getPeers: () => ({}),
   }
 
+  /** Senders observáveis, para conferir o liga-desliga do codificador. */
+  function comSender(peerId: string) {
+    const params: { encodings: Record<string, unknown>[] } = { encodings: [{}] }
+    const faixa = { kind: 'video' }
+    const sender = {
+      track: faixa,
+      getParameters: () => params,
+      setParameters: vi.fn().mockResolvedValue(undefined),
+    }
+    sala.getPeers = (() => ({ [peerId]: { getSenders: () => [sender] } })) as never
+    return { sender, params, faixa }
+  }
+
   /** Entrega ao destinatário pelo MESMO caminho que o `addStream` alimenta. */
   function entregar(stream: unknown, de: string, meta?: unknown): void {
     sala.onPeerStream?.(stream, de, meta)
   }
 
-  return { sala: sala as unknown as SalaTrystero, bruta: sala, publicados, entregar }
+  return { sala: sala as unknown as SalaTrystero, bruta: sala, publicados, entregar, comSender }
 }
 
 describe('Midia — recebimento', () => {
@@ -239,7 +252,7 @@ describe('Midia — qualidade', () => {
       value: {
         getDisplayMedia: vi.fn().mockResolvedValue({
           getTracks: () => [],
-          getVideoTracks: () => [{ contentHint: '', onended: null }],
+          getVideoTracks: () => [{ contentHint: '', onended: null, getSettings: () => ({ height: 1080 }) }],
         }),
       },
       configurable: true,
@@ -262,5 +275,132 @@ describe('Midia — qualidade', () => {
     midia.definirQualidade(1080)
 
     expect(sender.setParameters).not.toHaveBeenCalled()
+  })
+})
+
+describe('Midia — assistir, parar e assistir de novo', () => {
+  async function comTelaCompartilhada() {
+    const contexto = criarSalaFalsa()
+    const midia = new Midia(contexto.sala)
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getDisplayMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [],
+          getVideoTracks: () => [{ contentHint: '', onended: null, getSettings: () => ({ height: 1080 }) }],
+        }),
+      },
+      configurable: true,
+    })
+    await midia.compartilharTela(() => {})
+    return { ...contexto, midia }
+  }
+
+  it('estabelece o envio uma vez só, mesmo assistindo várias vezes', async () => {
+    const { midia, publicados, comSender } = await comTelaCompartilhada()
+    comSender('pa')
+
+    midia.sincronizarTela(['pa'])
+    midia.sincronizarTela([])
+    midia.sincronizarTela(['pa'])
+
+    // Republicar faria o `ontrack` do outro lado não disparar de novo (o
+    // transceiver é reaproveitado), e a tela nunca mais voltaria.
+    expect(publicados).toHaveLength(1)
+  })
+
+  it('não desmonta o envio quando o espectador para de assistir', async () => {
+    const { midia, bruta, comSender } = await comTelaCompartilhada()
+    comSender('pa')
+    midia.sincronizarTela(['pa'])
+
+    midia.sincronizarTela([])
+
+    expect(bruta.removeStream).not.toHaveBeenCalled()
+  })
+
+  it('desliga o codificador quando ninguém assiste', async () => {
+    const { midia, comSender } = await comTelaCompartilhada()
+    const { params } = comSender('pa')
+    midia.sincronizarTela(['pa'])
+
+    midia.sincronizarTela([])
+
+    expect(params.encodings[0]!['active']).toBe(false)
+  })
+
+  it('religa o codificador quando voltam a assistir', async () => {
+    const { midia, comSender } = await comTelaCompartilhada()
+    const { params } = comSender('pa')
+    midia.sincronizarTela(['pa'])
+    midia.sincronizarTela([])
+
+    midia.sincronizarTela(['pa'])
+
+    expect(params.encodings[0]!['active']).toBe(true)
+  })
+
+  it('parar de compartilhar de vez desmonta o envio', async () => {
+    const { midia, bruta, comSender } = await comTelaCompartilhada()
+    comSender('pa')
+    midia.sincronizarTela(['pa'])
+
+    midia.pararTela()
+
+    expect(bruta.removeStream).toHaveBeenCalled()
+  })
+})
+
+describe('Midia — escala pela resolução real da fonte', () => {
+  async function comFonteDe(alturaFonte: number) {
+    const contexto = criarSalaFalsa()
+    const midia = new Midia(contexto.sala)
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getDisplayMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [],
+          getVideoTracks: () => [
+            { contentHint: '', onended: null, getSettings: () => ({ height: alturaFonte }) },
+          ],
+        }),
+      },
+      configurable: true,
+    })
+    await midia.compartilharTela(() => {})
+    return { ...contexto, midia }
+  }
+
+  it('reduz uma tela 1440p para a altura escolhida', async () => {
+    const { midia, comSender } = await comFonteDe(1440)
+    const { params } = comSender('pa')
+
+    midia.sincronizarTela(['pa'])
+    midia.definirQualidade(720)
+
+    expect(params.encodings[0]!['scaleResolutionDownBy']).toBe(2)
+  })
+
+  it('não reduz quando a fonte já é menor que o alvo', async () => {
+    const { midia, comSender } = await comFonteDe(900)
+    const { params } = comSender('pa')
+
+    midia.sincronizarTela(['pa'])
+    midia.definirQualidade(1080)
+
+    // Sem o `Math.max(1, ...)`, isto viraria um aumento de escala: pixels
+    // inventados, custando bitrate e sem ganhar nitidez nenhuma.
+    expect(params.encodings[0]!['scaleResolutionDownBy']).toBe(1)
+  })
+
+  it('usa bitrate maior em 1080p que em 720p', async () => {
+    const { midia, comSender } = await comFonteDe(1080)
+    const { params } = comSender('pa')
+    midia.sincronizarTela(['pa'])
+
+    midia.definirQualidade(720)
+    const em720 = params.encodings[0]!['maxBitrate'] as number
+    midia.definirQualidade(1080)
+    const em1080 = params.encodings[0]!['maxBitrate'] as number
+
+    expect(em1080).toBeGreaterThan(em720)
   })
 })
