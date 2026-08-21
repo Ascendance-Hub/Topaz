@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import {
   ehCodigoValido, gerarCodigoSala, haCodigoNaUrl, lerCodigoDaUrl,
   montarLinkSala, TAMANHO_CODIGO,
-} from './sala'
-import type { FonteBytes } from './sala'
+} from './codigo'
+import type { FonteBytes } from './codigo'
 import { rngSemente } from '../game/shoe'
 
 /**
