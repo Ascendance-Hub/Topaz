@@ -15,9 +15,9 @@ import { criarRedeFalsa } from './net/transport.fake'
 import { MS_DESCOBERTA, MS_SEM_CONEXAO, Sessao } from './net/sessao'
 import { TITULO_SEM_CONEXAO } from './ui/components/conexao'
 import { rngSemente } from './game/shoe'
-import { iniciarApp, iniciarPartida, MENSAGEM_ERRO_INICIAL } from './main'
+import { entrarNaSala, iniciarApp, MENSAGEM_ERRO_INICIAL } from './main'
 
-describe('iniciarPartida — barra de sala continua atualizando o DOM real', () => {
+describe('entrarNaSala — barra de sala continua atualizando o DOM real', () => {
   it('reflete a migração de anfitrião mesmo depois de vários desenhar()', () => {
     // Relógio falso: é o `setInterval` de main.ts que faz a janela de
     // descoberta de host vencer, exatamente como no navegador.
@@ -43,7 +43,7 @@ describe('iniciarPartida — barra de sala continua atualizando o DOM real', () 
     vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
     const app = document.createElement('div')
-    iniciarPartida(app, 'Bruno', 'CODIGO01')
+    entrarNaSala(app, 'Bruno', 'CODIGO01')
 
     rede.bombear()
     // O tique periódico de 'pb' vence a janela sem reivindicar nada ('pa'
@@ -54,7 +54,7 @@ describe('iniciarPartida — barra de sala continua atualizando o DOM real', () 
     // Depois do primeiro round-trip (entrar + snapshot do host), 'pb' já
     // sabe que 'pa' manda — isso já passou por pelo menos duas trocas de
     // `desenhar()` (uma ao adotar o snapshot recebido, outra explícita ao
-    // final de `iniciarPartida`). Sob o bug do `replaceWith` único, a barra
+    // final de `entrarNaSala`). Sob o bug do `replaceWith` único, a barra
     // já teria parado de acompanhar depois da primeira delas.
     const barraAntes = app.querySelector('.barra-sala')
     expect(barraAntes).not.toBeNull()
@@ -74,8 +74,8 @@ describe('iniciarPartida — barra de sala continua atualizando o DOM real', () 
   }
 })
 
-describe('iniciarPartida — estado da conexão em vez de mesa travada', () => {
-  it('mostra "conectando" antes de a sala ter anfitrião e a mesa depois', () => {
+describe('entrarNaSala — estado da conexão em vez de mesa travada', () => {
+  it('mostra "conectando" antes de a sala ter anfitrião e a sala depois', () => {
     vi.useFakeTimers()
     try {
       const rede = criarRedeFalsa({ conexaoDiferida: true })
@@ -83,7 +83,7 @@ describe('iniciarPartida — estado da conexão em vez de mesa travada', () => {
       vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
       const app = document.createElement('div')
-      iniciarPartida(app, 'Bruno', 'CODIGO01')
+      entrarNaSala(app, 'Bruno', 'CODIGO01')
 
       // Sem anfitrião ainda: nada de mesa nem de "Aguardando jogadores…",
       // que seria a mesma tela de uma conexão que nunca vai acontecer.
@@ -92,7 +92,12 @@ describe('iniciarPartida — estado da conexão em vez de mesa travada', () => {
 
       vi.advanceTimersByTime(MS_DESCOBERTA + 600)
 
+      // Conectado, o palco mostra a sala — a mesa passou a ser um clique de
+      // distância, não o conteúdo automático de quem entra.
       expect(app.querySelector('.conexao')).toBeNull()
+      expect(app.querySelector('.sala-parada')).not.toBeNull()
+
+      app.querySelector<HTMLButtonElement>('[data-nav="mesa"]')!.click()
       expect(app.querySelector('.mesa')).not.toBeNull()
     } finally {
       vi.useRealTimers()
@@ -111,7 +116,7 @@ describe('iniciarPartida — estado da conexão em vez de mesa travada', () => {
       vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
       const app = document.createElement('div')
-      iniciarPartida(app, 'Bruno', 'CODIGO01')
+      entrarNaSala(app, 'Bruno', 'CODIGO01')
       rede.bombear()
 
       vi.advanceTimersByTime(MS_SEM_CONEXAO + 600)
@@ -153,7 +158,7 @@ describe('iniciarApp — fallback de erro na inicialização', () => {
   })
 })
 
-describe('iniciarPartida — chat da sala', () => {
+describe('entrarNaSala — chat da sala', () => {
   /**
    * Sobe 'pb' (a aba sob teste) numa sala onde 'pa' já é anfitrião com o
    * apelido Alex, e devolve o transporte de 'pa' para simular alguém falando.
@@ -167,7 +172,7 @@ describe('iniciarPartida — chat da sala', () => {
     vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
     vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
     const app = document.createElement('div')
-    iniciarPartida(app, 'Bruno', 'CODIGO01')
+    entrarNaSala(app, 'Bruno', 'CODIGO01')
 
     rede.bombear()
     vi.advanceTimersByTime(MS_DESCOBERTA + 600)
@@ -236,6 +241,94 @@ describe('iniciarPartida — chat da sala', () => {
         .toBe('ainda estou escrevend')
       expect(app.contains(campo)).toBe(true)
       expect(app.querySelector('.chat-linha')!.textContent).toContain('e aí')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('entrarNaSala — a sala é o espaço, a mesa é uma escolha', () => {
+  function salaConectada() {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
+    outraAba.entrar('Alex')
+
+    vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+    vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
+
+    const app = document.createElement('div')
+    entrarNaSala(app, 'Bruno', 'CODIGO01')
+
+    rede.bombear()
+    vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+    outraAba.tique(Date.now())
+    return { app, outraAba }
+  }
+
+  function clicar(app: HTMLElement, alvo: string): void {
+    app.querySelector<HTMLButtonElement>(`[data-nav="${alvo}"]`)!.click()
+  }
+
+  it('ao entrar, mostra a sala com quem está — não a mesa', () => {
+    vi.useFakeTimers()
+    try {
+      const { app } = salaConectada()
+
+      expect(app.querySelector('.sala-parada')).not.toBeNull()
+      expect(app.querySelector('.mesa')).toBeNull()
+      expect(app.textContent).toContain('Alex')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('abrir a mesa troca o palco, e voltar devolve a sala', () => {
+    vi.useFakeTimers()
+    try {
+      const { app } = salaConectada()
+
+      clicar(app, 'mesa')
+      expect(app.querySelector('.mesa')).not.toBeNull()
+      expect(app.querySelector('.sala-parada')).toBeNull()
+
+      clicar(app, 'sala')
+      expect(app.querySelector('.mesa')).toBeNull()
+      expect(app.querySelector('.sala-parada')).not.toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('o chat sobrevive a alternar entre sala e mesa, com o que estava digitado', () => {
+    vi.useFakeTimers()
+    try {
+      const { app } = salaConectada()
+      const campo = app.querySelector<HTMLInputElement>('.chat-campo')!
+      campo.value = 'escrevendo ainda'
+
+      clicar(app, 'mesa')
+      clicar(app, 'sala')
+
+      expect(app.querySelectorAll('.chat')).toHaveLength(1)
+      expect(app.querySelector<HTMLInputElement>('.chat-campo')!.value)
+        .toBe('escrevendo ainda')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('com a mesa aberta, um broadcast do host não devolve o palco para a sala', () => {
+    vi.useFakeTimers()
+    try {
+      const { app, outraAba } = salaConectada()
+      clicar(app, 'mesa')
+
+      // Cada despacho do host publica um snapshot, e cada snapshot redesenha.
+      // Se `mesaAberta` morasse no estado do jogo em vez de ser escolha local,
+      // era aqui que a tela pularia de volta para a sala sozinha.
+      for (let i = 0; i < 3; i++) outraAba.entrar('Alex')
+
+      expect(app.querySelector('.mesa')).not.toBeNull()
     } finally {
       vi.useRealTimers()
     }

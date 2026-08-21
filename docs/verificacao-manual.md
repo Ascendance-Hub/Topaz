@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (338, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (356, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -25,6 +25,15 @@ simular um navegador separado.
 - [ ] Alguém chegando a 1500 encerra a partida com placar
 - [ ] "Nova partida" devolve todos à sala de espera com 1000 fichas
 - [ ] O botão "?" explica Dobrar, Dividir e Seguro
+
+## Sala
+
+- [ ] Ao entrar, a tela mostra a sala com quem está — não a mesa
+- [ ] A navegação alterna entre Sala e Mesa, e a mesa em andamento continua
+      valendo quando você volta para ela
+- [ ] Quem está na sala aparece na lista mesmo sem ter sentado
+- [ ] Quem fecha a aba aparece marcado como caído antes de sumir
+- [ ] Abrir a mesa não arrasta os outros junto — cada um escolhe o que vê
 
 ## Rede
 

@@ -12,6 +12,10 @@ com um botão "?" explicando as três que não são óbvias para quem não joga.
 Dealer automático que para em 17, com o avanço pausado no tempo (turnos e a
 compra do dealer têm prazo visível, não resolvem tudo instantaneamente).
 
+Entrar numa sala não é sentar numa mesa: a sala mostra quem está presente, e a
+mesa é uma das coisas que se abre lá dentro, pela navegação no topo. Abrir a
+mesa é escolha de cada um — não arrasta os outros junto.
+
 A partida começa quando o anfitrião aperta "Iniciar partida" — sentar não
 inicia mais nada sozinho, então os outros esperam com um aviso na tela. Quem
 quebra (fica sem fichas) vira espectador e não consegue sentar de novo até a
