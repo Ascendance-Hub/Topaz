@@ -13,6 +13,13 @@ as coisas andam — não é plano de implementação (esses vivem em
   ⚠️ Está na branch `chat-da-sala`, commitada e no remoto, **ainda não mergeada
   na `main`** — ou seja, ainda não está no ar.
 
+## Onde ficam os aprendizados
+
+`docs/aprendizados-trystero-webrtc.md` guarda o que descobrimos sobre Trystero
+e WebRTC que **não está na documentação oficial** de nenhum dos dois, com o
+sintoma, a causa e o conserto de cada caso — mais o histórico dos problemas
+relatados em uso e o que cada um se revelou ser.
+
 ## Investigado e encerrado
 
 - **Topaz não conecta na rede da faculdade** — diagnosticado em 2026-08-19:

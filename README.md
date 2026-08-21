@@ -97,4 +97,7 @@ npm run build    # build de produção
 
 `src/game/` não importa nada das outras camadas — há um teste que garante isso.
 
-Design e plano de implementação em `docs/superpowers/`.
+Design e plano de implementação em `docs/superpowers/`. O que aprendemos sobre
+Trystero e WebRTC pelo caminho — quase tudo saído de bug em uso real, e nada
+disso na documentação oficial — está em
+[`docs/aprendizados-trystero-webrtc.md`](docs/aprendizados-trystero-webrtc.md).
