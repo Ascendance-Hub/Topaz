@@ -63,11 +63,15 @@ export function criarVideoRemoto(
   if (temAudio) {
     const som = botao('som', 'Silenciar')
     som.onclick = () => {
-      video.muted = !video.muted
-      som.textContent = video.muted ? 'Ouvir' : 'Silenciar'
+      const mudo = !video.muted
+      video.muted = mudo
+      // Registra a INTENÇÃO, separada do mudo técnico de estar escondido:
+      // quem silenciou de propósito não quer o som de volta ao reaparecer.
+      caixa.dataset['silenciado'] = mudo ? '1' : '0'
+      som.textContent = mudo ? 'Ouvir' : 'Silenciar'
       // O clique é um gesto do usuário: se o autoplay tinha sido recusado, é
       // aqui que o som finalmente começa.
-      if (!video.muted) void video.play?.().catch(() => {})
+      if (!mudo) void video.play?.().catch(() => {})
     }
     barra.append(som)
   }
@@ -106,6 +110,26 @@ export function criarVideoRemoto(
     barra.append(pip)
   }
 
+  if (temAudio) caixa.dataset['comAudio'] = '1'
+  caixa.dataset['silenciado'] = '0'
   caixa.append(video, barra)
   return caixa
+}
+
+/**
+ * Mostra ou esconde a tela de alguém.
+ *
+ * Existe porque `hidden` sozinho **não para o áudio**: um `<video>` escondido
+ * continua tocando. Era isso que fazia o som da tela continuar saindo depois
+ * de parar de assistir, e depois de sair da call.
+ */
+export function mostrarVideo(caixa: HTMLElement, visivel: boolean): void {
+  caixa.hidden = !visivel
+  const video = caixa.querySelector('video')
+  if (!video) return
+  const temAudio = caixa.dataset['comAudio'] === '1'
+  const silenciado = caixa.dataset['silenciado'] === '1'
+  video.muted = !visivel || !temAudio || silenciado
+  if (visivel) void video.play?.().catch(() => {})
+  else video.pause?.()
 }

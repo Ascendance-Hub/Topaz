@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (472, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (491, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -69,6 +69,16 @@ exercitam o caminho real de rede.
 - [ ] Trocar "Jogo / vídeo" para "Código / texto" deixa letra pequena legível
 - [ ] Compartilhar uma aba com som: quem assiste ouve, e o botão silencia
 - [ ] Com fone nos dois lados, o som da tela não gera eco
+- [ ] **Parar de assistir uma tela com som cala o som junto** (era o bug do
+      elemento escondido que continuava tocando)
+- [ ] **Sair da call cala tudo**: nenhuma tela e nenhum áudio continuam
+- [ ] **Com 3 ou 4 pessoas**, entrar alguém novo não faz ninguém sumir do
+      áudio de quem já estava
+- [ ] Com duas pessoas compartilhando, os botões dizem o nome de cada uma
+- [ ] "Mutar meu microfone" cala você para todos, e o estado sobrevive a sair
+      e voltar da call
+- [ ] "Silenciar todos" cala vozes e telas de uma vez
+- [ ] O som de um jogo compartilhado não chega abafado nem chiado
 
 ## Rede
 

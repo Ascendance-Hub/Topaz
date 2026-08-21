@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest'
-import { criarVideoRemoto, ROTULO_EXPANDIR, ROTULO_RECOLHER } from './video-remoto'
+import { criarVideoRemoto, mostrarVideo, ROTULO_EXPANDIR, ROTULO_RECOLHER } from './video-remoto'
 
 function comSuportePiP(suportado: boolean): void {
   Object.defineProperty(document, 'pictureInPictureEnabled', {
@@ -169,4 +169,57 @@ describe('som do compartilhamento', () => {
     expect(video.muted).toBe(false)
   })
 
+})
+
+describe('mostrar e esconder', () => {
+  function streamComAudio2(): MediaStream {
+    const s = new MediaStream()
+    Object.defineProperty(s, 'getAudioTracks', {
+      value: () => [{ kind: 'audio' }], configurable: true,
+    })
+    return s
+  }
+
+  it('esconder também cala o som', () => {
+    const caixa = criarVideoRemoto('pa', streamComAudio2())
+    const video = caixa.querySelector<HTMLVideoElement>('video')!
+    expect(video.muted).toBe(false)
+
+    mostrarVideo(caixa, false)
+
+    // `hidden` sozinho NÃO para o áudio: o elemento continua tocando fora da
+    // tela. Era isso que fazia o som da tela continuar saindo depois de parar
+    // de assistir.
+    expect(caixa.hidden).toBe(true)
+    expect(video.muted).toBe(true)
+  })
+
+  it('mostrar devolve o som de quem tinha som', () => {
+    const caixa = criarVideoRemoto('pa', streamComAudio2())
+    mostrarVideo(caixa, false)
+
+    mostrarVideo(caixa, true)
+
+    expect(caixa.hidden).toBe(false)
+    expect(caixa.querySelector<HTMLVideoElement>('video')!.muted).toBe(false)
+  })
+
+  it('mostrar não dá som a quem nunca teve', () => {
+    const caixa = criarVideoRemoto('pa', streamFalso())
+
+    mostrarVideo(caixa, true)
+
+    expect(caixa.querySelector<HTMLVideoElement>('video')!.muted).toBe(true)
+  })
+
+  it('respeita o silenciar manual ao voltar a aparecer', () => {
+    const caixa = criarVideoRemoto('pa', streamComAudio2())
+    caixa.querySelector<HTMLButtonElement>('[data-video="som"]')!.click()
+
+    mostrarVideo(caixa, false)
+    mostrarVideo(caixa, true)
+
+    // Quem silenciou de propósito não quer o som de volta sozinho.
+    expect(caixa.querySelector<HTMLVideoElement>('video')!.muted).toBe(true)
+  })
 })

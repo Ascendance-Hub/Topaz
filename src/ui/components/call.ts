@@ -10,6 +10,15 @@ export interface AcoesCall {
   pararDeAssistir(peerId: string): void
   definirQualidade(altura: number): void
   definirTipoConteudo(tipo: TipoConteudo): void
+  alternarMeuMicrofone(): void
+  alternarSilenciarTodos(): void
+}
+
+/** O que a barra precisa saber além do estado da call. */
+export interface ContextoCall {
+  apelidoDe: (peerId: string) => string
+  meuMicrofoneMudo?: boolean
+  todosSilenciados?: boolean
 }
 
 /**
@@ -43,6 +52,7 @@ function botao(chave: string, rotulo: string, aoClicar: () => void): HTMLElement
 export function renderizarControlesCall(
   estado: EstadoCall, acoes: AcoesCall,
   alturaAtual = 720, conteudoAtual: TipoConteudo = 'motion',
+  contexto: ContextoCall = { apelidoDe: (id) => id },
 ): HTMLElement {
   const barra = document.createElement('div')
   barra.className = 'call-controles'
@@ -58,7 +68,23 @@ export function renderizarControlesCall(
   // do outro lado descreveria uma lista de terceiros que ninguém pediu.
   contagem.textContent = `${estado.naCall.length + 1} na call`
 
-  barra.append(contagem, botao('sair', 'Sair da call', () => acoes.sair()))
+  barra.append(contagem)
+
+  const meuMic = botao(
+    'meu-microfone',
+    contexto.meuMicrofoneMudo ? 'Ligar meu microfone' : 'Mutar meu microfone',
+    () => acoes.alternarMeuMicrofone(),
+  )
+  meuMic.dataset['mudo'] = contexto.meuMicrofoneMudo ? '1' : '0'
+  barra.append(meuMic)
+
+  const silenciar = botao(
+    'silenciar-todos',
+    contexto.todosSilenciados ? 'Ouvir todos' : 'Silenciar todos',
+    () => acoes.alternarSilenciarTodos(),
+  )
+  silenciar.dataset['silenciado'] = contexto.todosSilenciados ? '1' : '0'
+  barra.append(silenciar, botao('sair', 'Sair da call', () => acoes.sair()))
 
   if (estado.euCompartilhando) {
     barra.append(botao('parar-tela', 'Parar de compartilhar', () => acoes.pararTela()))
@@ -106,9 +132,12 @@ export function renderizarControlesCall(
 
   for (const peerId of estado.compartilhando) {
     const assistindo = estado.assistindo.includes(peerId)
+    // O nome vai no rótulo: com duas pessoas compartilhando, dois botões
+    // "Parar de assistir" idênticos não deixam escolher qual.
+    const quem = contexto.apelidoDe(peerId)
     const el = botao(
       assistindo ? 'parar-assistir' : 'assistir',
-      assistindo ? 'Parar de assistir' : 'Assistir tela',
+      assistindo ? `Parar de ver ${quem}` : `Ver tela de ${quem}`,
       () => (assistindo ? acoes.pararDeAssistir(peerId) : acoes.assistir(peerId)),
     )
     el.dataset[assistindo ? 'pararAssistir' : 'assistir'] = peerId

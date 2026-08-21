@@ -101,7 +101,7 @@ describe('Midia — publicação da tela', () => {
 
 /** Só o `getUserMedia` é falsificado; o resto do caminho é o de verdade. */
 function fingirMicrofone(): MediaStream {
-  const stream = { id: 'mic', getTracks: () => [] } as unknown as MediaStream
+  const stream = { id: 'mic', getTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream
   Object.defineProperty(navigator, 'mediaDevices', {
     value: { getUserMedia: vi.fn().mockResolvedValue(stream) },
     configurable: true,
@@ -253,6 +253,7 @@ describe('Midia — qualidade', () => {
         getDisplayMedia: vi.fn().mockResolvedValue({
           getTracks: () => [],
           getVideoTracks: () => [{ contentHint: '', onended: null, getSettings: () => ({ height: 1080 }) }],
+          getAudioTracks: () => [],
         }),
       },
       configurable: true,
@@ -287,6 +288,7 @@ describe('Midia — assistir, parar e assistir de novo', () => {
         getDisplayMedia: vi.fn().mockResolvedValue({
           getTracks: () => [],
           getVideoTracks: () => [{ contentHint: '', onended: null, getSettings: () => ({ height: 1080 }) }],
+          getAudioTracks: () => [],
         }),
       },
       configurable: true,
@@ -361,6 +363,7 @@ describe('Midia — escala pela resolução real da fonte', () => {
           getVideoTracks: () => [
             { contentHint: '', onended: null, getSettings: () => ({ height: alturaFonte }) },
           ],
+          getAudioTracks: () => [],
         }),
       },
       configurable: true,
@@ -402,5 +405,94 @@ describe('Midia — escala pela resolução real da fonte', () => {
     const em1080 = params.encodings[0]!['maxBitrate'] as number
 
     expect(em1080).toBeGreaterThan(em720)
+  })
+})
+
+describe('Midia — áudio do compartilhamento', () => {
+  async function telaComSom() {
+    const contexto = criarSalaFalsa()
+    const midia = new Midia(contexto.sala)
+    const faixaAudio = { kind: 'audio', contentHint: '', getSettings: () => ({}) }
+    const faixaVideo = { kind: 'video', contentHint: '', onended: null, getSettings: () => ({ height: 1080 }) }
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getDisplayMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [faixaVideo, faixaAudio],
+          getVideoTracks: () => [faixaVideo],
+          getAudioTracks: () => [faixaAudio],
+        }),
+      },
+      configurable: true,
+    })
+    await midia.compartilharTela(() => {})
+    return { ...contexto, midia, faixaAudio, faixaVideo }
+  }
+
+  it('marca o áudio da tela como música, não como fala', async () => {
+    const { faixaAudio } = await telaComSom()
+
+    // Sem isto o codificador trata como voz: corta faixa de frequência, aplica
+    // supressão e o som do jogo chega abafado. `music` diz para preservar.
+    expect(faixaAudio.contentHint).toBe('music')
+  })
+
+  it('a faixa de vídeo continua com a dica de vídeo, não de música', async () => {
+    const { faixaVideo } = await telaComSom()
+
+    expect(faixaVideo.contentHint).toBe('motion')
+  })
+
+  it('dá bitrate de música ao áudio da tela', async () => {
+    const { midia, bruta, faixaAudio } = await telaComSom()
+    const params: { encodings: Record<string, unknown>[] } = { encodings: [{}] }
+    const senderAudio = {
+      // A MESMA faixa que está na tela: o ajuste é dirigido, para o microfone
+      // (publicado por outro caminho) não ganhar bitrate de música.
+      track: faixaAudio,
+      getParameters: () => params,
+      setParameters: vi.fn().mockResolvedValue(undefined),
+    }
+    bruta.getPeers = (() => ({ pa: { getSenders: () => [senderAudio] } })) as never
+
+    midia.sincronizarTela(['pa'])
+    midia.definirQualidade(720)
+
+    // O Opus padrão do WebRTC mira voz, com bitrate baixo. Som de jogo precisa
+    // de mais para não virar chiado.
+    expect(params.encodings[0]!['maxBitrate']).toBeGreaterThanOrEqual(128_000)
+  })
+})
+
+describe('Midia — o microfone não vira música', () => {
+  it('não aplica bitrate de tela ao microfone', async () => {
+    const contexto = criarSalaFalsa()
+    const midia = new Midia(contexto.sala)
+    const faixaVideo = {
+      contentHint: '', onended: null, getSettings: () => ({ height: 1080 }),
+    }
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getDisplayMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [faixaVideo],
+          getVideoTracks: () => [faixaVideo],
+          getAudioTracks: () => [],
+        }),
+      },
+      configurable: true,
+    })
+    await midia.compartilharTela(() => {})
+
+    const params: { encodings: Record<string, unknown>[] } = { encodings: [{}] }
+    const senderMicrofone = {
+      track: { kind: 'audio' },
+      getParameters: () => params,
+      setParameters: vi.fn().mockResolvedValue(undefined),
+    }
+    contexto.bruta.getPeers = (() => ({ pa: { getSenders: () => [senderMicrofone] } })) as never
+
+    midia.sincronizarTela(['pa'])
+    midia.definirQualidade(720)
+
+    expect(senderMicrofone.setParameters).not.toHaveBeenCalled()
   })
 })

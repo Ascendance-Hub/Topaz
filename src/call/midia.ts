@@ -27,6 +27,14 @@ export const BITRATE_POR_ALTURA: Record<number, number> = {
 }
 const BITRATE_FALLBACK = 4_000_000
 
+/**
+ * O Opus do WebRTC nasce mirando voz: bitrate baixo, mono, banda estreita.
+ * Para o som de um jogo ou de um vídeo isso chega abafado e chiado — foi o
+ * relato. Este teto, somado ao `contentHint = 'music'` na faixa, é o que faz o
+ * codificador parar de tratar aquilo como fala.
+ */
+export const BITRATE_AUDIO_TELA = 192_000
+
 export const RESTRICOES_TELA: DisplayMediaStreamOptions = {
   video: { frameRate: { ideal: 30 } },
   /**
@@ -79,6 +87,7 @@ export class Midia {
   private telaPara = new Set<string>()
   private altura: number = ALTURA_PADRAO
   private conteudo: TipoConteudo = 'motion'
+  private mudo = false
 
   /**
    * `onPeerStream` e NÃO `onPeerTrack`: em `media.mjs` do Trystero, quem
@@ -101,6 +110,9 @@ export class Midia {
   async ligarMicrofone(): Promise<void> {
     if (this.microfone) return
     this.microfone = await navigator.mediaDevices.getUserMedia(RESTRICOES_MICROFONE)
+    // O mudo sobrevive a sair e voltar da call: se a pessoa se mutou, não é
+    // para o microfone voltar aberto sozinho.
+    for (const faixa of this.microfone.getAudioTracks()) faixa.enabled = !this.mudo
   }
 
   /**
@@ -113,6 +125,21 @@ export class Midia {
    */
   sincronizarMicrofone(alvos: string[]): void {
     this.reconciliar(this.microfone, this.micPara, alvos, 'microfone')
+  }
+
+  microfoneMudo(): boolean {
+    return this.mudo
+  }
+
+  /**
+   * `enabled = false` continua enviando a faixa, mas em silêncio — é o mudo
+   * que todo app de call usa. Desligar a captura acenderia e apagaria o
+   * indicador do navegador a cada clique, e obrigaria a renegociar.
+   */
+  alternarMicrofone(): boolean {
+    this.mudo = !this.mudo
+    for (const faixa of this.microfone?.getAudioTracks() ?? []) faixa.enabled = !this.mudo
+    return this.mudo
   }
 
   desligarMicrofone(): void {
@@ -176,6 +203,10 @@ export class Midia {
     // Diz ao codificador o que priorizar. Escolher errado aqui é a causa
     // clássica de "tela travando", e é o botão que Discord e Meet não expõem.
     faixa.contentHint = this.conteudo
+    // A faixa de áudio da tela recebe dica PRÓPRIA: `music` diz ao codificador
+    // para preservar a faixa de frequência inteira, em vez de otimizar para
+    // voz como faria por padrão.
+    for (const audio of this.tela.getAudioTracks()) audio.contentHint = 'music'
     // O Chrome mostra a barra dele com "Parar de compartilhar". Sem tratar o
     // fim por esse caminho, a interface continuaria dizendo que você
     // compartilha depois de você já ter parado.
@@ -240,6 +271,18 @@ export class Midia {
       : escolherH264(RTCRtpSender.getCapabilities?.('video')?.codecs ?? [])
 
     for (const sender of pc.getSenders()) {
+      if (sender.track?.kind === 'audio') {
+        // Só o áudio que veio junto da tela passa por aqui: o microfone é
+        // publicado por outro caminho e não deve ganhar bitrate de música.
+        if (!this.faixaDaTela(sender.track)) continue
+        const params = sender.getParameters()
+        const encoding = params.encodings?.[0]
+        if (!encoding) continue
+        encoding.active = ativo
+        encoding.maxBitrate = BITRATE_AUDIO_TELA
+        void sender.setParameters(params).catch(() => {})
+        continue
+      }
       if (sender.track?.kind !== 'video') continue
       const params = sender.getParameters()
       const encoding: EncodingComCodec | undefined = params.encodings?.[0]
@@ -288,6 +331,10 @@ export class Midia {
   definirQualidade(altura: number): void {
     this.altura = altura
     for (const peerId of this.telaPara) this.ajustarEnvio(peerId, true)
+  }
+
+  private faixaDaTela(faixa: MediaStreamTrack): boolean {
+    return this.tela?.getTracks().includes(faixa) ?? false
   }
 
   aoReceberMidia(cb: (stream: MediaStream, de: string, meta?: unknown) => void): void {
