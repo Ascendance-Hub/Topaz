@@ -3,7 +3,14 @@ import type { EstadoCall } from '../../call/protocolo'
 export interface AcoesCall {
   entrar(): void
   sair(): void
+  compartilhar(): void
+  pararTela(): void
+  assistir(peerId: string): void
+  pararDeAssistir(peerId: string): void
 }
+
+export const AVISO_SEM_ESPECTADOR =
+  'ninguém está assistindo — sua tela não está sendo codificada'
 
 function botao(chave: string, rotulo: string, aoClicar: () => void): HTMLElement {
   const el = document.createElement('button')
@@ -39,5 +46,31 @@ export function renderizarControlesCall(estado: EstadoCall, acoes: AcoesCall): H
   contagem.textContent = `${estado.naCall.length + 1} na call`
 
   barra.append(contagem, botao('sair', 'Sair da call', () => acoes.sair()))
+
+  if (estado.euCompartilhando) {
+    barra.append(botao('parar-tela', 'Parar de compartilhar', () => acoes.pararTela()))
+    if (estado.assistidoPor.length === 0) {
+      const aviso = document.createElement('span')
+      aviso.className = 'call-sem-espectador'
+      // Não é erro: é a assinatura funcionando. Dizer isso em voz alta evita a
+      // pessoa achar que o compartilhamento falhou e ficar clicando de novo.
+      aviso.textContent = AVISO_SEM_ESPECTADOR
+      barra.append(aviso)
+    }
+  } else {
+    barra.append(botao('compartilhar', 'Compartilhar tela', () => acoes.compartilhar()))
+  }
+
+  for (const peerId of estado.compartilhando) {
+    const assistindo = estado.assistindo.includes(peerId)
+    const el = botao(
+      assistindo ? 'parar-assistir' : 'assistir',
+      assistindo ? 'Parar de assistir' : 'Assistir tela',
+      () => (assistindo ? acoes.pararDeAssistir(peerId) : acoes.assistir(peerId)),
+    )
+    el.dataset[assistindo ? 'pararAssistir' : 'assistir'] = peerId
+    barra.append(el)
+  }
+
   return barra
 }
