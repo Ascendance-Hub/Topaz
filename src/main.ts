@@ -1,5 +1,5 @@
 import { Sessao } from './net/sessao'
-import { criarSalaTrystero, criarTransporte } from './net/transport'
+import { criarSalaTrystero, criarTransporte, relaysConectados } from './net/transport'
 import { renderizarLobby } from './ui/components/lobby'
 import { renderizarBarraSala } from './ui/components/barra-sala'
 import { renderizarConexao } from './ui/components/conexao'
@@ -284,7 +284,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // com "a conexão falhou" (spec §14).
     const status = sessao.statusConexao()
     if (status !== 'conectado') {
-      palco.replaceChildren(renderizarConexao(status))
+      palco.replaceChildren(renderizarConexao(status, relaysConectados()))
       return
     }
     if (mesaAberta) {

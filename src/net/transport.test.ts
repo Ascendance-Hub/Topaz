@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { criarTransporte } from './transport'
+import { criarTransporte, RELAYS } from './transport'
 import type { SalaTrystero } from './transport'
 import type { Acao } from '../game/types'
 
@@ -92,5 +92,31 @@ describe('convivência com outros consumidores da mesma sala', () => {
 
     expect(entrouNoJogo).toHaveBeenCalledWith('p2')
     expect(entrouNaCall).toHaveBeenCalledWith('p2')
+  })
+})
+
+describe('relays de sinalização', () => {
+  it('usa uma lista própria, e não a padrão da biblioteca', () => {
+    // A lista padrão é escolhida por um embaralhamento derivado do `appId`:
+    // todo mundo cai nos MESMOS 5 relays. Se um sair do ar ou for marcado por
+    // antivírus, o efeito é igual para todos os jogadores, e nada avisa.
+    expect(RELAYS.length).toBeGreaterThanOrEqual(6)
+  })
+
+  it('só aceita endereços wss', () => {
+    // Página em https não abre socket ws sem TLS: seria bloqueado pelo
+    // navegador antes de chegar na rede.
+    for (const url of RELAYS) expect(url.startsWith('wss://')).toBe(true)
+  })
+
+  it('não repete endereço, para redundância ser redundância de verdade', () => {
+    expect(new Set(RELAYS).size).toBe(RELAYS.length)
+  })
+
+  it('não usa os relays que já nos deram problema', () => {
+    // `hol.is` estava fora do ar e `relay.agorist.space` foi marcado como
+    // phishing pelo Norton em 2026-08-21. Ambos vinham da lista padrão.
+    expect(RELAYS.some((u) => u.includes('hol.is'))).toBe(false)
+    expect(RELAYS.some((u) => u.includes('agorist'))).toBe(false)
   })
 })

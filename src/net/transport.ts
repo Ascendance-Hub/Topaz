@@ -1,7 +1,33 @@
-import { joinRoom, selfId } from 'trystero/nostr'
+import { joinRoom, selfId, getRelaySockets } from 'trystero/nostr'
 import type { Acao, EstadoJogo } from '../game/types'
 
 export const APP_ID = 'topaz-ascendance-hub'
+
+/**
+ * Os relays de sinalização, escolhidos por nós.
+ *
+ * O padrão do Trystero é um embaralhamento determinístico da lista dele
+ * semeado pelo `appId`: todo mundo do Topaz caía nos MESMOS 5 relays. Isso é
+ * um ponto único de falha coletivo — em 21/08/2026, um deles (`hol.is`) estava
+ * fora do ar e outro (`relay.agorist.space`) foi marcado como phishing pelo
+ * Norton, deixando 3 de pé sem ninguém ser avisado.
+ *
+ * Passar `relayConfig.urls` substitui a lista inteira, sem corte: os oito
+ * abaixo são todos usados. São endereços mais conhecidos do ecossistema nostr,
+ * que têm menos chance de cair em lista de reputação de antivírus — o que não
+ * é garantia, e é por isso que o número de relays conectados agora aparece na
+ * tela de falha.
+ */
+export const RELAYS = [
+  'wss://relay.damus.io',
+  'wss://nos.lol',
+  'wss://nostr.wine',
+  'wss://relay.mostr.pub',
+  'wss://nostr.tegila.com.br',
+  'wss://basspistol.org',
+  'wss://purplerelay.com',
+  'wss://offchain.pub',
+]
 
 export interface Transporte {
   meuId(): string
@@ -35,7 +61,27 @@ export type SalaTrystero = ReturnType<typeof joinRoom>
  * verificar que cada canal vai para o lugar certo exigia navegador.
  */
 export function criarSalaTrystero(codigoSala: string): SalaTrystero {
-  return joinRoom({ appId: APP_ID }, codigoSala)
+  return joinRoom({ appId: APP_ID, relayConfig: { urls: RELAYS } }, codigoSala)
+}
+
+/**
+ * Quantos relays de sinalização estão de fato conectados.
+ *
+ * Sem isto, "não foi possível conectar" significa tanto "ninguém entrou na
+ * sala" quanto "a sinalização está bloqueada" — e a segunda é justamente a que
+ * a pessoa não tem como adivinhar sozinha, porque antivírus e firewall
+ * bloqueiam em silêncio.
+ */
+export function relaysConectados(): number {
+  try {
+    // O tipo devolvido não promete `readyState`, mas em navegador são
+    // `WebSocket` de verdade. Estreitar aqui é mais honesto que `any`.
+    const sockets = getRelaySockets() as Record<string, { readyState?: number }>
+    return Object.values(sockets)
+      .filter((socket) => socket?.readyState === WebSocket.OPEN).length
+  } catch {
+    return 0
+  }
 }
 
 export function criarTransporte(sala: SalaTrystero): Transporte {
