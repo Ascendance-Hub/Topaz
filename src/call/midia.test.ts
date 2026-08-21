@@ -24,7 +24,9 @@ function criarSalaFalsa() {
     },
     removeStream: vi.fn(),
     replaceTrack: vi.fn(),
-    getPeers: () => ({}),
+    // Por padrão, os peers usados nos testes já completaram o handshake — é o
+    // caso comum. Quem quiser modelar peer ainda conectando sobrescreve.
+    getPeers: () => ({ pa: { getSenders: () => [] }, pb: { getSenders: () => [] } }),
   }
 
   /** Senders observáveis, para conferir o liga-desliga do codificador. */
@@ -587,5 +589,57 @@ describe('Midia — trocar de microfone', () => {
     await midia.trocarMicrofone('fone-usb')
 
     expect(midia.microfoneAtual()).toBe('fone-usb')
+  })
+})
+
+describe('Midia — peer que ainda não terminou de conectar', () => {
+  /** `getPeers()` só lista quem já está ATIVO — é o mesmo critério que o
+   *  Trystero usa para decidir a quem entregar. */
+  function comAtivos(bruta: Record<string, unknown>, ids: string[]) {
+    bruta['getPeers'] = () => Object.fromEntries(ids.map((id) => [id, { getSenders: () => [] }]))
+  }
+
+  it('não marca como publicado quem o Trystero vai descartar', async () => {
+    const { sala, bruta, publicados } = criarSalaFalsa()
+    comAtivos(bruta as unknown as Record<string, unknown>, [])
+    const midia = new Midia(sala)
+    fingirMicrofone()
+    await midia.ligarMicrofone()
+
+    midia.sincronizarMicrofone(['pa'])
+
+    // Em `room.mjs`, publicar para um peer que ainda não está ativo é jogado
+    // fora com um `console.warn`. Marcar como feito ali era o que fazia a
+    // terceira e a quarta pessoa nunca serem ouvidas.
+    expect(publicados).toHaveLength(0)
+  })
+
+  it('publica assim que o peer fica ativo, na sincronização seguinte', async () => {
+    const { sala, bruta, publicados } = criarSalaFalsa()
+    const brutaRec = bruta as unknown as Record<string, unknown>
+    comAtivos(brutaRec, [])
+    const midia = new Midia(sala)
+    fingirMicrofone()
+    await midia.ligarMicrofone()
+    midia.sincronizarMicrofone(['pa'])
+
+    comAtivos(brutaRec, ['pa'])
+    midia.sincronizarMicrofone(['pa'])
+
+    expect(publicados).toHaveLength(1)
+  })
+
+  it('não republica para quem já recebeu', async () => {
+    const { sala, bruta, publicados } = criarSalaFalsa()
+    const brutaRec = bruta as unknown as Record<string, unknown>
+    comAtivos(brutaRec, ['pa'])
+    const midia = new Midia(sala)
+    fingirMicrofone()
+    await midia.ligarMicrofone()
+
+    midia.sincronizarMicrofone(['pa'])
+    midia.sincronizarMicrofone(['pa'])
+
+    expect(publicados).toHaveLength(1)
   })
 })

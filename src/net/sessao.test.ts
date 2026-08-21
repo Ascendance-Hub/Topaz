@@ -574,3 +574,98 @@ describe('reconexão', () => {
     expect(a!.estado().jogadores.map((j) => j.apelido)).toEqual(['Alex'])
   })
 })
+
+describe('presença que se conserta sozinha', () => {
+  /**
+   * Um anfitrião que publica estado mas não aplica ação nenhuma — é o que
+   * permite montar a situação real: o cliente conhece o host e mesmo assim
+   * não aparece na mesa dele, porque o `entrar` se perdeu no caminho.
+   */
+  function anfitriaoQueIgnora(rede: ReturnType<typeof redeDiferida>) {
+    const transporte = rede.conectar('pa')
+    const recebidas: string[] = []
+    transporte.aoReceberAcao((acao) => recebidas.push(acao.tipo))
+    const publicar = () => transporte.enviarEstado(estadoFalso({
+      hostAtual: 'pa',
+      jogadores: [{
+        peerId: 'pa', apelido: 'Alex', cadeira: null, fichas: 1000, maos: [],
+        maoAtiva: 0, seguro: 0, rodadasInativo: 0, desconectadoEm: null,
+        decidiuSeguro: false, eliminadoEm: null,
+      }],
+    }))
+    return { transporte, recebidas, publicar }
+  }
+
+  it('quem não aparece na mesa do anfitrião se reanuncia', () => {
+    const rede = redeDiferida()
+    const host = anfitriaoQueIgnora(rede)
+    const cliente = new Sessao(rede.conectar('pb'), rng)
+    rede.bombear()
+    cliente.entrar('Bruno')
+    host.publicar()
+
+    // O cliente já sabe quem manda, e mesmo assim não está na mesa: é
+    // exatamente o estado em que o jogador conversa na call sem aparecer
+    // online para ninguém.
+    expect(cliente.estado().jogadores.map((j) => j.peerId)).toEqual(['pa'])
+    const tentativasAntes = host.recebidas.filter((t) => t === 'entrar').length
+
+    const agora = Date.now() + MS_DESCOBERTA + 1
+    for (let i = 1; i <= 6; i++) cliente.tique(agora + i * 1000)
+
+    expect(host.recebidas.filter((t) => t === 'entrar').length)
+      .toBeGreaterThan(tentativasAntes)
+  })
+
+  it('espaça os reanúncios em vez de inundar a cada tique', () => {
+    const rede = redeDiferida()
+    const host = anfitriaoQueIgnora(rede)
+    const cliente = new Sessao(rede.conectar('pb'), rng)
+    rede.bombear()
+    cliente.entrar('Bruno')
+    host.publicar()
+    const antes = host.recebidas.filter((t) => t === 'entrar').length
+
+    // Meio segundo de tiques, que é o ritmo real da aplicação.
+    const agora = Date.now() + MS_DESCOBERTA + 1
+    for (let i = 1; i <= 4; i++) cliente.tique(agora + i * 500)
+
+    // Dois segundos não podem virar quatro anúncios: seria tráfego constante
+    // para sempre, já que este anfitrião nunca aplica nada.
+    expect(host.recebidas.filter((t) => t === 'entrar').length - antes)
+      .toBeLessThanOrEqual(1)
+  })
+
+  it('não se reanuncia quem já está na mesa', () => {
+    const { sessoes } = abrirSala(['pa', 'pb'])
+    const [anfitriao, cliente] = sessoes as [Sessao, Sessao]
+    anfitriao.entrar('Alex')
+    cliente.entrar('Bruno')
+    const antes = anfitriao.estado().jogadores.length
+
+    for (let i = 1; i <= 6; i++) {
+      cliente.tique(Date.now() + MS_DESCOBERTA + i * 1000)
+      anfitriao.tique(Date.now() + MS_DESCOBERTA + i * 1000)
+    }
+
+    // Reanúncio à toa geraria um broadcast de estado por tique, para sempre.
+    expect(anfitriao.estado().jogadores).toHaveLength(antes)
+  })
+
+  it('não se reanuncia quem nunca entrou', () => {
+    const rede = redeDiferida()
+    const anfitriao = new Sessao(rede.conectar('pa'), rng)
+    const espiao = new Sessao(rede.conectar('pb'), rng)
+    anfitriao.entrar('Alex')
+    rede.bombear()
+    passarJanela([anfitriao, espiao])
+
+    for (let i = 1; i <= 8; i++) {
+      espiao.tique(Date.now() + MS_DESCOBERTA + i * 1000)
+      anfitriao.tique(Date.now() + MS_DESCOBERTA + i * 1000)
+    }
+
+    // Quem só abriu o link e nunca se apresentou não deve virar jogador.
+    expect(anfitriao.estado().jogadores.map((j) => j.apelido)).toEqual(['Alex'])
+  })
+})

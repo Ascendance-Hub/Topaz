@@ -23,6 +23,20 @@ export const MS_DESCOBERTA = 2500
  */
 export const MS_SEM_CONEXAO = 15000
 
+/**
+ * De quanto em quanto tempo um cliente que não se vê na mesa do anfitrião
+ * volta a se anunciar.
+ *
+ * `enviarAcao` só alcança quem já está conectado, e o Trystero descarta em
+ * silêncio o envio a um peer que ainda não terminou o handshake. Um `entrar`
+ * despachado nessa janela some sem deixar rastro, e o jogador fica invisível
+ * para todo mundo enquanto conversa normalmente na call — foi o relato.
+ *
+ * Espaçado o bastante para não virar tráfego constante, e curto o bastante
+ * para a pessoa não ficar minutos sem aparecer.
+ */
+export const MS_REANUNCIO = 3000
+
 export type StatusConexao = 'conectando' | 'conectado' | 'sem-conexao'
 
 /** Determinística: todo cliente com a mesma lista chega ao mesmo host. */
@@ -57,6 +71,9 @@ export class Sessao {
   private ouvintes: (() => void)[] = []
   /** Ações despachadas antes de haver host: guardadas para não se perderem. */
   private pendentes: Acao[] = []
+  /** Apelido com que eu entrei; `null` = ainda não me apresentei. */
+  private meuApelido: string | null = null
+  private ultimoReanuncio = 0
   private inicioSessao: number
   private inicioDescoberta: number
   private status: StatusConexao = 'conectando'
@@ -260,7 +277,28 @@ export class Sessao {
   }
 
   entrar(apelido: string): void {
+    this.meuApelido = apelido
     this.despachar({ tipo: 'entrar', apelido })
+  }
+
+  /**
+   * Se eu me apresentei mas não estou na mesa que o anfitrião publica, meu
+   * `entrar` se perdeu no caminho. Me reanuncio.
+   *
+   * A ação `entrar` é idempotente por construção — sobre um jogador que já
+   * existe ela só atualiza o apelido —, então repetir não tem efeito colateral
+   * nenhum. Quem nunca se apresentou não entra aqui: abrir o link não pode
+   * transformar ninguém em jogador.
+   */
+  private repararPresenca(agora: number): void {
+    if (this.meuApelido === null || this.souHost() || this.hostId === null) return
+    if (agora - this.ultimoReanuncio < MS_REANUNCIO) return
+
+    const eu = this.transporte.meuId()
+    if (this.ctx.estado.jogadores.some((j) => j.peerId === eu)) return
+
+    this.ultimoReanuncio = agora
+    this.despachar({ tipo: 'entrar', apelido: this.meuApelido })
   }
 
   /** Cliente envia intenção; host aplica localmente e transmite. */
@@ -311,6 +349,7 @@ export class Sessao {
    *  host, os prazos vencidos. */
   tique(agora: number): void {
     this.avaliarDescoberta(agora)
+    this.repararPresenca(agora)
     if (!this.souHost()) return
     const antes = JSON.stringify(this.ctx.estado)
     const purgou = this.purgarAusentes(agora)

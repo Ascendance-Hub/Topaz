@@ -213,7 +213,13 @@ export class Midia {
     for (const id of sobrando) publicado.delete(id)
 
     if (!stream) return
-    const faltando = alvos.filter((id) => !publicado.has(id))
+    // Só quem já está ATIVO. Em `room.mjs`, publicar para um peer que ainda
+    // não terminou o handshake é descartado com um `console.warn` — e marcar
+    // como feito ali era o que fazia a terceira e a quarta pessoa da call
+    // nunca serem ouvidas: a publicação sumia e nunca era tentada de novo.
+    // Quem ficar de fora é pego na sincronização seguinte.
+    const ativos = this.peersAtivos()
+    const faltando = alvos.filter((id) => !publicado.has(id) && ativos.has(id))
     if (faltando.length === 0) return
 
     // Invólucro NOVO a cada publicação, e nunca o mesmo objeto duas vezes.
@@ -275,7 +281,8 @@ export class Midia {
    */
   sincronizarTela(alvos: string[]): void {
     if (!this.tela) return
-    const novos = alvos.filter((id) => !this.telaPara.has(id))
+    const ativos = this.peersAtivos()
+    const novos = alvos.filter((id) => !this.telaPara.has(id) && ativos.has(id))
     if (novos.length > 0) {
       this.sala.addStream(new MediaStream(this.tela.getTracks()),
         { target: novos, metadata: { tipo: 'tela' } })
@@ -377,6 +384,15 @@ export class Midia {
   definirQualidade(altura: number): void {
     this.altura = altura
     for (const peerId of this.telaPara) this.ajustarEnvio(peerId, true)
+  }
+
+  /** Quem já completou o handshake — o mesmo critério que o Trystero usa. */
+  private peersAtivos(): Set<string> {
+    try {
+      return new Set(Object.keys(this.sala.getPeers()))
+    } catch {
+      return new Set()
+    }
   }
 
   private faixaDaTela(faixa: MediaStreamTrack): boolean {
