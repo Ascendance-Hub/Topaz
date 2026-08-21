@@ -46,11 +46,22 @@ type EncodingComCodec = RTCRtpEncodingParameters & { codec?: RTCRtpCodec }
 export class Midia {
   private microfone: MediaStream | null = null
   private tela: MediaStream | null = null
-  private aoFaixa: ((faixa: MediaStreamTrack, de: string) => void)[] = []
+  private aoMidia: ((stream: MediaStream, de: string, meta?: unknown) => void)[] = []
 
+  /**
+   * `onPeerStream` e NÃO `onPeerTrack`: em `media.mjs` do Trystero, quem
+   * publica com `addStream` alimenta `pendingStreamMetas`, e essa fila só é
+   * consumida por `receiveRemoteStream`, que dispara `onPeerStream`.
+   * `onPeerTrack` vem de `pendingTrackMetas`, que só existe quando o remetente
+   * usou `addTrack`.
+   *
+   * Publicar de um jeito e escutar do outro faz a mídia sumir sem erro nenhum:
+   * os dados continuam chegando, e só áudio e vídeo somem. Foi assim que este
+   * módulo nasceu quebrado, e por isso há teste espelhando esse pareamento.
+   */
   constructor(private sala: SalaTrystero) {
-    this.sala.onPeerTrack = (faixa, _stream, peerId) => {
-      for (const cb of this.aoFaixa) cb(faixa, peerId)
+    this.sala.onPeerStream = (stream, peerId, metadata) => {
+      for (const cb of this.aoMidia) cb(stream, peerId, metadata)
     }
   }
 
@@ -146,7 +157,7 @@ export class Midia {
     }
   }
 
-  aoReceberFaixa(cb: (faixa: MediaStreamTrack, de: string) => void): void {
-    this.aoFaixa.push(cb)
+  aoReceberMidia(cb: (stream: MediaStream, de: string, meta?: unknown) => void): void {
+    this.aoMidia.push(cb)
   }
 }

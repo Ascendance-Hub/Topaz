@@ -130,26 +130,37 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     videos.querySelector(`[data-de="${peerId}"]`)?.remove()
   }
 
-  midia.aoReceberFaixa((faixa, de) => {
-    if (faixa.kind === 'audio') {
-      const el = document.createElement('audio')
+  midia.aoReceberMidia((stream, de, meta) => {
+    // A metadata vem de quem publicou (`{ tipo: 'microfone' }` ou
+    // `{ tipo: 'tela' }`), e é mais confiável do que adivinhar pelo tipo da
+    // faixa: uma tela sem áudio e um microfone são ambos "uma faixa só".
+    const tipo = (meta as { tipo?: string } | undefined)?.tipo
+    if (tipo === 'tela') {
+      // Uma tela por peer: se ele reabrir o compartilhamento, a nova substitui
+      // a velha em vez de empilhar quadros congelados.
+      removerVideoDe(de)
+      const el = document.createElement('video')
       el.autoplay = true
-      el.srcObject = new MediaStream([faixa])
-      audios.append(el)
+      el.playsInline = true
+      // Mudo de propósito: o áudio dele já vem pelo microfone, e o elemento de
+      // vídeo com som duplicaria a voz.
+      el.muted = true
+      el.dataset['de'] = de
+      el.srcObject = stream
+      videos.append(el)
       return
     }
-    // Uma tela por peer: se ele reabrir o compartilhamento, a nova substitui a
-    // velha em vez de empilhar quadros congelados.
-    removerVideoDe(de)
-    const el = document.createElement('video')
+
+    const el = document.createElement('audio')
     el.autoplay = true
-    el.playsInline = true
-    // Mudo de propósito: o áudio dele já vem pelo microfone, e o elemento de
-    // vídeo com som duplicaria a voz.
-    el.muted = true
-    el.dataset['de'] = de
-    el.srcObject = new MediaStream([faixa])
-    videos.append(el)
+    el.srcObject = stream
+    // O navegador pode recusar tocar sem gesto do usuário. Entrar na call é um
+    // clique, então quase sempre há permissão — mas engolir a rejeição faria a
+    // call ficar muda sem nenhuma pista do motivo.
+    void el.play().catch((erro) => {
+      console.warn('áudio da call bloqueado pelo navegador:', erro)
+    })
+    audios.append(el)
   })
 
   /**
