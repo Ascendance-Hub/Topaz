@@ -5,6 +5,11 @@ import { renderizarBarraSala } from './ui/components/barra-sala'
 import { renderizarConexao } from './ui/components/conexao'
 import { criarChat } from './ui/components/chat'
 import { renderizarNavSala, renderizarSalaParada } from './ui/components/sala'
+import { renderizarControlesCall } from './ui/components/call'
+import type { AcoesCall } from './ui/components/call'
+import { criarCanalCall } from './call/canal'
+import { ProtocoloCall } from './call/protocolo'
+import { Midia } from './call/midia'
 import { renderizar } from './ui/render'
 import { rngSemente } from './game/shoe'
 import { mesaEsperaPor } from './game/rules'
@@ -30,8 +35,12 @@ function rngDaSessao() {
  * de fato na página, nunca um órfão de uma rodada anterior.
  */
 export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string): void {
-  const transporte = criarTransporte(criarSalaTrystero(codigo))
+  const salaTrystero = criarSalaTrystero(codigo)
+  const transporte = criarTransporte(salaTrystero)
   const sessao = new Sessao(transporte, rngDaSessao)
+
+  const protocolo = new ProtocoloCall(criarCanalCall(salaTrystero, transporte))
+  const midia = new Midia(salaTrystero)
 
   /**
    * O apelido sai do `EstadoJogo` pelo peerId, não do payload do chat: assim
@@ -80,13 +89,112 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       && mesaEsperaPor(sessao.estado(), sessao.meuId())
   }
 
+  const acoesCall: AcoesCall = {
+    entrar: () => {
+      // O microfone sobe ANTES de anunciar: anunciar primeiro faria os outros
+      // esperarem um áudio que ainda não existe, e se a permissão fosse negada
+      // eu apareceria na call mudo sem saber.
+      void midia.ligarMicrofone(protocolo.estado().naCall)
+        .then(() => protocolo.entrar())
+    },
+    sair: () => {
+      protocolo.sair()
+      midia.desligarMicrofone()
+      midia.pararTela()
+    },
+    compartilhar: () => {
+      void midia.compartilharTela(() => {
+        // Chegou aqui porque a pessoa usou a barra nativa do Chrome. Sem isto,
+        // a interface continuaria dizendo que ela compartilha.
+        protocolo.definirCompartilhando(false)
+        midia.pararTela()
+      }).then(() => protocolo.definirCompartilhando(true))
+    },
+    pararTela: () => {
+      protocolo.definirCompartilhando(false)
+      midia.pararTela()
+    },
+    assistir: (peerId) => protocolo.assistir(peerId),
+    pararDeAssistir: (peerId) => protocolo.pararDeAssistir(peerId),
+  }
+
+  // Área de áudio remoto: criada uma vez e nunca substituída, pelo mesmo motivo
+  // do chat — recriar um <audio> reinicia o fluxo.
+  const audios = document.createElement('div')
+  audios.className = 'call-audios'
+  // A área de vídeo segue a mesma regra: criada uma vez, nunca substituída.
+  const videos = document.createElement('div')
+  videos.className = 'call-videos'
+
+  function removerVideoDe(peerId: string): void {
+    videos.querySelector(`[data-de="${peerId}"]`)?.remove()
+  }
+
+  midia.aoReceberFaixa((faixa, de) => {
+    if (faixa.kind === 'audio') {
+      const el = document.createElement('audio')
+      el.autoplay = true
+      el.srcObject = new MediaStream([faixa])
+      audios.append(el)
+      return
+    }
+    // Uma tela por peer: se ele reabrir o compartilhamento, a nova substitui a
+    // velha em vez de empilhar quadros congelados.
+    removerVideoDe(de)
+    const el = document.createElement('video')
+    el.autoplay = true
+    el.playsInline = true
+    // Mudo de propósito: o áudio dele já vem pelo microfone, e o elemento de
+    // vídeo com som duplicaria a voz.
+    el.muted = true
+    el.dataset['de'] = de
+    el.srcObject = new MediaStream([faixa])
+    videos.append(el)
+  })
+
+  /**
+   * Quem entra na call depois de mim precisa receber meu microfone: o
+   * `addStream` inicial só alcançou quem já estava lá.
+   */
+  let naCallAntes: string[] = []
+  let assistidoAntes: string[] = []
+  let assistindoAntes: string[] = []
+
+  protocolo.aoMudar(() => {
+    const atual = protocolo.estado()
+
+    for (const peerId of atual.naCall) {
+      if (!naCallAntes.includes(peerId)) midia.publicarMicrofonePara(peerId)
+    }
+    naCallAntes = atual.naCall
+
+    // A assinatura vira efeito, de forma idempotente: quem entrou na lista
+    // ganha a tela, quem saiu perde. Sem espectador nenhum, o `removeStream`
+    // do último desliga o codificador — que é o ponto de todo o desenho.
+    for (const peerId of atual.assistidoPor) {
+      if (!assistidoAntes.includes(peerId)) midia.publicarTelaPara(peerId)
+    }
+    for (const peerId of assistidoAntes) {
+      if (!atual.assistidoPor.includes(peerId)) midia.despublicarTelaDe(peerId)
+    }
+    assistidoAntes = atual.assistidoPor
+
+    for (const peerId of assistindoAntes) {
+      if (!atual.assistindo.includes(peerId)) removerVideoDe(peerId)
+    }
+    assistindoAntes = atual.assistindo
+
+    desenhar()
+  })
+
   let barra = renderizarBarraSala(codigo, sessao.souHost())
   let nav = renderizarNavSala(mesaAberta, alternarMesa, mesaEspera())
+  let controles = renderizarControlesCall(protocolo.estado(), acoesCall)
   // `palco` é criado uma vez e só tem os filhos trocados: `renderizar` guarda
   // a contagem de cartas no dataset dele para decidir animação, e recriar o
   // elemento a cada ida e volta faria as cartas voarem de novo sem motivo.
   const palco = document.createElement('div')
-  app.replaceChildren(barra, nav, palco, chat.raiz)
+  app.replaceChildren(barra, nav, palco, chat.raiz, controles, videos, audios)
 
   function desenhar(): void {
     const novaBarra = renderizarBarraSala(codigo, sessao.souHost())
@@ -96,6 +204,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     const novaNav = renderizarNavSala(mesaAberta, alternarMesa, mesaEspera())
     nav.replaceWith(novaNav)
     nav = novaNav
+
+    const novosControles = renderizarControlesCall(protocolo.estado(), acoesCall)
+    controles.replaceWith(novosControles)
+    controles = novosControles
 
     // Enquanto ninguém é anfitrião a mesa ainda não existe: mostrar a mesa
     // vazia com "Aguardando jogadores…" confundiria "ninguém entrou ainda"

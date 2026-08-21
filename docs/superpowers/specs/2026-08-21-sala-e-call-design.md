@@ -207,7 +207,21 @@ Preferir **H.264**, que no hardware do autor aciona o Intel Quick Sync. A troca
 recurso que sobra (200 Mbps de upload) enquanto CPU é o que falta. Em máquina
 sem encoder dedicado a escolha é neutra.
 
-**Ver a Seção 12 — não está confirmado que dá para forçar isso pelo Trystero.**
+**Como forçar** (medido em 2026-08-21, duas abas ligadas por Trystero real):
+
+```ts
+const params = sender.getParameters()
+params.encodings[0].codec = perfilH264   // de RTCRtpSender.getCapabilities('video')
+sender.setParameters(params)
+```
+
+Troca o codec **com a conexão já de pé, sem renegociar**. Serve porque só
+seleciona entre o que já foi negociado, e o H.264 entra no SDP por padrão
+mesmo sem ser o preferido.
+
+`setCodecPreferences` **não** serve: logo após `addStream` não existe
+transceiver nenhum para configurar (o `addStream` do Trystero é assíncrono).
+Não é uma corrida apertada — a janela não existe.
 
 ### Dispositivos
 
@@ -341,15 +355,18 @@ parte do processo de verificação, não um extra.
 
 ## 12. Riscos
 
-**Forçar H.264 pode não ser possível através do Trystero.** `setCodecPreferences`
-precisa rodar antes da negociação, e o Trystero negocia sozinho dentro do
-`addStream`. Pegar o `RTCPeerConnection` via `getPeers()` logo após o `addTrack`
-pode ou não cair dentro dessa janela.
+**~~Forçar H.264 pode não ser possível através do Trystero.~~ RESOLVIDO em
+2026-08-21.** Dá, por `sender.setParameters` com a conexão já estabelecida —
+ver Seção 7. O risco como estava escrito partia de uma premissa errada: o
+problema não era corrida com a negociação, era que o transceiver ainda não
+existe logo após o `addStream`.
 
-> **Mitigação: o primeiro passo da implementação é confirmar isso, antes de
-> qualquer UI.** Se não der, fica o codec padrão e perde-se o encoder de
-> hardware — chato, mas não fatal para 1:1, que o probe mostrou folgado até em
-> software.
+**Não está confirmado que o encoder de hardware entra pelo caminho do
+Trystero.** A sonda de codec devolveu `encoderImplementation` vazio. Sabe-se,
+da sonda anterior, que este notebook usa Quick Sync quando o H.264 é
+negociado, e a escolha de encoder não depende de como o SDP chegou lá — mas
+isso é inferência, não medição. Conferir na verificação manual, com a call de
+verdade rodando.
 
 **A reestruturação do `main.ts` pode causar regressão no jogo.** Mitigação: a
 sala nasce com o jogo funcionando exatamente como hoje e a suíte verde, e só

@@ -43,6 +43,21 @@ quem entra depois começa em branco, e recarregar a página apaga a conversa. N�
 há como moderar nem bloquear alguém — sem servidor, não haveria onde. Mande o
 link só para quem você conhece.
 
+### Call
+
+Voz e compartilhamento de tela entre duas pessoas, pela mesma conexão direta que
+o jogo usa — não há servidor de mídia no meio.
+
+Entrar na call é um ato explícito: estar na sala não abre o seu microfone. E
+compartilhar a tela não liga o codificador — ele só começa a trabalhar quando
+alguém clica em "Assistir", e desliga quando o último espectador sai. É isso que
+permite várias pessoas compartilharem ao mesmo tempo sem derreter a máquina de
+ninguém, e a barra avisa quando ninguém está assistindo, para não parecer que o
+compartilhamento falhou.
+
+Não tem câmera, não captura o áudio do sistema (então assistir vídeo junto
+entrega imagem sem som) e não funciona em celular.
+
 ### Privacidade
 
 Entrar numa sala expõe o endereço IP dos participantes uns aos outros. Isso é

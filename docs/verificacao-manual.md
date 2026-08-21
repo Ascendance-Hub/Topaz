@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (378, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (420, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -38,6 +38,25 @@ simular um navegador separado.
       quando a mesa espera por você — na aposta, no seguro e na sua vez
 - [ ] A marca some assim que você responde, e não aparece com a mesa aberta
 - [ ] Com "reduzir movimento" ligado, a marca aparece sem pulsar
+
+## Call
+
+Precisa de **duas pessoas em máquinas diferentes** — abas na mesma máquina não
+exercitam o caminho real de rede.
+
+- [ ] Entrar na call nas duas pontas e ouvir um ao outro
+- [ ] Estar na sala **sem** entrar na call não faz receber áudio de ninguém
+- [ ] Sair da call apaga o indicador de microfone do navegador
+- [ ] Compartilhar tela e conferir que **nada é codificado** até alguém clicar
+      em Assistir — o aviso "ninguém está assistindo" aparece
+- [ ] Clicar em Assistir mostra a tela do outro
+- [ ] Parar de assistir faz o aviso voltar do outro lado
+- [ ] Parar pela barra nativa do Chrome atualiza a interface corretamente
+- [ ] Em `chrome://webrtc-internals`, confirmar codec **H264** e
+      `encoderImplementation` citando MediaFoundation ou Quick Sync
+- [ ] Fechar a aba de quem compartilhava limpa o vídeo do outro lado
+- [ ] O anfitrião cair no meio da call não interrompe a conversa
+- [ ] Jogar uma rodada de blackjack com a call aberta, falando ao mesmo tempo
 
 ## Rede
 
