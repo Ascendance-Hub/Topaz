@@ -45,9 +45,16 @@ da conexão, com jogo e call como módulos opcionais e independentes por cima.
 | 4 — erros e casos de borda | aprovada |
 | 5 — testes | aprovada |
 | documento em `docs/superpowers/specs/` | escrito, aguardando revisão |
-| plano de implementação | a fazer |
+| plano de implementação | escrito (parte 1 de 2) |
 
-Documento: `docs/superpowers/specs/2026-08-21-sala-e-call-design.md`
+- Spec: `docs/superpowers/specs/2026-08-21-sala-e-call-design.md`
+- Plano 1 — sala neutra: `docs/superpowers/plans/2026-08-21-sala-neutra.md`
+- Plano 2 — a call: a escrever, depois que o plano 1 estiver executado
+
+O spec foi partido em dois planos porque a reestruturação da sala entrega
+software funcionando sozinha, sem nenhuma mídia. O passo de confirmar se dá
+para forçar H.264 pelo Trystero saiu do começo (onde a §13 do spec o punha) e
+virou a primeira tarefa do plano 2 — ele não bloqueia a reestruturação.
 
 Decisões já tomadas neste ciclo:
 
