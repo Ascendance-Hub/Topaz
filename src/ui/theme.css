@@ -413,3 +413,36 @@ body {
   border: 1px solid var(--topazio-600);
   font-family: var(--serif); font-size: 13px; cursor: pointer;
 }
+
+.nav-sala {
+  max-width: 940px;
+  margin: 0 auto 14px;
+  display: flex;
+  gap: 8px;
+}
+.nav-sala-item {
+  padding: 8px 18px; border-radius: 8px;
+  background: transparent; color: var(--texto-fraco);
+  border: 1px solid var(--carvao-500);
+  font-family: var(--serif); font-size: 13px; cursor: pointer;
+}
+/* A marcação visual sai do mesmo atributo que o leitor de tela usa, para as
+   duas não poderem divergir. */
+.nav-sala-item[aria-current="page"] {
+  color: var(--topazio-500);
+  border-color: var(--topazio-600);
+  background: rgba(201, 162, 39, 0.1);
+}
+
+.sala-parada { max-width: 940px; margin: 0 auto; text-align: center; }
+.sala-titulo { color: var(--topazio-500); font-size: 18px; margin: 18px 0 14px; }
+.sala-lista { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.sala-quem {
+  color: var(--texto); font-size: 15px;
+  padding: 6px 12px; border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(201, 162, 39, 0.22);
+}
+.sala-quem[data-eu="1"] { border-color: var(--topazio-600); }
+.sala-quem[data-caiu="1"] { opacity: 0.5; font-style: italic; }
+.sala-aviso { color: var(--texto-fraco); font-size: 13px; margin-top: 16px; }
