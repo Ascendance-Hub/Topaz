@@ -334,3 +334,98 @@ describe('entrarNaSala — a sala é o espaço, a mesa é uma escolha', () => {
     }
   })
 })
+
+describe('entrarNaSala — várias pessoas na mesma sala', () => {
+  /** Duas interfaces completas na mesma rede falsa. 'pa' vence a eleição. */
+  function duasAbas() {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const ids = ['pa', 'pb']
+    let proximo = 0
+    vi.mocked(criarSalaTrystero).mockReturnValue(undefined as never)
+    vi.mocked(criarTransporte).mockImplementation(() => rede.conectar(ids[proximo++]!))
+
+    const appA = document.createElement('div')
+    const appB = document.createElement('div')
+    entrarNaSala(appA, 'Alex', 'CODIGO01')
+    entrarNaSala(appB, 'Bruno', 'CODIGO01')
+
+    rede.bombear()
+    vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+    return { appA, appB }
+  }
+
+  const nav = (app: HTMLElement, alvo: string) =>
+    app.querySelector<HTMLButtonElement>(`[data-nav="${alvo}"]`)!.click()
+  const agir = (app: HTMLElement, seletor: string) =>
+    app.querySelector<HTMLButtonElement>(`[data-acao="${seletor}"]`)!.click()
+
+  it('a lista da sala mostra as duas pessoas nas duas abas', () => {
+    vi.useFakeTimers()
+    try {
+      const { appA, appB } = duasAbas()
+
+      for (const app of [appA, appB]) {
+        const nomes = [...app.querySelectorAll('.sala-quem')].map((n) => n.textContent)
+        expect(nomes.sort()).toEqual(['Alex', 'Bruno'])
+      }
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('um abrir a mesa não arrasta o outro para ela', () => {
+    vi.useFakeTimers()
+    try {
+      const { appA, appB } = duasAbas()
+
+      nav(appA, 'mesa')
+
+      expect(appA.querySelector('.mesa')).not.toBeNull()
+      expect(appB.querySelector('.mesa')).toBeNull()
+      expect(appB.querySelector('.sala-parada')).not.toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('quem senta e volta para a sala continua sentado para o outro', () => {
+    vi.useFakeTimers()
+    try {
+      const { appA, appB } = duasAbas()
+
+      nav(appB, 'mesa')
+      agir(appB, 'sentar')
+      nav(appB, 'sala')
+      vi.advanceTimersByTime(600)
+
+      nav(appA, 'mesa')
+      expect(appA.querySelectorAll('[data-sentado]')).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('voltar para a mesa mostra a partida como ela está agora, não como estava ao sair', () => {
+    vi.useFakeTimers()
+    try {
+      const { appA, appB } = duasAbas()
+
+      nav(appA, 'mesa'); agir(appA, 'sentar')
+      nav(appB, 'mesa'); agir(appB, 'sentar')
+      vi.advanceTimersByTime(600)
+
+      // Bruno vai para a sala ANTES de a partida começar.
+      nav(appB, 'sala')
+      agir(appA, 'iniciar')
+      vi.advanceTimersByTime(600)
+
+      // E volta depois: precisa cair na fase corrente, não numa mesa parada.
+      nav(appB, 'mesa')
+      expect(appB.querySelector('[data-acao="apostar"]')).not.toBeNull()
+      expect(appB.querySelector('[data-acao="iniciar"]')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
