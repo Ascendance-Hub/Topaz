@@ -12,21 +12,30 @@ export const APP_ID = 'topaz-ascendance-hub'
  * fora do ar e outro (`relay.agorist.space`) foi marcado como phishing pelo
  * Norton, deixando 3 de pé sem ninguém ser avisado.
  *
- * Passar `relayConfig.urls` substitui a lista inteira, sem corte: os oito
- * abaixo são todos usados. São endereços mais conhecidos do ecossistema nostr,
- * que têm menos chance de cair em lista de reputação de antivírus — o que não
- * é garantia, e é por isso que o número de relays conectados agora aparece na
- * tela de falha.
+ * Passar `relayConfig.urls` substitui a lista inteira, sem corte: os dez
+ * abaixo são todos usados.
+ *
+ * O critério de escolha mudou depois de um erro: na primeira versão desta
+ * lista eu escolhi por o socket ABRIR, e dois dos oito (`nostr.wine`, pago, e
+ * `basspistol.org`) recusam publicação. Um relay assim parece vivo e descarta
+ * todo anúncio, o que fazia a descoberta funcionar muito bem uma hora e falhar
+ * na outra, conforme onde o anúncio de cada pessoa tivesse caído.
+ *
+ * Agora os dez foram verificados nos DOIS critérios: o socket abre e o NIP-11
+ * não declara `payment_required`, `auth_required`, `restricted_writes` nem
+ * exigência de proof-of-work. Estão em ordem de latência medida.
  */
 export const RELAYS = [
-  'wss://relay.damus.io',
+  'wss://relay.mostro.network',
+  'wss://strfry.shock.network',
   'wss://nos.lol',
-  'wss://nostr.wine',
-  'wss://relay.mostr.pub',
-  'wss://nostr.tegila.com.br',
-  'wss://basspistol.org',
   'wss://purplerelay.com',
+  'wss://relay.damus.io',
   'wss://offchain.pub',
+  'wss://relay.mostr.pub',
+  'wss://nostr.bitcoiner.social',
+  'wss://relay.libernet.app',
+  'wss://nostr.data.haus',
 ]
 
 export interface Transporte {

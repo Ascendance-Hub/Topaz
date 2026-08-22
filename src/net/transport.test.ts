@@ -115,8 +115,11 @@ describe('relays de sinalização', () => {
 
   it('não usa os relays que já nos deram problema', () => {
     // `hol.is` estava fora do ar e `relay.agorist.space` foi marcado como
-    // phishing pelo Norton em 2026-08-21. Ambos vinham da lista padrão.
-    expect(RELAYS.some((u) => u.includes('hol.is'))).toBe(false)
-    expect(RELAYS.some((u) => u.includes('agorist'))).toBe(false)
+    // phishing pelo Norton. `nostr.wine` (pago) e `basspistol.org` abrem o
+    // socket e RECUSAM publicação — parecem vivos e descartam todo anúncio,
+    // que foi o que fez a descoberta ser intermitente.
+    for (const ruim of ['hol.is', 'agorist', 'nostr.wine', 'basspistol']) {
+      expect(RELAYS.some((u) => u.includes(ruim))).toBe(false)
+    }
   })
 })
