@@ -326,6 +326,35 @@ navegadores mais antigos. Uma exceção num ajuste **opcional** não pode derrub
 a funcionalidade inteira — e botão que falha no clique é pior que botão
 ausente.
 
+### Verificar um relay: só entrega de ponta a ponta prova alguma coisa
+
+Errei este critério **três vezes**, e cada erro passou pelo anterior:
+
+1. **"o socket abre"** — insuficiente: `nostr.wine` (pago) e `basspistol.org`
+   abriam e recusavam publicação.
+2. **"o NIP-11 não declara restrição"** — insuficiente: `nostr.tegila.com.br`
+   aceita a publicação com `OK true` e **não entrega** a quem está inscrito.
+3. **"publica de uma conexão e recebe em outra, no mesmo relay"** — este prova.
+
+O motivo é o tipo de evento: o Trystero manda **evento efêmero** (kind na faixa
+21xxx, **derivado do tópico** — não é fixo). Relay nenhum é obrigado a
+armazenar nem a repassar efêmero.
+
+Montar a sonda ensinou outra coisa: filtrei por um kind fixo que eu tinha visto
+num teste anterior, e **todos** os relays apareceram como "não entrega",
+inclusive os que sabidamente funcionavam. **Quando um resultado condena todo
+mundo, o defeito é da medição.**
+
+```js
+const bruto = await createEvent(topico, 'ping')
+const kind = JSON.parse(bruto)[1].kind   // sai do próprio evento
+sub.send(JSON.stringify(['REQ', 'p1', { kinds: [kind], '#x': [topico] }]))
+```
+
+E vale a lição de durabilidade: `relay.damus.io` entregava de manhã e parou de
+abrir à tarde, três tentativas seguidas. Verificar na escolha não garante nada
+depois — por isso a contagem de relays conectados aparece na tela.
+
 ### Diagnóstico de NAT que o navegador não dá
 
 Para saber se um NAT é simétrico, o navegador não serve: o Chrome zera
