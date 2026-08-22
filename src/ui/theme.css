@@ -100,26 +100,67 @@ body::before {
 
 h2, h3, h4 { margin: 0; font-weight: 600; }
 
-/* Em tela larga a sala ganha uma coluna lateral: conversa e volumes ficam ao
-   lado, e a mesa deixa de dividir espaço com painéis flutuantes. */
+/* A lateral não é uma caixa por padrão: a conversa flutua como gaveta e o
+   mixer entra no fluxo. Ela só vira coluna quando tem o que mostrar. */
+.lateral { display: contents; }
+
+/* ---------------------------------------------------------------------------
+   Em tela larga, uma coluna só — centrada.
+
+   TUDO compartilha a mesma largura e o mesmo eixo. A primeira versão deste
+   grid deixava a barra e a navegação atravessando duas colunas com
+   `max-width` próprio: ficavam centradas na página inteira enquanto a mesa
+   ficava centrada só na coluna da esquerda, e as bordas esquerdas não batiam.
+   Era o "tudo torto".
+   ------------------------------------------------------------------------ */
 @media (min-width: 1080px) {
   #app {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 330px;
+    grid-template-columns: minmax(0, 940px);
+    justify-content: center;
     align-content: start;
-    column-gap: 24px;
-    max-width: 1340px;
+    column-gap: 28px;
     margin: 0 auto;
   }
-  /* Posicionamento por linha e coluna, e não por áreas nomeadas: duas peças
-     na mesma área se empilhariam uma sobre a outra em vez de uma abaixo da
-     outra, que foi o erro da primeira versão deste grid. */
-  .barra-sala { grid-column: 1 / -1; grid-row: 1; }
-  .nav-sala { grid-column: 1 / -1; grid-row: 2; }
+  .barra-sala { grid-column: 1; grid-row: 1; }
+  .nav-sala { grid-column: 1; grid-row: 2; }
   .palco { grid-column: 1; grid-row: 3; min-width: 0; }
   .call-videos { grid-column: 1; grid-row: 4; }
-  .chat { grid-column: 2; grid-row: 3; align-self: start; }
-  .mixer { grid-column: 2; grid-row: 4; align-self: start; }
+
+  /* A largura passa a ser a da coluna: um `max-width` menor aqui dentro
+     recentralizaria cada peça por conta própria e desalinharia de novo. */
+  .barra-sala,
+  .nav-sala,
+  .mesa,
+  .call-videos,
+  .mixer { max-width: none; margin-left: 0; margin-right: 0; }
+
+  /* A segunda coluna só nasce quando a conversa está aberta ou há volumes
+     para ajustar. Reservá-la vazia empurraria a mesa para fora do centro sem
+     nada em troca — que era a queixa da tela da sala. */
+  #app:has(.chat[data-aberto='1']),
+  #app:has(.mixer-linha) {
+    grid-template-columns: minmax(0, 940px) 320px;
+  }
+  #app:has(.chat[data-aberto='1']) .lateral,
+  #app:has(.mixer-linha) .lateral {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    grid-column: 2;
+    grid-row: 3 / span 2;
+    align-self: start;
+    /* A linha que separa a lateral do resto: é ela que explica por que
+       aquele espaço existe. */
+    border-left: 1px solid var(--latao-fraco);
+    padding-left: 24px;
+  }
+  #app:has(.chat[data-aberto='1']) .lateral .chat,
+  #app:has(.mixer-linha) .lateral .chat {
+    position: static;
+    width: auto;
+    align-items: stretch;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -593,11 +634,6 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 .chat-campo::placeholder { color: var(--creme-tenue); }
 .chat-campo:focus { outline: none; border-color: var(--latao); }
 .chat-enviar { padding: 10px 16px; font-size: 13px; }
-
-@media (min-width: 1080px) {
-  /* Na coluna lateral a conversa deixa de flutuar e vira parte da sala. */
-  .chat { position: static; width: auto; align-items: stretch; }
-}
 
 /* ---------------------------------------------------------------------------
    AJUDA, LOBBY, CONEXÃO E FIM.

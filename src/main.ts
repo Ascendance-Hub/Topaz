@@ -337,6 +337,18 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     volumes.set(chave, volume)
     aplicarVolumes()
   })
+
+  /**
+   * A coluna lateral: conversa e volumes.
+   *
+   * Existe como elemento de verdade, e não como duas peças soltas no grid,
+   * porque é ela que carrega a linha que separa a lateral da mesa. Sem um
+   * container, a linha teria que ser desenhada em cada peça e quebraria no
+   * vão entre elas.
+   */
+  const lateral = document.createElement('aside')
+  lateral.className = 'lateral'
+  lateral.append(chat.raiz, mixer)
   let controles = renderizarControlesCall(
     protocolo.estado(), acoesCall, midia.qualidade(), midia.tipoConteudo())
   // `palco` é criado uma vez e só tem os filhos trocados: `renderizar` guarda
@@ -344,7 +356,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   // elemento a cada ida e volta faria as cartas voarem de novo sem motivo.
   const palco = document.createElement('div')
   palco.className = 'palco'
-  app.replaceChildren(barra, nav, palco, chat.raiz, controles, mixer, videos, audios)
+  app.replaceChildren(barra, nav, palco, controles, lateral, videos, audios)
 
   function desenhar(): void {
     const novaBarra = renderizarBarraSala(codigo, sessao.souHost())
