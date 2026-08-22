@@ -118,7 +118,11 @@ describe('relays de sinalização', () => {
     // phishing pelo Norton. `nostr.wine` (pago) e `basspistol.org` abrem o
     // socket e RECUSAM publicação — parecem vivos e descartam todo anúncio,
     // que foi o que fez a descoberta ser intermitente.
-    for (const ruim of ['hol.is', 'agorist', 'nostr.wine', 'basspistol']) {
+    // `hol.is` fora do ar; `relay.agorist.space` marcado como phishing pelo
+    // Norton; `nostr.wine` pago; `nostr.tegila.com.br` aceita publicação e
+    // NÃO entrega o evento efêmero a quem está inscrito; `relay.damus.io`
+    // entregava de manhã e parou de abrir à tarde.
+    for (const ruim of ['hol.is', 'agorist', 'nostr.wine', 'tegila', 'damus']) {
       expect(RELAYS.some((u) => u.includes(ruim))).toBe(false)
     }
   })

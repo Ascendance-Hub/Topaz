@@ -21,21 +21,29 @@ export const APP_ID = 'topaz-ascendance-hub'
  * todo anúncio, o que fazia a descoberta funcionar muito bem uma hora e falhar
  * na outra, conforme onde o anúncio de cada pessoa tivesse caído.
  *
- * Agora os dez foram verificados nos DOIS critérios: o socket abre e o NIP-11
- * não declara `payment_required`, `auth_required`, `restricted_writes` nem
- * exigência de proof-of-work. Estão em ordem de latência medida.
+ * O critério mudou de novo, e o de agora é o único que prova o que importa:
+ * **entrega de ponta a ponta**. Abrir o socket não basta, e aceitar publicação
+ * também não — o que o Trystero manda é evento EFÊMERO (kind na faixa 21xxx,
+ * derivado do tópico), e relay nenhum é obrigado a repassar efêmero. Um relay
+ * pode responder `OK true` e nunca entregar a inscrito nenhum.
+ *
+ * Cada endereço abaixo foi testado publicando de uma conexão e recebendo em
+ * outra, no mesmo relay. `relay.damus.io` saiu da lista: entregava de manhã e
+ * parou de abrir à tarde, que é a mesma fragilidade de sempre — relay bom na
+ * escolha pode morrer depois.
  */
 export const RELAYS = [
   'wss://relay.mostro.network',
   'wss://strfry.shock.network',
   'wss://nos.lol',
   'wss://purplerelay.com',
-  'wss://relay.damus.io',
   'wss://offchain.pub',
   'wss://relay.mostr.pub',
   'wss://nostr.bitcoiner.social',
   'wss://relay.libernet.app',
   'wss://nostr.data.haus',
+  'wss://nostr.oxtr.dev',
+  'wss://nostr-01.yakihonne.com',
 ]
 
 export interface Transporte {
