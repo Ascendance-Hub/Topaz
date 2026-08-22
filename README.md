@@ -55,6 +55,9 @@ permite várias pessoas compartilharem ao mesmo tempo sem derreter a máquina de
 ninguém, e a barra avisa quando ninguém está assistindo, para não parecer que o
 compartilhamento falhou.
 
+Cada voz e cada tela têm volume próprio, num mixer ao lado da mesa — dá para
+deixar o jogo de alguém baixo e a voz dele alta, ou o contrário.
+
 Quem assiste pode expandir a tela recebida ou jogá-la numa janela flutuante do
 sistema (Picture-in-Picture), que continua visível mesmo fora do navegador. Quem
 compartilha escolhe entre 720p e 1080p — o salto de custo entre as duas é de

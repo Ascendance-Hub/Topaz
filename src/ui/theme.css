@@ -1,26 +1,44 @@
+/* ============================================================================
+   Topaz — sala de jogos
+   ----------------------------------------------------------------------------
+   A tela é uma MESA SOB UM ABAJUR, não um painel de controle.
+
+   O fundo é feltro, não preto: preto neutro com botões flutuando não conta
+   nada sobre o produto, e era exatamente a queixa. A luz vem de cima, cai
+   sobre a mesa e some nas bordas — é ela que faz a página parecer um lugar
+   onde as pessoas se reúnem, em vez de uma lista de controles.
+
+   O latão dá a estrutura (trilhos, aros, molduras) e o topázio é a única cor
+   que brilha. A ousadia é gasta num lugar só: a luz.
+   ========================================================================= */
+
 :root {
-  --topazio-300: #FFCE6B;
-  --topazio-400: #F5B942;
-  --topazio-500: #E8A317;
-  --topazio-600: #C9A227;
-  --topazio-700: #A4801A;
-  --topazio-900: #4A3A0E;
+  /* A sala, do canto mais escuro ao feltro que pega luz. */
+  --noite: #061511;
+  --penumbra: #0A1F18;
+  --feltro: #0D2A20;
+  --feltro-alto: #143B2C;
 
-  --feltro-400: #1D5641;
-  --feltro-600: #123528;
-  --feltro-800: #0B2117;
+  /* O metal da sala e a pedra que dá nome a ela. */
+  --latao: #B98A2E;
+  --latao-fraco: rgba(185, 138, 46, 0.28);
+  --topazio: #F0B34A;
+  --topazio-claro: #FFDE9B;
 
-  --carvao-900: #0E0F12;
-  --carvao-700: #1A1C21;
-  --carvao-500: #2A2E36;
-  --texto: #EFE6CF;
-  --texto-fraco: #CFC4A4;
+  --creme: #F4EBD7;
+  --creme-fraco: #C4BAA0;
+  --creme-tenue: rgba(244, 235, 215, 0.5);
 
-  --carta-face: #F6F1E3;
-  --carta-borda: #D8CDB0;
-  --naipe-vermelho: #A3232A;
+  --carta-face: #F7F2E6;
+  --carta-borda: #D6CBAD;
+  --naipe-vermelho: #B02B2B;
+  --alerta: #D4756B;
 
-  --serif: Georgia, 'Times New Roman', serif;
+  /* Bodoni só no nome da sala e nos títulos grandes: alto contraste cansa em
+     texto corrido, e é justamente por ser raro que ele marca. */
+  --display: 'Bodoni Moda', Georgia, 'Times New Roman', serif;
+  --corpo: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
   --dur-carta: 380ms;
   --dur-virada: 300ms;
   --easing: cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -28,6 +46,9 @@
      cascata em vez de todas de uma vez. Multiplicado por --indice, que o
      JS define só nas cartas em voo (ver src/ui/animate.ts). */
   --atraso-cascata: 90ms;
+
+  --raio: 12px;
+  --raio-pequeno: 8px;
 }
 
 * { box-sizing: border-box; }
@@ -35,17 +56,305 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--carvao-900);
-  color: var(--texto);
-  font-family: var(--serif);
+  background: var(--noite);
+  color: var(--creme);
+  font-family: var(--corpo);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* ---------------------------------------------------------------------------
+   O ABAJUR — a assinatura da página.
+
+   Um halo quente no alto do centro e o feltro se dissolvendo nas bordas. Fica
+   atrás de tudo, não intercepta clique, e é o que transforma um fundo chapado
+   numa sala com profundidade.
+   ------------------------------------------------------------------------ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(120vw 70vh at 50% -12vh,
+      rgba(240, 179, 74, 0.16) 0%,
+      rgba(240, 179, 74, 0.06) 34%,
+      transparent 68%),
+    radial-gradient(95vw 65vh at 50% 6vh,
+      var(--feltro) 0%,
+      var(--penumbra) 55%,
+      transparent 88%);
+  animation: acender 900ms var(--easing) both;
+}
+
+@keyframes acender { from { opacity: 0; } to { opacity: 1; } }
+
+#app {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  padding: 0 16px 100px;
+}
+
+h2, h3, h4 { margin: 0; font-weight: 600; }
+
+/* Em tela larga a sala ganha uma coluna lateral: conversa e volumes ficam ao
+   lado, e a mesa deixa de dividir espaço com painéis flutuantes. */
+@media (min-width: 1080px) {
+  #app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    align-content: start;
+    column-gap: 24px;
+    max-width: 1340px;
+    margin: 0 auto;
+  }
+  /* Posicionamento por linha e coluna, e não por áreas nomeadas: duas peças
+     na mesma área se empilhariam uma sobre a outra em vez de uma abaixo da
+     outra, que foi o erro da primeira versão deste grid. */
+  .barra-sala { grid-column: 1 / -1; grid-row: 1; }
+  .nav-sala { grid-column: 1 / -1; grid-row: 2; }
+  .palco { grid-column: 1; grid-row: 3; min-width: 0; }
+  .call-videos { grid-column: 1; grid-row: 4; }
+  .chat { grid-column: 2; grid-row: 3; align-self: start; }
+  .mixer { grid-column: 2; grid-row: 4; align-self: start; }
+}
+
+/* ---------------------------------------------------------------------------
+   O TRILHO — barra do topo, uma régua de latão.
+   ------------------------------------------------------------------------ */
+.barra-sala {
+  max-width: 940px;
+  margin: 20px auto 16px;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent);
+  border: 1px solid var(--latao-fraco);
+  border-radius: var(--raio);
+  font-size: 12.5px;
+  color: var(--creme-fraco);
+}
+.barra-sala .codigo {
+  font-family: var(--display);
+  font-size: 19px;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  color: var(--topazio);
+}
+
+/* ---------------------------------------------------------------------------
+   Botões. Um só desenho, três pesos: cheio, de latão e fantasma.
+   ------------------------------------------------------------------------ */
+.botao,
+.call-botao,
+.video-botao,
+.nav-sala-item,
+.ajuda-gatilho,
+.chat-enviar,
+.chat-gatilho {
+  font-family: var(--corpo);
+  font-weight: 500;
+  color: var(--topazio);
+  background: rgba(240, 179, 74, 0.06);
+  border: 1px solid var(--latao-fraco);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 160ms var(--easing), border-color 160ms var(--easing),
+    color 160ms var(--easing);
+}
+.botao { padding: 10px 20px; font-size: 14px; }
+.call-botao { padding: 9px 16px; font-size: 13px; }
+.video-botao { padding: 5px 11px; font-size: 11px; }
+
+.botao:hover,
+.call-botao:hover,
+.video-botao:hover,
+.nav-sala-item:hover,
+.chat-enviar:hover,
+.chat-gatilho:hover,
+.ajuda-gatilho:hover {
+  background: rgba(240, 179, 74, 0.14);
+  border-color: var(--latao);
+  color: var(--topazio-claro);
+}
+
+.botao:disabled,
+.call-botao:disabled { opacity: 0.35; cursor: default; }
+.botao:disabled:hover {
+  background: rgba(240, 179, 74, 0.06);
+  border-color: var(--latao-fraco);
+  color: var(--topazio);
+}
+
+/* Fantasma: a escolha secundária de um par (dispensar seguro, dividir). */
+.botao.fantasma {
+  background: transparent;
+  color: var(--creme-fraco);
+  border-color: rgba(244, 235, 215, 0.18);
+}
+.botao.fantasma:hover { color: var(--creme); border-color: rgba(244, 235, 215, 0.4); }
+
+:focus-visible { outline: 2px solid var(--topazio); outline-offset: 2px; }
+
+/* ---------------------------------------------------------------------------
+   Navegação entre a sala e a mesa.
+   ------------------------------------------------------------------------ */
+.nav-sala {
+  max-width: 940px;
+  margin: 0 auto 18px;
+  display: flex;
+  gap: 8px;
+}
+.nav-sala-item { padding: 9px 22px; font-size: 13px; }
+.nav-sala-item[aria-current='page'] {
+  color: var(--noite);
+  background: var(--topazio);
+  border-color: var(--topazio);
+  font-weight: 600;
+}
+.nav-sala-item[data-espera='1'] { position: relative; }
+.nav-sala-marca {
+  position: absolute;
+  top: -3px; right: -3px;
+  width: 10px; height: 10px;
+  border-radius: 999px;
+  background: var(--topazio-claro);
+  box-shadow: 0 0 0 2px var(--noite), 0 0 10px var(--topazio);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .nav-sala-marca { animation: marca-pulsa 1.6s ease-in-out infinite; }
+}
+@keyframes marca-pulsa { 50% { transform: scale(1.35); } }
+
+/* ---------------------------------------------------------------------------
+   A SALA PARADA — quem está aqui, como fichas na mesa.
+
+   Cada pessoa é uma ficha com aro de latão e um ponto aceso. Quem caiu perde
+   o brilho do ponto em vez de sumir da lista: a cadeira dele continua
+   reservada durante a janela de reconexão, e some da tela seria mentira.
+   ------------------------------------------------------------------------ */
+.sala-parada { text-align: center; padding: 8px 0 24px; }
+.sala-titulo {
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 400;
+  color: var(--creme);
+  margin: 6px 0 20px;
+}
+.sala-lista { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.sala-quem {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 18px 9px 14px;
+  border-radius: 999px;
+  font-size: 14.5px;
+  color: var(--creme);
+  background: linear-gradient(180deg, var(--feltro-alto), var(--feltro));
+  border: 1px solid var(--latao-fraco);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.sala-quem::before {
+  content: '';
+  width: 8px; height: 8px;
+  border-radius: 999px;
+  background: var(--topazio);
+  box-shadow: 0 0 8px rgba(240, 179, 74, 0.7);
+}
+.sala-quem[data-eu='1'] { border-color: var(--latao); }
+.sala-quem[data-caiu='1'] { opacity: 0.45; font-style: italic; }
+.sala-quem[data-caiu='1']::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--creme-tenue);
+}
+.sala-aviso { color: var(--creme-fraco); font-size: 13px; margin-top: 22px; }
+
+/* ---------------------------------------------------------------------------
+   A MESA.
+   ------------------------------------------------------------------------ */
+.mesa {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 26px 22px 22px;
+  border-radius: 20px;
+  background: radial-gradient(70% 90% at 50% 0%, var(--feltro-alto), var(--feltro) 70%);
+  border: 1px solid var(--latao-fraco);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 50px rgba(0, 0, 0, 0.45);
+}
+
+.dealer { text-align: center; margin-bottom: 22px; }
+.rotulo {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--creme-tenue);
+  margin-bottom: 8px;
+}
+.nome { font-size: 14.5px; color: var(--creme); margin-top: 6px; }
+.total { font-size: 13px; color: var(--creme-fraco); font-variant-numeric: tabular-nums; margin-top: 4px; }
+.separador { height: 1px; background: var(--latao-fraco); margin: 20px 0; }
+.vazio { text-align: center; color: var(--creme-fraco); padding: 34px 10px; }
+
+.grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (min-width: 640px) { .grade { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.grade.poucos { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+
+.peca {
+  padding: 14px 12px;
+  border-radius: var(--raio);
+  text-align: center;
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid transparent;
+  transition: border-color 200ms var(--easing), background 200ms var(--easing);
+}
+.peca.vez {
+  border-color: var(--topazio);
+  background: rgba(240, 179, 74, 0.08);
+  box-shadow: 0 0 22px rgba(240, 179, 74, 0.14);
+}
+
+.maos { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.mao { padding: 4px; border-radius: var(--raio-pequeno); }
+.mao.ativa { background: rgba(240, 179, 74, 0.07); }
+.mao.encerrada { opacity: 0.55; }
+.mao-cartas { display: flex; justify-content: center; min-height: 62px; }
+
+.selo-fichas {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--topazio-claro);
+  background: rgba(240, 179, 74, 0.1);
+  border: 1px solid var(--latao-fraco);
+}
+
+.painel-proprio {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--latao-fraco);
+  text-align: center;
+}
+.acoes { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
+
+/* --- cartas ------------------------------------------------------------- */
 .carta {
   width: 42px;
   height: 60px;
   border-radius: 5px;
   background: var(--carta-face);
-  color: var(--carvao-900);
+  color: #17181C;
   border: 1px solid var(--carta-borda);
   display: flex;
   align-items: center;
@@ -53,38 +362,387 @@ body {
   font-size: 17px;
   font-weight: 700;
   margin-left: -14px;
-  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
   /* Shorthand: precisa listar as duas propriedades explicitamente, porque
-     "transition" não faz merge — sobrescrever com uma só apagaria a outra
-     (é o que a revisão da Task 9 pegou). --indice fica 0 fora de voo, então
-     o atraso não afeta transições comuns de uma carta parada. */
+     "transition" não faz merge — sobrescrever com uma só apagaria a outra.
+     --indice fica 0 fora de voo, então o atraso não afeta transições comuns
+     de uma carta parada. */
   transition:
     transform var(--dur-carta) var(--easing) calc(var(--atraso-cascata) * var(--indice, 0)),
     opacity var(--dur-carta) var(--easing) calc(var(--atraso-cascata) * var(--indice, 0));
 }
-
 .carta:first-child { margin-left: 0; }
 .carta.vermelha { color: var(--naipe-vermelho); }
-
-.carta.grande {
-  width: 57px;
-  height: 81px;
-  font-size: 22px;
-  margin-left: -17px;
-}
+.carta.grande { width: 57px; height: 81px; font-size: 22px; margin-left: -17px; }
 .carta.grande:first-child { margin-left: 0; }
-
 .carta.verso {
   background: repeating-linear-gradient(45deg, #7C1D22 0 4px, #651418 4px 8px);
-  border-color: var(--topazio-600);
+  border-color: var(--latao);
   color: transparent;
 }
 
+/* --- barra de prazo ------------------------------------------------------ */
+.barra-prazo {
+  height: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+/* Duração e atraso (negativo, para começar já no meio) vêm inline de
+   components/mesa.ts, calculados a partir de `prazoTurno`. É o que faz a
+   barra andar sem depender de um novo render — nada muda no estado enquanto
+   o turno corre. */
+@keyframes esvaziar-prazo { from { width: 100%; } to { width: 0%; } }
+.barra-prazo > div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--topazio), var(--topazio-claro));
+  animation-name: esvaziar-prazo;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+/* ---------------------------------------------------------------------------
+   O CONSOLE DA CALL — barra fixa embaixo, agrupada como um painel físico.
+   ------------------------------------------------------------------------ */
+.call-controles {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100vw - 24px);
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(6, 21, 17, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--latao-fraco);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+}
+.call-contagem {
+  font-size: 12px;
+  color: var(--creme-fraco);
+  padding-left: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.call-botao[data-mudo='1'],
+.call-botao[data-silenciado='1'] {
+  color: var(--alerta);
+  border-color: rgba(212, 117, 107, 0.45);
+  background: rgba(212, 117, 107, 0.1);
+}
+.call-sem-espectador {
+  color: var(--creme-tenue);
+  font-size: 11px;
+  max-width: 180px;
+  line-height: 1.3;
+}
+.call-qualidade {
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--creme);
+  border: 1px solid var(--latao-fraco);
+  font-family: var(--corpo);
+  font-size: 12px;
+  cursor: pointer;
+}
+.call-audios { display: none; }
+
+/* ---------------------------------------------------------------------------
+   TELAS COMPARTILHADAS.
+   ------------------------------------------------------------------------ */
+.call-videos { display: flex; flex-direction: column; gap: 12px; margin: 18px auto 0; max-width: 940px; }
+.video-remoto {
+  border-radius: var(--raio);
+  border: 1px solid var(--latao-fraco);
+  background: #000;
+  overflow: hidden;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+}
+.video-remoto video { display: block; width: 100%; }
+/* Expandir não vira tela cheia: a mesa e a conversa continuam acessíveis, e
+   quem quiser mais que isso tem a tela cheia ou a janela flutuante. */
+.video-remoto:not([data-expandido='1']) video { max-width: 420px; }
+.video-barra {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(6, 21, 17, 0.9);
+  border-top: 1px solid var(--latao-fraco);
+}
+.video-nome {
+  color: var(--creme);
+  font-size: 12.5px;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.video-remoto:fullscreen { display: flex; flex-direction: column; width: 100vw; height: 100vh; }
+.video-remoto:fullscreen video {
+  width: 100%;
+  max-width: none;
+  flex: 1;
+  min-height: 0;
+  object-fit: contain;
+}
+
+/* ---------------------------------------------------------------------------
+   MIXER — um controle por voz e um por tela.
+   ------------------------------------------------------------------------ */
+.mixer:empty { display: none; }
+.mixer {
+  margin: 18px auto 0;
+  max-width: 940px;
+  padding: 14px 16px;
+  border-radius: var(--raio);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--latao-fraco);
+}
+.mixer-titulo {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--creme-tenue);
+  margin-bottom: 12px;
+}
+.mixer-linha {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+.mixer-linha:last-child { margin-bottom: 0; }
+.mixer-nome {
+  font-size: 13px;
+  color: var(--creme-fraco);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mixer-linha input[type='range'] { width: 100%; accent-color: var(--topazio); cursor: pointer; }
+
+/* ---------------------------------------------------------------------------
+   CONVERSA.
+   ------------------------------------------------------------------------ */
+.chat {
+  position: fixed;
+  right: 16px;
+  bottom: 82px;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  width: min(340px, calc(100vw - 32px));
+}
+.chat-gatilho { display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 13px; }
+.chat-nao-lidas {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--topazio);
+  color: var(--noite);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.chat[data-aberto='0'] .chat-log,
+.chat[data-aberto='0'] .chat-form { display: none; }
+.chat-log {
+  width: 100%;
+  max-height: min(46vh, 320px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: rgba(6, 21, 17, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--latao-fraco);
+  border-radius: var(--raio);
+  text-align: left;
+}
+.chat-linha { font-size: 13.5px; line-height: 1.5; margin-bottom: 7px; }
+.chat-linha:last-child { margin-bottom: 0; }
+.chat-autor { color: var(--topazio); font-weight: 600; margin-right: 6px; }
+/* `overflow-wrap` e não `word-break`: uma mensagem de 200 caracteres sem
+   espaço nenhum não pode esticar o painel para fora da tela. */
+.chat-texto { color: var(--creme); overflow-wrap: anywhere; }
+.chat-form { display: flex; gap: 8px; width: 100%; }
+.chat-campo {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 13px;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--creme);
+  border: 1px solid var(--latao-fraco);
+  border-radius: 999px;
+  font-family: var(--corpo);
+  font-size: 13.5px;
+}
+.chat-campo::placeholder { color: var(--creme-tenue); }
+.chat-campo:focus { outline: none; border-color: var(--latao); }
+.chat-enviar { padding: 10px 16px; font-size: 13px; }
+
+@media (min-width: 1080px) {
+  /* Na coluna lateral a conversa deixa de flutuar e vira parte da sala. */
+  .chat { position: static; width: auto; align-items: stretch; }
+}
+
+/* ---------------------------------------------------------------------------
+   AJUDA, LOBBY, CONEXÃO E FIM.
+   ------------------------------------------------------------------------ */
+.ajuda-gatilho {
+  width: 34px; height: 34px;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ajuda-painel {
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--latao-fraco);
+  border-radius: var(--raio);
+  padding: 16px 18px;
+  margin-top: 14px;
+  text-align: left;
+}
+.ajuda-painel h4 { color: var(--topazio); font-size: 14px; margin: 0 0 5px; }
+.ajuda-painel p { color: var(--creme-fraco); font-size: 13px; margin: 0 0 14px; line-height: 1.5; }
+.ajuda-painel p:last-child { margin-bottom: 0; }
+
+.lobby {
+  max-width: 400px;
+  margin: 14vh auto 0;
+  padding: 34px 30px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(20, 59, 44, 0.5), rgba(13, 42, 32, 0.35));
+  border: 1px solid var(--latao-fraco);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.lobby h1 {
+  font-family: var(--display);
+  font-size: 46px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--topazio);
+  margin: 0 0 6px;
+}
+.lobby .sub { color: var(--creme-fraco); font-size: 13.5px; margin-bottom: 26px; }
+.campo {
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: rgba(0, 0, 0, 0.38);
+  color: var(--creme);
+  border: 1px solid var(--latao-fraco);
+  border-radius: var(--raio-pequeno);
+  font-family: var(--corpo);
+  font-size: 15px;
+  text-align: center;
+}
+.campo::placeholder { color: var(--creme-tenue); }
+.campo:focus { outline: none; border-color: var(--latao); }
+.lobby .botao { width: 100%; padding: 13px; margin-top: 4px; }
+.ou {
+  color: var(--creme-tenue);
+  font-size: 11px;
+  margin: 20px 0 14px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.conexao {
+  max-width: 520px;
+  margin: 10vh auto 0;
+  padding: 30px 26px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--latao-fraco);
+  border-radius: 16px;
+}
+.conexao-titulo { font-family: var(--display); font-size: 24px; color: var(--creme); margin-bottom: 10px; }
+.conexao-detalhe { color: var(--creme-fraco); font-size: 13.5px; line-height: 1.6; }
+.conexao.falhou .conexao-titulo { color: var(--alerta); }
+
+.fim {
+  max-width: 520px;
+  margin: 7vh auto 0;
+  padding: 32px 28px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(20, 59, 44, 0.5), rgba(13, 42, 32, 0.3));
+  border: 1px solid var(--latao-fraco);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.fim h2 {
+  font-family: var(--display);
+  color: var(--topazio);
+  font-size: 30px;
+  font-weight: 400;
+  margin: 0 0 6px;
+}
+.fim .sub { color: var(--creme-fraco); font-size: 13.5px; margin-bottom: 24px; }
+
+.colocacao {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border-radius: var(--raio-pequeno);
+  margin-bottom: 7px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid transparent;
+}
+.colocacao.campea { border-color: var(--latao); background: rgba(240, 179, 74, 0.09); }
+.colocacao .pos {
+  color: var(--latao);
+  font-size: 15px;
+  min-width: 32px;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.colocacao .quem { color: var(--creme); font-size: 15px; flex: 1; text-align: left; }
+.colocacao .saldo { color: var(--topazio); font-size: 15px; font-variant-numeric: tabular-nums; }
+.colocacao .caiu { color: var(--creme-tenue); font-size: 12px; }
+
+.espera { text-align: center; }
+.espera .aviso { color: var(--creme-fraco); font-size: 13px; margin-top: 12px; }
+.espera .lista-espera {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin: 14px 0 4px;
+}
+.espera .quem {
+  color: var(--creme);
+  font-size: 14.5px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--latao-fraco);
+}
+
+/* ---------------------------------------------------------------------------
+   Quem pediu menos movimento recebe menos movimento.
+   ------------------------------------------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
   /* transition-delay também precisa zerar aqui: sem isso, o atraso em
      cascata do voo de cartas (--atraso-cascata × --indice) sobreviveria e a
-     carta ainda apareceria escalonada no tempo, só que sem deslizar —
-     ainda seria movimento perceptível para quem pediu para reduzir. */
+     carta ainda apareceria escalonada no tempo, só que sem deslizar — ainda
+     seria movimento perceptível para quem pediu para reduzir. */
   * {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
@@ -94,462 +752,4 @@ body {
      largura estática que mesa.ts escreve inline (o tempo que ainda resta no
      momento do render), em vez de saltar para o fim e mentir "acabou". */
   .barra-prazo > div { animation: none !important; }
-}
-
-.mesa {
-  max-width: 940px;
-  margin: 0 auto;
-  padding: 22px 18px 18px;
-  background: radial-gradient(ellipse at 50% -12%,
-    var(--feltro-400) 0%, var(--feltro-600) 58%, var(--feltro-800) 100%);
-  border: 1px solid var(--topazio-900);
-  border-radius: 14px;
-}
-
-.rotulo {
-  color: var(--topazio-600);
-  letter-spacing: 0.22em;
-  font-size: 11px;
-  text-transform: uppercase;
-  margin-bottom: 7px;
-}
-
-.dealer { text-align: center; margin-bottom: 16px; }
-.mao-cartas { display: flex; justify-content: center; margin-bottom: 6px; }
-
-/* Todas as mãos do jogador lado a lado — com split são até 3. */
-.maos { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-.mao { padding: 4px 6px 2px; border-radius: 7px; border: 1px solid transparent; }
-.mao.ativa { border-color: rgba(201, 162, 39, 0.45); background: rgba(201, 162, 39, 0.07); }
-/* Mão resolvida continua visível, só recuada: o jogador precisa ver o que
-   tinha na hora do acerto. */
-.mao.encerrada { opacity: 0.62; }
-.mao[data-resultado='blackjack'] .total,
-.mao[data-resultado='ganhou'] .total { color: var(--topazio-400); }
-.mao[data-resultado='perdeu'] .total { color: var(--texto-fraco); }
-
-.separador {
-  height: 1px;
-  background: linear-gradient(90deg, transparent,
-    rgba(201, 162, 39, 0.22), transparent);
-  margin-bottom: 14px;
-}
-
-.grade {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 11px;
-}
-.grade.poucos { grid-template-columns: repeat(auto-fit, minmax(150px, 200px)); justify-content: center; }
-@media (min-width: 640px) { .grade { grid-template-columns: repeat(3, 1fr); } }
-
-.peca {
-  text-align: center;
-  padding: 10px 6px 8px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.028);
-  border: 1px solid rgba(201, 162, 39, 0.12);
-  transition: opacity 200ms var(--easing), border-color 200ms var(--easing);
-}
-.peca.vez {
-  border-color: var(--topazio-600);
-  background: rgba(201, 162, 39, 0.1);
-  box-shadow: 0 0 20px rgba(201, 162, 39, 0.28);
-}
-.peca.encerrada { opacity: 0.42; }
-.peca .carta { width: 40px; height: 57px; font-size: 16px; margin-left: -13px; }
-.peca .carta:first-child { margin-left: 0; }
-
-.nome { font-size: 15px; color: var(--texto); font-weight: 600; }
-.total { font-size: 13px; color: var(--texto-fraco); margin-top: 2px; }
-
-.selo-fichas {
-  display: inline-flex; align-items: center; gap: 5px; margin-top: 6px;
-  background: rgba(201, 162, 39, 0.14);
-  border: 1px solid rgba(201, 162, 39, 0.42);
-  border-radius: 999px; padding: 3px 11px;
-}
-.selo-fichas b {
-  font-size: 17px; color: var(--topazio-300);
-  font-variant-numeric: tabular-nums; line-height: 1;
-}
-.selo-fichas span {
-  font-size: 10px; color: var(--topazio-600);
-  letter-spacing: 0.1em; text-transform: uppercase;
-}
-
-.painel-proprio {
-  border: 1px solid rgba(201, 162, 39, 0.5);
-  border-radius: 11px;
-  background: linear-gradient(rgba(201,162,39,0.09), rgba(201,162,39,0.03));
-  padding: 15px 14px 13px;
-  text-align: center;
-  margin-top: 16px;
-}
-
-.acoes { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 13px; }
-
-.botao {
-  padding: 11px 20px;
-  border-radius: 6px;
-  font-size: 14.5px;
-  font-weight: 600;
-  font-family: var(--serif);
-  cursor: pointer;
-  background: linear-gradient(var(--topazio-600), var(--topazio-700));
-  color: var(--topazio-900);
-  border: 1px solid var(--topazio-400);
-}
-.botao.fantasma { background: transparent; color: var(--topazio-600); border-color: var(--topazio-900); }
-.botao:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.vazio { text-align: center; color: var(--texto-fraco); padding: 30px 10px; }
-
-.barra-prazo { height: 3px; background: rgba(0,0,0,0.3); border-radius: 2px; overflow: hidden; margin-top: 8px; }
-/* Duração e atraso (negativo, para começar já no meio) vêm inline de
-   components/mesa.ts, calculados a partir de `prazoTurno`. É o que faz a
-   barra andar sem depender de um novo render — nada muda no estado
-   enquanto o turno corre. */
-@keyframes esvaziar-prazo { from { width: 100%; } to { width: 0%; } }
-.barra-prazo > div {
-  height: 100%;
-  background: var(--topazio-500);
-  animation-name: esvaziar-prazo;
-  animation-timing-function: linear;
-  animation-fill-mode: forwards;
-}
-
-.conexao {
-  max-width: 520px;
-  margin: 8vh auto 0;
-  padding: 26px 24px;
-  background: var(--carvao-700);
-  border: 1px solid var(--topazio-900);
-  border-radius: 14px;
-  text-align: center;
-}
-.conexao-titulo { color: var(--topazio-500); font-size: 18px; margin-bottom: 8px; }
-.conexao-detalhe { color: var(--texto-fraco); font-size: 13px; line-height: 1.5; }
-.conexao.falhou { border-color: var(--naipe-vermelho); }
-.conexao.falhou .conexao-titulo { color: var(--texto); }
-
-.lobby {
-  max-width: 420px;
-  margin: 12vh auto 0;
-  padding: 32px 28px;
-  background: var(--carvao-700);
-  border: 1px solid var(--topazio-900);
-  border-radius: 14px;
-  text-align: center;
-}
-
-.lobby h1 {
-  margin: 0 0 4px;
-  font-size: 30px;
-  letter-spacing: 0.06em;
-  color: var(--topazio-500);
-}
-
-.lobby .sub { color: var(--texto-fraco); font-size: 13px; margin-bottom: 26px; }
-
-.lobby .aviso {
-  color: var(--texto);
-  background: rgba(163, 35, 42, 0.18);
-  border: 1px solid var(--naipe-vermelho);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 12.5px;
-  line-height: 1.45;
-  margin: 0 0 18px;
-  text-align: left;
-}
-
-.campo {
-  width: 100%;
-  padding: 11px 13px;
-  margin-bottom: 12px;
-  border-radius: 7px;
-  background: var(--carvao-900);
-  border: 1px solid var(--carvao-500);
-  color: var(--texto);
-  font-family: var(--serif);
-  font-size: 15px;
-  text-align: center;
-}
-.campo:focus { outline: none; border-color: var(--topazio-600); }
-
-.lobby .botao { width: 100%; padding: 12px; font-size: 14px; margin-top: 4px; }
-.ou { color: var(--texto-fraco); font-size: 11px; margin: 16px 0 12px; letter-spacing: 0.14em; }
-
-.barra-sala {
-  max-width: 940px;
-  margin: 18px auto 12px;
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  background: var(--carvao-700);
-  border: 1px solid var(--carvao-500);
-  border-radius: 10px;
-  font-size: 12px;
-  color: var(--texto-fraco);
-}
-.barra-sala .codigo { color: var(--topazio-500); letter-spacing: 0.12em; font-weight: 700; }
-.barra-sala .botao { padding: 6px 12px; font-size: 11px; }
-
-.fim {
-  max-width: 520px;
-  margin: 8vh auto 0;
-  padding: 26px 24px;
-  background: var(--carvao-700);
-  border: 1px solid var(--topazio-900);
-  border-radius: 14px;
-  text-align: center;
-}
-.fim h2 { color: var(--topazio-500); font-size: 22px; margin: 0 0 4px; }
-.fim .sub { color: var(--texto-fraco); font-size: 13px; margin-bottom: 22px; }
-
-.colocacao {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 12px; border-radius: 9px; margin-bottom: 6px;
-  background: rgba(255, 255, 255, 0.028);
-  border: 1px solid rgba(201, 162, 39, 0.12);
-}
-.colocacao.campea { border-color: var(--topazio-600); background: rgba(201, 162, 39, 0.1); }
-.colocacao .pos { color: var(--topazio-600); font-size: 15px; min-width: 32px; text-align: left; }
-.colocacao .quem { color: var(--texto); font-size: 15px; flex: 1; text-align: left; }
-.colocacao .saldo { color: var(--topazio-400); font-size: 15px; font-variant-numeric: tabular-nums; }
-.colocacao .caiu { color: var(--texto-fraco); font-size: 12px; }
-
-.espera { text-align: center; }
-.espera .aviso { color: var(--texto-fraco); font-size: 13px; margin-top: 10px; }
-.espera .lista-espera {
-  display: flex; flex-wrap: wrap; gap: 8px;
-  justify-content: center; margin: 12px 0 4px;
-}
-.espera .quem {
-  color: var(--texto); font-size: 15px;
-  padding: 6px 12px; border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(201, 162, 39, 0.22);
-}
-
-.ajuda-gatilho {
-  width: 30px; height: 30px; border-radius: 999px;
-  background: transparent; color: var(--topazio-500);
-  border: 1px solid var(--topazio-600);
-  font-family: var(--serif); font-size: 15px; cursor: pointer;
-}
-.ajuda-painel {
-  background: var(--carvao-700); border: 1px solid var(--topazio-900);
-  border-radius: 10px; padding: 14px 16px; margin-top: 12px; text-align: left;
-}
-.ajuda-painel h4 { color: var(--topazio-500); font-size: 14px; margin: 0 0 4px; }
-.ajuda-painel p { color: var(--texto-fraco); font-size: 13px; margin: 0 0 12px; line-height: 1.45; }
-.ajuda-painel p:last-child { margin-bottom: 0; }
-
-/* O chat é `fixed` porque vive fora do palco que `renderizar` reconstrói:
-   ele não pode disputar o fluxo da mesa nem ser empurrado por ela. Fechado,
-   é só o gatilho no canto; aberto, um painel ancorado no mesmo canto. */
-.chat {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  width: min(340px, calc(100vw - 32px));
-}
-.chat-gatilho {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 14px; border-radius: 999px;
-  background: var(--carvao-700); color: var(--topazio-500);
-  border: 1px solid var(--topazio-600);
-  font-family: var(--serif); font-size: 13px; cursor: pointer;
-}
-.chat-nao-lidas {
-  min-width: 18px; padding: 0 5px; border-radius: 999px;
-  background: var(--topazio-500); color: var(--carvao-900);
-  font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-.chat[data-aberto="0"] .chat-log,
-.chat[data-aberto="0"] .chat-form { display: none; }
-
-.chat-log {
-  width: 100%;
-  max-height: min(46vh, 320px);
-  overflow-y: auto;
-  padding: 10px 12px;
-  background: var(--carvao-700);
-  border: 1px solid var(--carvao-500);
-  border-radius: 10px;
-  text-align: left;
-}
-.chat-linha { font-size: 13px; line-height: 1.45; margin-bottom: 6px; }
-.chat-linha:last-child { margin-bottom: 0; }
-.chat-autor { color: var(--topazio-500); font-weight: 700; margin-right: 6px; }
-/* `overflow-wrap` e não `word-break`: uma mensagem de 200 caracteres sem
-   espaço nenhum não pode esticar o painel para fora da tela. */
-.chat-texto { color: var(--texto); overflow-wrap: anywhere; }
-
-.chat-form { display: flex; gap: 8px; width: 100%; }
-.chat-campo {
-  flex: 1; min-width: 0;
-  padding: 9px 11px;
-  background: var(--carvao-900); color: var(--texto);
-  border: 1px solid var(--carvao-500); border-radius: 8px;
-  font-family: var(--serif); font-size: 13px;
-}
-.chat-campo::placeholder { color: var(--texto-fraco); }
-.chat-campo:focus { outline: none; border-color: var(--topazio-600); }
-.chat-enviar {
-  padding: 9px 14px; border-radius: 8px;
-  background: transparent; color: var(--topazio-500);
-  border: 1px solid var(--topazio-600);
-  font-family: var(--serif); font-size: 13px; cursor: pointer;
-}
-
-.nav-sala {
-  max-width: 940px;
-  margin: 0 auto 14px;
-  display: flex;
-  gap: 8px;
-}
-.nav-sala-item {
-  padding: 8px 18px; border-radius: 8px;
-  background: transparent; color: var(--texto-fraco);
-  border: 1px solid var(--carvao-500);
-  font-family: var(--serif); font-size: 13px; cursor: pointer;
-}
-/* A marcação visual sai do mesmo atributo que o leitor de tela usa, para as
-   duas não poderem divergir. */
-.nav-sala-item[aria-current="page"] {
-  color: var(--topazio-500);
-  border-color: var(--topazio-600);
-  background: rgba(201, 162, 39, 0.1);
-}
-
-.sala-parada { max-width: 940px; margin: 0 auto; text-align: center; }
-.sala-titulo { color: var(--topazio-500); font-size: 18px; margin: 18px 0 14px; }
-.sala-lista { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-.sala-quem {
-  color: var(--texto); font-size: 15px;
-  padding: 6px 12px; border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(201, 162, 39, 0.22);
-}
-.sala-quem[data-eu="1"] { border-color: var(--topazio-600); }
-.sala-quem[data-caiu="1"] { opacity: 0.5; font-style: italic; }
-.sala-aviso { color: var(--texto-fraco); font-size: 13px; margin-top: 16px; }
-
-/* Marca de "a mesa espera por você". O botão vira relativo só quando marcado,
-   para não mexer no posicionamento dos outros. */
-.nav-sala-item[data-espera="1"] {
-  position: relative;
-  border-color: var(--topazio-500);
-}
-.nav-sala-marca {
-  position: absolute;
-  top: -4px; right: -4px;
-  width: 10px; height: 10px; border-radius: 999px;
-  background: var(--topazio-400);
-  box-shadow: 0 0 0 2px var(--carvao-900);
-}
-/* A pulsação chama o olho de quem está conversando e não olhando a mesa —
-   mas quem pediu menos movimento no sistema não deve receber isso. */
-@media (prefers-reduced-motion: no-preference) {
-  .nav-sala-marca { animation: marca-pulsa 1.6s ease-in-out infinite; }
-}
-@keyframes marca-pulsa {
-  50% { transform: scale(1.35); }
-}
-
-.call-controles {
-  position: fixed;
-  left: 50%; bottom: 16px; transform: translateX(-50%);
-  z-index: 15;
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 14px; border-radius: 999px;
-  background: var(--carvao-700);
-  border: 1px solid var(--carvao-500);
-}
-.call-botao {
-  padding: 8px 16px; border-radius: 999px;
-  background: transparent; color: var(--topazio-500);
-  border: 1px solid var(--topazio-600);
-  font-family: var(--serif); font-size: 13px; cursor: pointer;
-}
-.call-contagem { color: var(--texto-fraco); font-size: 12px; }
-/* Os elementos de áudio remoto existem só para tocar; não têm nada a mostrar. */
-.call-audios { display: none; }
-
-.call-videos {
-  position: fixed;
-  left: 16px; bottom: 72px;
-  z-index: 14;
-  display: flex; flex-direction: column; gap: 8px;
-}
-.call-videos video {
-  width: min(420px, calc(100vw - 32px));
-  border-radius: 10px;
-  border: 1px solid var(--carvao-500);
-  background: #000;
-}
-.call-sem-espectador {
-  color: var(--texto-fraco); font-size: 11px;
-  max-width: 190px; line-height: 1.3;
-}
-
-.video-remoto {
-  border-radius: 10px;
-  border: 1px solid var(--carvao-500);
-  background: #000;
-  overflow: hidden;
-}
-.video-remoto video {
-  display: block;
-  width: min(360px, calc(100vw - 32px));
-}
-/* Expandir não vira tela cheia: a mesa e o chat continuam acessíveis, e quem
-   quiser mais que isso tem a janela flutuante do sistema. */
-.video-remoto[data-expandido="1"] video {
-  width: min(820px, calc(100vw - 32px));
-}
-.video-barra {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 8px;
-  background: var(--carvao-700);
-}
-.video-nome { color: var(--texto-fraco); font-size: 12px; flex: 1; }
-.video-botao {
-  padding: 4px 10px; border-radius: 6px;
-  background: transparent; color: var(--topazio-500);
-  border: 1px solid var(--topazio-600);
-  font-family: var(--serif); font-size: 11px; cursor: pointer;
-}
-.call-qualidade {
-  padding: 6px 8px; border-radius: 8px;
-  background: var(--carvao-900); color: var(--texto);
-  border: 1px solid var(--carvao-500);
-  font-family: var(--serif); font-size: 12px; cursor: pointer;
-}
-
-/* Em tela cheia a caixa vira o palco inteiro, e o vídeo ocupa o que sobra
-   depois da barra — sem esticar, para não distorcer a tela compartilhada. */
-.video-remoto:fullscreen {
-  display: flex;
-  flex-direction: column;
-  width: 100vw; height: 100vh;
-  background: #000;
-}
-.video-remoto:fullscreen video {
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  object-fit: contain;
 }

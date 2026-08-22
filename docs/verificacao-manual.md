@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (532, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (539, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -123,6 +123,16 @@ exercitam o caminho real de rede.
       e o teclado não esconde o campo
 
 ## Aparência
+
+- [ ] A sala parece um lugar: feltro sob uma luz quente, não um fundo preto
+- [ ] Em tela larga, conversa e volumes ficam na coluna da direita, sem cobrir
+      a mesa
+- [ ] Em tela estreita, tudo empilha e a conversa volta a ser gaveta
+- [ ] As fontes carregam (Bodoni no nome da sala, Archivo no resto); se a rede
+      bloquear o Google Fonts, o texto continua legível nas fontes de sistema
+- [ ] O mixer aparece só com alguém na call, e mexer num controle muda o volume
+      **daquela** pessoa sem afetar as outras
+- [ ] Baixar o volume de uma tela não baixa a voz da mesma pessoa
 
 - [ ] A grade reflui de 3 para 2 colunas em tela estreita
 - [ ] Com "reduzir movimento" ligado no sistema operacional, as cartas aparecem

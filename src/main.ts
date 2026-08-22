@@ -8,6 +8,7 @@ import { renderizarNavSala, renderizarSalaParada } from './ui/components/sala'
 import { renderizarControlesCall } from './ui/components/call'
 import type { AcoesCall } from './ui/components/call'
 import { criarVideoRemoto, mostrarVideo } from './ui/components/video-remoto'
+import { renderizarMixer, chaveVoz, chaveTela } from './ui/components/mixer'
 import { ehTela } from './call/classificar'
 import { criarCanalCall } from './call/canal'
 import { ProtocoloCall } from './call/protocolo'
@@ -214,6 +215,40 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * aí sim não há mais nada para mostrar.
    */
   let todosSilenciados = false
+  /** Volume por canal, de 0 a 1. Ausente = 1, que é o padrão de mídia. */
+  const volumes = new Map<string, number>()
+
+  const volumeDe = (chave: string): number => volumes.get(chave) ?? 1
+
+  /**
+   * Aplica os volumes aos elementos que existem agora.
+   *
+   * Roda a cada desenho porque elementos aparecem e somem conforme a call
+   * muda, e um volume ajustado antes precisa valer para o elemento novo.
+   */
+  function aplicarVolumes(): void {
+    for (const el of audios.querySelectorAll<HTMLAudioElement>('audio[data-de]')) {
+      el.volume = volumeDe(chaveVoz(el.dataset['de'] ?? ''))
+    }
+    for (const caixa of videos.querySelectorAll<HTMLElement>('[data-de]')) {
+      const video = caixa.querySelector('video')
+      if (video) video.volume = volumeDe(chaveTela(caixa.dataset['de'] ?? ''))
+    }
+  }
+
+  /** Um canal de voz por pessoa na call, e um de tela por quem compartilha. */
+  function canaisDeAudio() {
+    const atual = protocolo.estado()
+    const vozes = atual.naCall.map((peerId) => ({
+      chave: chaveVoz(peerId), nome: apelidoDe(peerId), volume: volumeDe(chaveVoz(peerId)),
+    }))
+    const telas = atual.assistindo.map((peerId) => ({
+      chave: chaveTela(peerId),
+      nome: `Tela de ${apelidoDe(peerId)}`,
+      volume: volumeDe(chaveTela(peerId)),
+    }))
+    return [...vozes, ...telas]
+  }
 
   function ajustarVideos(assistindo: string[], compartilhando: string[]): void {
     for (const caixa of videos.querySelectorAll<HTMLElement>('[data-de]')) {
@@ -298,13 +333,18 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
 
   let barra = renderizarBarraSala(codigo, sessao.souHost())
   let nav = renderizarNavSala(mesaAberta, alternarMesa, mesaEspera())
+  let mixer = renderizarMixer(canaisDeAudio(), (chave, volume) => {
+    volumes.set(chave, volume)
+    aplicarVolumes()
+  })
   let controles = renderizarControlesCall(
     protocolo.estado(), acoesCall, midia.qualidade(), midia.tipoConteudo())
   // `palco` é criado uma vez e só tem os filhos trocados: `renderizar` guarda
   // a contagem de cartas no dataset dele para decidir animação, e recriar o
   // elemento a cada ida e volta faria as cartas voarem de novo sem motivo.
   const palco = document.createElement('div')
-  app.replaceChildren(barra, nav, palco, chat.raiz, controles, videos, audios)
+  palco.className = 'palco'
+  app.replaceChildren(barra, nav, palco, chat.raiz, controles, mixer, videos, audios)
 
   function desenhar(): void {
     const novaBarra = renderizarBarraSala(codigo, sessao.souHost())
@@ -324,6 +364,14 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
         })
     controles.replaceWith(novosControles)
     controles = novosControles
+
+    const novoMixer = renderizarMixer(canaisDeAudio(), (chave, volume) => {
+      volumes.set(chave, volume)
+      aplicarVolumes()
+    })
+    mixer.replaceWith(novoMixer)
+    mixer = novoMixer
+    aplicarVolumes()
 
     // Enquanto ninguém é anfitrião a mesa ainda não existe: mostrar a mesa
     // vazia com "Aguardando jogadores…" confundiria "ninguém entrou ainda"
