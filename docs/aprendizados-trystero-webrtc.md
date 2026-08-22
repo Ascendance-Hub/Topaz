@@ -326,6 +326,24 @@ navegadores mais antigos. Uma exceção num ajuste **opcional** não pode derrub
 a funcionalidade inteira — e botão que falha no clique é pior que botão
 ausente.
 
+### Duas pessoas podem alcançar conjuntos DIFERENTES de relays
+
+**Sintoma:** duas pessoas específicas nunca se acham, mesmo com a rede de cada
+uma passando no teste de NAT, e **nenhuma das duas vê erro**.
+
+**Causa:** cada rede alcança um subconjunto diferente da lista. Antivírus, DNS
+corporativo e filtros de provedor bloqueiam endereços diferentes. Se os
+subconjuntos não se cruzam, os anúncios de uma nunca chegam à outra — e as
+duas têm relays conectados, então a contagem parece saudável dos dois lados.
+
+**Detalhe que engana:** passar num teste de STUN **não** diz nada sobre os
+relays. STUN é UDP; relay nostr é WSS em TCP 443. São caminhos diferentes, e
+um firewall pode liberar um e barrar o outro.
+
+**Diagnóstico:** mostrar a lista COMPLETA com quais estão conectados, para as
+duas pessoas compararem lado a lado. Um número agregado não serve — só os
+nomes revelam a falta de interseção.
+
 ### O navegador DEDUPLICA candidatos ICE — e isso engana o diagnóstico
 
 Dois servidores STUN que enxergam o **mesmo** endereço externo produzem **um**

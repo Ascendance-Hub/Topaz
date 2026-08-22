@@ -11,6 +11,7 @@ vi.mock('./net/transport', () => ({
   // Sinalização saudável por padrão: estes testes são sobre a sala, não sobre
   // rede bloqueada, e zero relays mudaria a mensagem de falha.
   relaysConectados: vi.fn(() => 3),
+  relaysDetalhados: vi.fn(() => []),
 }))
 
 import { criarSalaTrystero, criarTransporte } from './net/transport'

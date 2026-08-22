@@ -54,3 +54,39 @@ describe('renderizarTesteRede', () => {
       .toBe('0')
   })
 })
+
+describe('lista de servidores de descoberta', () => {
+  const relays = [
+    { url: 'wss://a.com', nome: 'a.com', conectado: true },
+    { url: 'wss://b.com', nome: 'b.com', conectado: false },
+    { url: 'wss://c.com', nome: 'c.com', conectado: true },
+  ]
+
+  it('mostra todos, marcando quais estão conectados', () => {
+    const painel = renderizarTesteRede(null, false, vi.fn(), relays)
+
+    const itens = [...painel.querySelectorAll('.teste-rede-relay')]
+    expect(itens).toHaveLength(3)
+    expect(itens.map((i) => (i as HTMLElement).dataset['conectado']))
+      .toEqual(['1', '0', '1'])
+  })
+
+  it('mostra o nome curto, que é o que se compara entre duas telas', () => {
+    const painel = renderizarTesteRede(null, false, vi.fn(), relays)
+
+    expect(painel.querySelector('.teste-rede-relay')!.textContent).toBe('a.com')
+  })
+
+  it('resume quantos de quantos', () => {
+    const painel = renderizarTesteRede(null, false, vi.fn(), relays)
+
+    expect(painel.querySelector('.teste-rede-relays-resumo')!.textContent)
+      .toContain('2 de 3')
+  })
+
+  it('sem lista, não mostra a seção', () => {
+    const painel = renderizarTesteRede(null, false, vi.fn())
+
+    expect(painel.querySelector('.teste-rede-relay')).toBeNull()
+  })
+})

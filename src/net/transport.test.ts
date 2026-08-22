@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { criarTransporte, RELAYS } from './transport'
+import { criarTransporte, RELAYS, relaysDetalhados } from './transport'
 import type { SalaTrystero } from './transport'
 import type { Acao } from '../game/types'
 
@@ -120,6 +120,33 @@ describe('relays de sinalização', () => {
     // que foi o que fez a descoberta ser intermitente.
     for (const ruim of ['hol.is', 'agorist', 'nostr.wine', 'basspistol']) {
       expect(RELAYS.some((u) => u.includes(ruim))).toBe(false)
+    }
+  })
+})
+
+describe('detalhe dos relays', () => {
+  it('lista todos os relays configurados, conectados ou não', () => {
+    // Sem `getRelaySockets` real (fora do navegador), o detalhe cai para
+    // "nenhum conectado" — mas a lista precisa continuar completa, senão
+    // comparar dois computadores fica impossível.
+    const detalhe = relaysDetalhados()
+
+    expect(detalhe).toHaveLength(RELAYS.length)
+    expect(detalhe.map((d) => d.url).sort()).toEqual([...RELAYS].sort())
+  })
+
+  it('cada item diz se está conectado', () => {
+    for (const item of relaysDetalhados()) {
+      expect(typeof item.conectado).toBe('boolean')
+    }
+  })
+
+  it('o nome curto é o host, sem o wss://', () => {
+    // É esse nome que duas pessoas vão comparar entre si na tela; a URL
+    // inteira ocuparia espaço sem acrescentar nada.
+    for (const item of relaysDetalhados()) {
+      expect(item.nome.startsWith('wss://')).toBe(false)
+      expect(item.url).toContain(item.nome)
     }
   })
 })
