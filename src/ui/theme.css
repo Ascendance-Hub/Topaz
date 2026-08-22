@@ -812,3 +812,14 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   background: var(--alerta);
   box-shadow: none;
 }
+
+/* Teste de rede: aparece só para quem está sozinho ou não conectou. */
+.teste-rede { text-align: center; margin-top: 26px; }
+.teste-rede-veredito {
+  max-width: 460px;
+  margin: 14px auto 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--creme-fraco);
+}
+.teste-rede-veredito[data-ruim='1'] { color: var(--alerta); }

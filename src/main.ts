@@ -1,5 +1,9 @@
 import { Sessao } from './net/sessao'
 import { criarSalaTrystero, criarTransporte, relaysConectados } from './net/transport'
+import { coletarCandidatos } from './net/coletar-candidatos'
+import { analisarCandidatos } from './net/diagnostico-rede'
+import type { Analise } from './net/diagnostico-rede'
+import { renderizarTesteRede } from './ui/components/teste-rede'
 import { renderizarLobby } from './ui/components/lobby'
 import { renderizarBarraSala } from './ui/components/barra-sala'
 import { renderizarConexao } from './ui/components/conexao'
@@ -400,13 +404,24 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     const status = sessao.statusConexao()
     if (status !== 'conectado') {
       palco.replaceChildren(renderizarConexao(status, relaysConectados()))
+      if (status === 'sem-conexao') {
+        palco.append(renderizarTesteRede(analiseRede, testandoRede, testarRede))
+      }
       return
     }
     if (mesaAberta) {
       renderizar(palco, sessao.estado(), sessao.meuId(), (acao) => sessao.despachar(acao))
-    } else {
-      palco.replaceChildren(
-        renderizarSalaParada(sessao.estado(), sessao.meuId(), conectadosComigo()))
+      return
+    }
+
+    palco.replaceChildren(
+      renderizarSalaParada(sessao.estado(), sessao.meuId(), conectadosComigo()))
+
+    // Quem está sozinho é exatamente quem precisa do teste: a aplicação não
+    // distingue de dentro "ninguém me achou" de "minha rede não deixa
+    // conectar", e o teste responde a segunda metade na máquina certa.
+    if (conectadosComigo().length <= 1) {
+      palco.append(renderizarTesteRede(analiseRede, testandoRede, testarRede))
     }
   }
 
@@ -427,6 +442,20 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
 
   /** Preenchido no fim da montagem, quando o tique já existe. */
   let encerrar: () => void = () => {}
+
+  let analiseRede: Analise | null = null
+  let testandoRede = false
+
+  function testarRede(): void {
+    if (testandoRede) return
+    testandoRede = true
+    desenhar()
+    void coletarCandidatos().then((candidatos) => {
+      analiseRede = analisarCandidatos(candidatos)
+      testandoRede = false
+      desenhar()
+    })
+  }
 
   /**
    * Refaz a conexão sem recarregar a página.
