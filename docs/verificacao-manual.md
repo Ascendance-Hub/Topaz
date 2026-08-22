@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (564, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (572, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -103,6 +103,11 @@ exatamente quem precisa dele.
       nenhuma mudança no site resolve — precisaria de um servidor de
       retransmissão
 - [ ] Com o antivírus bloqueando, o resultado acusa a saída bloqueada
+- [ ] A lista de servidores de descoberta aparece, com os conectados em
+      destaque e os demais riscados
+- [ ] **Quando duas pessoas específicas não se acham, comparar as duas listas.**
+      Se não houver nenhum servidor em comum aceso nas duas telas, é essa a
+      causa — e nenhuma delas vê erro, porque as duas têm servidores conectados
 
 ## Diagnóstico de conexão
 

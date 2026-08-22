@@ -1,5 +1,7 @@
 import { Sessao } from './net/sessao'
-import { criarSalaTrystero, criarTransporte, relaysConectados } from './net/transport'
+import {
+  criarSalaTrystero, criarTransporte, relaysConectados, relaysDetalhados,
+} from './net/transport'
 import { coletarCandidatos } from './net/coletar-candidatos'
 import { analisarCandidatos } from './net/diagnostico-rede'
 import type { Analise } from './net/diagnostico-rede'
@@ -405,7 +407,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     if (status !== 'conectado') {
       palco.replaceChildren(renderizarConexao(status, relaysConectados()))
       if (status === 'sem-conexao') {
-        palco.append(renderizarTesteRede(analiseRede, testandoRede, testarRede))
+        palco.append(
+        renderizarTesteRede(analiseRede, testandoRede, testarRede, relaysDetalhados()))
       }
       return
     }
@@ -421,7 +424,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // distingue de dentro "ninguém me achou" de "minha rede não deixa
     // conectar", e o teste responde a segunda metade na máquina certa.
     if (conectadosComigo().length <= 1) {
-      palco.append(renderizarTesteRede(analiseRede, testandoRede, testarRede))
+      palco.append(
+        renderizarTesteRede(analiseRede, testandoRede, testarRede, relaysDetalhados()))
     }
   }
 

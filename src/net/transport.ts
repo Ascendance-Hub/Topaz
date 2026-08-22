@@ -81,6 +81,43 @@ export function criarSalaTrystero(codigoSala: string): SalaTrystero {
  * a pessoa não tem como adivinhar sozinha, porque antivírus e firewall
  * bloqueiam em silêncio.
  */
+export interface RelayDetalhe {
+  url: string
+  /** Só o host, que é o que se compara entre duas telas. */
+  nome: string
+  conectado: boolean
+}
+
+/**
+ * Situação de cada relay configurado.
+ *
+ * Existe para duas pessoas conseguirem COMPARAR. Se a rede de cada uma alcança
+ * relays diferentes e os conjuntos não se cruzam, elas nunca se encontram — e
+ * nenhuma das duas vê erro, porque ambas têm relays conectados. Só olhando os
+ * nomes lado a lado dá para ver isso.
+ */
+export function relaysDetalhados(): RelayDetalhe[] {
+  let abertos: Set<string>
+  try {
+    const sockets = getRelaySockets() as Record<string, { readyState?: number }>
+    abertos = new Set(
+      Object.entries(sockets)
+        .filter(([, s]) => s?.readyState === WebSocket.OPEN)
+        .map(([url]) => url),
+    )
+  } catch {
+    abertos = new Set()
+  }
+
+  return RELAYS.map((url) => ({
+    url,
+    nome: url.replace(/^wss:\/\//, ''),
+    // O Trystero normaliza a URL com barra no fim; comparar os dois formatos
+    // evita listar como desconectado quem está de pé.
+    conectado: abertos.has(url) || abertos.has(`${url}/`),
+  }))
+}
+
 export function relaysConectados(): number {
   try {
     // O tipo devolvido não promete `readyState`, mas em navegador são

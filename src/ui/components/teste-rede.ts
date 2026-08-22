@@ -1,5 +1,6 @@
 import { VEREDITOS } from '../../net/diagnostico-rede'
 import type { Analise } from '../../net/diagnostico-rede'
+import type { RelayDetalhe } from '../../net/transport'
 
 export const TEXTOS = {
   rodando: 'Testando sua rede…',
@@ -33,6 +34,7 @@ const PARA_TEXTO: Record<string, string> = {
  */
 export function renderizarTesteRede(
   analise: Analise | null, rodando: boolean, aoRodar: () => void,
+  relays?: RelayDetalhe[],
 ): HTMLElement {
   const painel = document.createElement('div')
   painel.className = 'teste-rede'
@@ -46,15 +48,51 @@ export function renderizarTesteRede(
   botao.onclick = aoRodar
   painel.append(botao)
 
+  /**
+   * Os servidores de descoberta, para duas pessoas compararem.
+   *
+   * Duas redes podem alcançar conjuntos DIFERENTES de servidores. Se os
+   * conjuntos não se cruzam, as duas pessoas nunca se encontram — e nenhuma
+   * vê erro, porque ambas têm servidores conectados. Só olhando os nomes lado
+   * a lado dá para ver isso.
+   */
+  function listarRelays(): void {
+    if (!relays || relays.length === 0) return
+
+    const resumo = document.createElement('p')
+    resumo.className = 'teste-rede-relays-resumo'
+    const vivos = relays.filter((r) => r.conectado).length
+    resumo.textContent =
+      `Servidores de descoberta: ${vivos} de ${relays.length}. `
+      + 'Compare esta lista com a da outra pessoa — vocês precisam ter pelo '
+      + 'menos um em comum.'
+    painel.append(resumo)
+
+    const lista = document.createElement('div')
+    lista.className = 'teste-rede-relays'
+    for (const relay of relays) {
+      const item = document.createElement('span')
+      item.className = 'teste-rede-relay'
+      item.dataset['conectado'] = relay.conectado ? '1' : '0'
+      item.textContent = relay.nome
+      lista.append(item)
+    }
+    painel.append(lista)
+  }
+
   if (rodando) {
     const aviso = document.createElement('p')
     aviso.className = 'teste-rede-veredito'
     aviso.textContent = TEXTOS.rodando
     painel.append(aviso)
+    listarRelays()
     return painel
   }
 
-  if (!analise) return painel
+  if (!analise) {
+    listarRelays()
+    return painel
+  }
 
   const veredito = document.createElement('p')
   veredito.className = 'teste-rede-veredito'
@@ -63,6 +101,7 @@ export function renderizarTesteRede(
   veredito.dataset['ruim'] = ruim ? '1' : '0'
   veredito.textContent = PARA_TEXTO[analise.veredito] ?? TEXTOS.inconclusivo
   painel.append(veredito)
+  listarRelays()
 
   return painel
 }
