@@ -22,16 +22,23 @@ export interface Analise {
 /**
  * Decide, a partir dos candidatos ICE, se esta rede consegue conexão direta.
  *
- * O teste é comparar a porta externa que DOIS servidores STUN diferentes viram
- * saindo do MESMO socket local. Se for a mesma, o NAT mantém o mapeamento
- * independentemente do destino e o P2P direto funciona. Se mudar, o NAT dá um
- * mapeamento por destino (simétrico) e nenhum truque de STUN fecha a conexão —
- * só um servidor TURN no meio.
+ * O sinal é a porta externa que servidores STUN diferentes veem saindo do
+ * MESMO socket local. Duas portas distintas provam que o NAT dá um mapeamento
+ * por destino (simétrico) — e aí nenhum truque de STUN fecha a conexão, só um
+ * servidor de retransmissão no meio.
  *
- * Agrupar por porta local importa: portas locais distintas são interfaces
- * distintas (wifi, VPN), e portas externas diferentes aí são normais.
+ * O detalhe que me enganou na primeira versão: **o navegador deduplica
+ * candidatos idênticos**. Quando os servidores concordam — que é o caso bom —
+ * sai UM candidato só, não dois. Ler candidato único como "só um respondeu"
+ * fazia a rede saudável aparecer como indefinida.
+ *
+ * Para separar "concordaram" de "não responderam", entra `errosDeServidor`:
+ * o navegador avisa cada servidor que falhou. Candidato único **sem** erro é
+ * concordância; com erro, não dá para saber.
  */
-export function analisarCandidatos(candidatos: CandidatoResumo[]): Analise {
+export function analisarCandidatos(
+  candidatos: CandidatoResumo[], errosDeServidor: number,
+): Analise {
   const contagem: Record<string, number> = {}
   for (const c of candidatos) contagem[c.tipo] = (contagem[c.tipo] ?? 0) + 1
 
@@ -44,14 +51,14 @@ export function analisarCandidatos(candidatos: CandidatoResumo[]): Analise {
     porSocket.get(c.portaLocal)!.add(c.porta)
   }
 
+  // Prova direta, e independe de algum servidor ter falhado.
   for (const portas of porSocket.values()) {
-    // Duas portas externas do mesmo socket é prova direta de NAT simétrico.
     if (portas.size > 1) return { veredito: VEREDITOS.simetrico, contagem }
   }
 
-  const comparaveis = [...porSocket.values()].some((p) => p.size >= 1) && externos.length >= 2
-  const mesmoSocket = porSocket.size === 1 && externos.length >= 2
-  if (mesmoSocket) return { veredito: VEREDITOS.direto, contagem }
-  void comparaveis
-  return { veredito: VEREDITOS.inconclusivo, contagem }
+  // Nenhum socket com divergência. Só vale como "direto" se todos os
+  // servidores tiverem respondido — senão o silêncio dos outros pode estar
+  // escondendo uma divergência.
+  if (errosDeServidor > 0) return { veredito: VEREDITOS.inconclusivo, contagem }
+  return { veredito: VEREDITOS.direto, contagem }
 }

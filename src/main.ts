@@ -450,8 +450,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     if (testandoRede) return
     testandoRede = true
     desenhar()
-    void coletarCandidatos().then((candidatos) => {
-      analiseRede = analisarCandidatos(candidatos)
+    void coletarCandidatos().then(({ candidatos, erros }) => {
+      analiseRede = analisarCandidatos(candidatos, erros)
       testandoRede = false
       desenhar()
     })
