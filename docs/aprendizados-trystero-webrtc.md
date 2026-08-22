@@ -326,6 +326,33 @@ navegadores mais antigos. Uma exceção num ajuste **opcional** não pode derrub
 a funcionalidade inteira — e botão que falha no clique é pior que botão
 ausente.
 
+### O navegador DEDUPLICA candidatos ICE — e isso engana o diagnóstico
+
+Dois servidores STUN que enxergam o **mesmo** endereço externo produzem **um**
+candidato `srflx`, não dois: candidatos idênticos são deduplicados.
+
+**A armadilha:** concordância entre servidores é exatamente o caso BOM (o NAT
+mantém o mapeamento), e ela se manifesta como candidato único. Ler "só um
+candidato" como "só um servidor respondeu" faz a rede saudável aparecer como
+indefinida — foi o que aconteceu no primeiro uso real do nosso teste.
+
+A leitura certa:
+
+| Observação | Significa |
+|---|---|
+| Nenhum `srflx` | UDP não sai |
+| Um `srflx`, **sem** erro de servidor | Servidores concordaram → **direto funciona** |
+| Um `srflx`, **com** erro de servidor | Não dá para concluir |
+| Dois `srflx` do mesmo socket local | Mapeamento por destino → **NAT simétrico** |
+
+Para separar "concordaram" de "não responderam", use
+`pc.onicecandidateerror` — o navegador avisa cada servidor que falhou. Conte
+por **URL**: o mesmo servidor pode falhar mais de uma vez (IPv4 e IPv6) sem
+que sejam duas falhas.
+
+E use **três** servidores, não dois: com dois, um único fora do ar já torna o
+teste inconclusivo.
+
 ### Diagnóstico de NAT que o navegador não dá
 
 Para saber se um NAT é simétrico, o navegador não serve: o Chrome zera

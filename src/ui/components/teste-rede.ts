@@ -11,8 +11,8 @@ export const TEXTOS = {
     + 'servidor de retransmissão no meio.',
   semUdp: 'Sua rede bloqueia a saída que o teste precisa. Firewall ou antivírus '
     + 'costumam ser a causa.',
-  inconclusivo: 'Não deu para concluir: só um dos servidores de teste '
-    + 'respondeu. Vale tentar de novo.',
+  inconclusivo: 'Não deu para concluir: algum servidor de teste não respondeu. '
+    + 'Vale tentar de novo em alguns segundos.',
 } as const
 
 const PARA_TEXTO: Record<string, string> = {
