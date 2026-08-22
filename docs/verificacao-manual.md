@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (552, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (564, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -90,6 +90,19 @@ exercitam o caminho real de rede.
 - [ ] Quem está na call **aparece na lista da sala**, sem exceção
 - [ ] Alguém que entra atrasado aparece sozinho em alguns segundos, sem
       ninguém precisar recarregar
+
+## Teste de rede
+
+Aparece para quem está sozinho na sala ou não conseguiu conectar — que é
+exatamente quem precisa dele.
+
+- [ ] Sozinho na sala, o botão "Testar minha rede" aparece
+- [ ] Numa rede doméstica comum, o resultado diz que a conexão direta funciona
+- [ ] **Na máquina de quem fica sozinho com 3 pessoas, rodar o teste.** Se
+      disser que a rede não permite conexão direta, a causa é a rede dele e
+      nenhuma mudança no site resolve — precisaria de um servidor de
+      retransmissão
+- [ ] Com o antivírus bloqueando, o resultado acusa a saída bloqueada
 
 ## Diagnóstico de conexão
 
