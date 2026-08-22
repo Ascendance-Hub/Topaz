@@ -65,7 +65,9 @@ export function renderizarNavSala(
  * sentar — presença não precisou ser inventada para esta tela, e por isso ela
  * nasce sincronizada e testada.
  */
-export function renderizarSalaParada(estado: EstadoJogo, meuId: string): HTMLElement {
+export function renderizarSalaParada(
+  estado: EstadoJogo, meuId: string, conectados?: string[],
+): HTMLElement {
   const tela = document.createElement('div')
   tela.className = 'sala-parada'
 
@@ -82,11 +84,22 @@ export function renderizarSalaParada(estado: EstadoJogo, meuId: string): HTMLEle
     // `textContent`: o apelido vem de outro navegador, e ninguém aqui
     // escolheu executar o que o outro digitou.
     quem.textContent = jogador.apelido
-    if (jogador.peerId === meuId) quem.dataset['eu'] = '1'
+    const souEu = jogador.peerId === meuId
+    if (souEu) quem.dataset['eu'] = '1'
     // Quem caiu fica visível e marcado em vez de sumir: a cadeira e as fichas
     // dele continuam reservadas durante a janela de reconexão, então some da
     // tela seria mentira.
-    if (jogador.desconectadoEm !== null) quem.dataset['caiu'] = '1'
+    const caiu = jogador.desconectadoEm !== null
+    if (caiu) quem.dataset['caiu'] = '1'
+
+    // "Achou mas não conectou": o anfitrião sabe que essa pessoa está aqui, e
+    // mesmo assim eu não tenho conexão direta com ela. Não se acusa quem já
+    // caiu — a queda já explica a ausência, e as duas marcas juntas
+    // confundiriam dois diagnósticos diferentes na mesma ficha.
+    if (conectados && !souEu && !caiu && !conectados.includes(jogador.peerId)) {
+      quem.dataset['semConexao'] = '1'
+      quem.title = 'Está na sala, mas sem conexão direta com você'
+    }
     lista.append(quem)
   }
   tela.append(lista)

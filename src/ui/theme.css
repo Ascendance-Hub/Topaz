@@ -789,3 +789,26 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
      momento do render), em vez de saltar para o fim e mentir "acabou". */
   .barra-prazo > div { animation: none !important; }
 }
+
+/* Diagnóstico de conexão na barra da sala. Discreto quando está tudo certo,
+   visível quando alguém da sala está fora do seu alcance. */
+.barra-diagnostico {
+  font-size: 12px;
+  color: var(--creme-tenue);
+  font-variant-numeric: tabular-nums;
+}
+.barra-diagnostico:not([data-faltando='0']) {
+  color: var(--alerta);
+  cursor: help;
+}
+/* Está na sala, mas sem conexão direta comigo. Aro tracejado: a ficha existe,
+   o vínculo é que não fechou. */
+.sala-quem[data-sem-conexao='1'] {
+  border-style: dashed;
+  border-color: rgba(212, 117, 107, 0.6);
+  cursor: help;
+}
+.sala-quem[data-sem-conexao='1']::before {
+  background: var(--alerta);
+  box-shadow: none;
+}

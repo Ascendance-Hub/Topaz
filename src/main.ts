@@ -24,6 +24,7 @@ import { mesaEsperaPor } from './game/rules'
 /** Quem falou antes de a mesa saber o nome dele. */
 export const APELIDO_DESCONHECIDO = 'Alguém'
 
+
 function rngDaSessao() {
   return rngSemente(Date.now() ^ Math.floor(Math.random() * 1e9))
 }
@@ -331,7 +332,11 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     desenhar()
   })
 
-  let barra = renderizarBarraSala(codigo, sessao.souHost())
+  let barra = renderizarBarraSala(codigo, sessao.souHost(), {
+    aoReconectar: reconectar,
+    naSala: sessao.estado().jogadores.length,
+    conectados: conectadosComigo().length,
+  })
   let nav = renderizarNavSala(mesaAberta, alternarMesa, mesaEspera())
   let mixer = renderizarMixer(canaisDeAudio(), (chave, volume) => {
     volumes.set(chave, volume)
@@ -359,7 +364,11 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   app.replaceChildren(barra, nav, palco, controles, lateral, videos, audios)
 
   function desenhar(): void {
-    const novaBarra = renderizarBarraSala(codigo, sessao.souHost())
+    const novaBarra = renderizarBarraSala(codigo, sessao.souHost(), {
+      aoReconectar: reconectar,
+      naSala: sessao.estado().jogadores.length,
+      conectados: conectadosComigo().length,
+    })
     barra.replaceWith(novaBarra)
     barra = novaBarra
 
@@ -396,13 +405,45 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     if (mesaAberta) {
       renderizar(palco, sessao.estado(), sessao.meuId(), (acao) => sessao.despachar(acao))
     } else {
-      palco.replaceChildren(renderizarSalaParada(sessao.estado(), sessao.meuId()))
+      palco.replaceChildren(
+        renderizarSalaParada(sessao.estado(), sessao.meuId(), conectadosComigo()))
     }
   }
 
   sessao.aoMudar(desenhar)
   sessao.entrar(apelido)
   desenhar()
+
+  /**
+   * Com quem eu tenho conexão direta agora, contando eu mesmo.
+   *
+   * A diferença entre isto e quantas pessoas o anfitrião lista é o
+   * "achou mas não conectou": alguém que existe na sala e com quem meu
+   * navegador nunca conseguiu fechar um par.
+   */
+  function conectadosComigo(): string[] {
+    return [sessao.meuId(), ...transporte.peers()]
+  }
+
+  /** Preenchido no fim da montagem, quando o tique já existe. */
+  let encerrar: () => void = () => {}
+
+  /**
+   * Refaz a conexão sem recarregar a página.
+   *
+   * Mesma sala, mesmo apelido — e, principalmente, o mesmo `selfId`, que vive
+   * enquanto a página viver. Recarregar daria identidade nova, e o anfitrião
+   * passaria a te ver como outra pessoa, deixando um fantasma para trás até a
+   * janela de reconexão vencer.
+   *
+   * Desmonta ESTA sala antes de montar a nova. O desmonte é local, e não de
+   * módulo: duas salas na mesma página são um caso legítimo de teste (duas
+   * pessoas), e uma variável de módulo faria a segunda matar a primeira.
+   */
+  function reconectar(): void {
+    encerrar()
+    entrarNaSala(app, apelido, codigo)
+  }
 
   // O host avalia prazos vencidos (turno, reconexão); nos clientes o tique
   // resolve a descoberta e reanuncia a presença quando ela se perde.
@@ -412,10 +453,16 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   // pelo Trystero: sem uma nova tentativa periódica, quem entrou na call
   // enquanto o par ainda se formava nunca seria ouvido. Quando está tudo em
   // dia, a chamada não faz nada.
-  setInterval(() => {
+  const tique = setInterval(() => {
     sessao.tique(Date.now())
     sincronizarMidia()
   }, 500)
+  encerrar = () => {
+    clearInterval(tique)
+    midia.desligarMicrofone()
+    midia.pararTela()
+    sessao.encerrar()
+  }
 
   window.addEventListener('beforeunload', () => sessao.encerrar())
 }

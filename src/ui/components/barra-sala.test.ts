@@ -77,3 +77,61 @@ describe('falha ao copiar o link', () => {
     expect(botao.textContent).toBe(ROTULO_FALHA_COPIA)
   })
 })
+
+describe('reconectar e diagnóstico', () => {
+  it('oferece reconectar', () => {
+    const barra = renderizarBarraSala('CODIGO01', false, { aoReconectar: vi.fn() })
+
+    expect(barra.querySelector('[data-sala="reconectar"]')).not.toBeNull()
+  })
+
+  it('clicar pede a reconexão', () => {
+    const reconectar = vi.fn()
+    const barra = renderizarBarraSala('CODIGO01', false, { aoReconectar: reconectar })
+
+    barra.querySelector<HTMLButtonElement>('[data-sala="reconectar"]')!.click()
+
+    expect(reconectar).toHaveBeenCalled()
+  })
+
+  it('mostra quantos você enxerga contra quantos estão na sala', () => {
+    const barra = renderizarBarraSala('CODIGO01', false, {
+      aoReconectar: vi.fn(), naSala: 3, conectados: 1,
+    })
+
+    // A diferença entre estes dois números É o tamanho do problema: quem
+    // aparece na sala mas com quem você não tem conexão.
+    const diag = barra.querySelector('.barra-diagnostico')!
+    expect(diag.textContent).toContain('1')
+    expect(diag.textContent).toContain('3')
+  })
+
+  it('avisa quantos estão na sala sem conexão comigo', () => {
+    const barra = renderizarBarraSala('CODIGO01', false, {
+      aoReconectar: vi.fn(), naSala: 3, conectados: 1,
+    })
+
+    // Três na sala e só eu conectado: faltam DOIS. É este número que diz o
+    // tamanho do "achou mas não conectou".
+    expect(barra.querySelector<HTMLElement>('.barra-diagnostico')!.dataset['faltando'])
+      .toBe('2')
+  })
+
+  it('não avisa nada quando está todo mundo conectado', () => {
+    const barra = renderizarBarraSala('CODIGO01', false, {
+      aoReconectar: vi.fn(), naSala: 3, conectados: 3,
+    })
+
+    expect(barra.querySelector<HTMLElement>('.barra-diagnostico')!.dataset['faltando'])
+      .toBe('0')
+  })
+
+  it('sozinho na sala não conta como problema', () => {
+    const barra = renderizarBarraSala('CODIGO01', false, {
+      aoReconectar: vi.fn(), naSala: 1, conectados: 1,
+    })
+
+    expect(barra.querySelector<HTMLElement>('.barra-diagnostico')!.dataset['faltando'])
+      .toBe('0')
+  })
+})
