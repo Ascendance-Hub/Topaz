@@ -603,3 +603,52 @@ describe('entrarNaSala — a call convive com o jogo', () => {
     }
   })
 })
+
+describe('entrarNaSala — diagnóstico de "achou mas não conectou"', () => {
+  it('mostra quantos estão na sala e com quantos eu falo', () => {
+    vi.useFakeTimers()
+    try {
+      const rede = criarRedeFalsa({ conexaoDiferida: true })
+      const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
+      outraAba.entrar('Alex')
+      vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
+      vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
+
+      const app = document.createElement('div')
+      entrarNaSala(app, 'Bruno', 'CODIGO01')
+      rede.bombear()
+      vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+      outraAba.tique(Date.now())
+
+      const diag = app.querySelector<HTMLElement>('.barra-diagnostico')!
+      expect(diag.textContent).toContain('2 de 2')
+      expect(diag.dataset['faltando']).toBe('0')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('oferece reconectar sem recarregar a página', () => {
+    vi.useFakeTimers()
+    try {
+      const rede = criarRedeFalsa({ conexaoDiferida: true })
+      vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
+      vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
+
+      const app = document.createElement('div')
+      entrarNaSala(app, 'Bruno', 'CODIGO01')
+      vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+
+      const botao = app.querySelector<HTMLButtonElement>('[data-sala="reconectar"]')!
+      expect(botao).not.toBeNull()
+
+      // Reconectar remonta a sala inteira; a tela precisa continuar de pé.
+      expect(() => botao.click()).not.toThrow()
+      vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+      expect(app.querySelectorAll('.barra-sala')).toHaveLength(1)
+      expect(app.querySelectorAll('.call-controles')).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

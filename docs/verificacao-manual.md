@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (539, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (552, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -90,6 +90,20 @@ exercitam o caminho real de rede.
 - [ ] Quem está na call **aparece na lista da sala**, sem exceção
 - [ ] Alguém que entra atrasado aparece sozinho em alguns segundos, sem
       ninguém precisar recarregar
+
+## Diagnóstico de conexão
+
+Estes existem para separar duas causas que parecem a mesma coisa: **ninguém
+achou a pessoa** e **acharam e a conexão direta não fechou**.
+
+- [ ] Com todo mundo conectado, a barra diz "N de N conectados" e fica discreta
+- [ ] Quando alguém está na sala mas sem conexão com você, o número fica em
+      vermelho e a ficha dele na sala ganha aro tracejado
+- [ ] **Quando o terceiro não aparecer, anotar o que a barra diz nas três
+      máquinas.** Se ele nem consta na sala, ninguém o achou; se consta e o aro
+      está tracejado, acharam e a conexão não fechou
+- [ ] "Reconectar" refaz a conexão sem recarregar, e você **não** vira uma
+      pessoa nova para os outros (a lista da sala não ganha um fantasma)
 
 ## Rede
 

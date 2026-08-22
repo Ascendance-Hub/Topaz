@@ -126,3 +126,47 @@ describe('a marca de "a mesa espera por você"', () => {
     expect(semEspera.querySelector('.nav-sala-marca')).toBeNull()
   })
 })
+
+describe('quem está na sala mas sem conexão comigo', () => {
+  const dois = () => estadoCom(jogador('eu', 'Alex'), jogador('p2', 'Bruno'))
+
+  it('marca quem eu não alcanço', () => {
+    // 'p2' aparece na sala porque o anfitrião sabe dele — mas eu não tenho
+    // conexão direta. É o "achou mas não conectou", visto por pessoa.
+    const tela = renderizarSalaParada(dois(), 'eu', ['eu'])
+
+    const marcado = tela.querySelector('.sala-quem[data-sem-conexao="1"]')!
+    expect(marcado.textContent).toBe('Bruno')
+  })
+
+  it('não marca quem eu alcanço', () => {
+    const tela = renderizarSalaParada(dois(), 'eu', ['eu', 'p2'])
+
+    expect(tela.querySelector('[data-sem-conexao="1"]')).toBeNull()
+  })
+
+  it('nunca marca você mesmo', () => {
+    const tela = renderizarSalaParada(dois(), 'eu', [])
+
+    expect(tela.querySelector('[data-eu="1"]')!.getAttribute('data-sem-conexao'))
+      .toBeNull()
+  })
+
+  it('sem a lista de conectados, não acusa ninguém', () => {
+    // A tela também é usada antes de haver informação de conexão; inventar
+    // um diagnóstico ali seria pior que não mostrar nenhum.
+    const tela = renderizarSalaParada(dois(), 'eu')
+
+    expect(tela.querySelector('[data-sem-conexao="1"]')).toBeNull()
+  })
+
+  it('quem já está marcado como caído não vira também sem conexão', () => {
+    const caido = { ...jogador('p2', 'Bruno'), desconectadoEm: 1000 }
+    const tela = renderizarSalaParada(estadoCom(jogador('eu', 'Alex'), caido), 'eu', ['eu'])
+
+    // Caiu já explica a ausência: acusar as duas coisas confundiria dois
+    // diagnósticos diferentes na mesma ficha.
+    const chip = tela.querySelector('[data-caiu="1"]')!
+    expect(chip.getAttribute('data-sem-conexao')).toBeNull()
+  })
+})
