@@ -14,7 +14,21 @@ export const TEXTOS = {
     + 'costumam ser a causa.',
   inconclusivo: 'Não deu para concluir: algum servidor de teste não respondeu. '
     + 'Vale tentar de novo em alguns segundos.',
+  poucosRelays: 'Poucos servidores estão respondendo na sua rede. Antivírus '
+    + 'costumam bloquear estes endereços por engano — vale conferir o '
+    + 'histórico de bloqueios e liberar, ou desativar a proteção de web por '
+    + 'alguns minutos para testar.',
 } as const
+
+/**
+ * Abaixo disto, o aviso de bloqueio aparece.
+ *
+ * Zero conectados é o estado normal de quem acabou de entrar, então zero não
+ * dispara nada — senão seria alarme falso em toda visita. O que preocupa é
+ * conseguir alguns e não a maioria, que é a assinatura de um filtro
+ * escolhendo endereços.
+ */
+const FRACAO_SAUDAVEL = 0.5
 
 const PARA_TEXTO: Record<string, string> = {
   [VEREDITOS.direto]: TEXTOS.direto,
@@ -67,6 +81,14 @@ export function renderizarTesteRede(
       + 'Compare esta lista com a da outra pessoa — vocês precisam ter pelo '
       + 'menos um em comum.'
     painel.append(resumo)
+
+    if (vivos > 0 && vivos < relays.length * FRACAO_SAUDAVEL) {
+      const alerta = document.createElement('p')
+      alerta.className = 'teste-rede-veredito'
+      alerta.dataset['ruim'] = '1'
+      alerta.textContent = TEXTOS.poucosRelays
+      painel.append(alerta)
+    }
 
     const lista = document.createElement('div')
     lista.className = 'teste-rede-relays'

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { criarTransporte, RELAYS, relaysDetalhados } from './transport'
+import { criarTransporte, RELAYS, REDUNDANCIA, relaysDetalhados } from './transport'
 import type { SalaTrystero } from './transport'
 import type { Acao } from '../game/types'
 
@@ -96,12 +96,18 @@ describe('convivência com outros consumidores da mesma sala', () => {
 })
 
 describe('relays de sinalização', () => {
-  it('usa a lista padrão do Trystero', () => {
+  it('usa a lista padrão do Trystero, sem curadoria nossa', () => {
     // Recuo deliberado. Três listas curadas por nós, cada uma com critério
-    // melhor que a anterior, e a conexão piorou mesmo assim — o erro de
-    // método foi medir em segundos o que se usa em minutos. A lista padrão é
-    // a que os autores da biblioteca exercitam nesse regime.
-    expect(RELAYS.length).toBeGreaterThan(20)
+    // melhor que a anterior, e a conexão piorou mesmo assim.
+    expect(RELAYS.length).toBe(REDUNDANCIA)
+  })
+
+  it('usa MUITO mais que os cinco padrão', () => {
+    // Cinco é a omissão da biblioteca, e é pouco quando antivírus bloqueiam
+    // endereços diferentes em cada máquina: a interseção entre duas pessoas
+    // desmorona. O que faltava não era escolher melhor, era ter mais de onde
+    // escolher.
+    expect(REDUNDANCIA).toBeGreaterThanOrEqual(15)
   })
 
   it('só aceita endereços wss', () => {

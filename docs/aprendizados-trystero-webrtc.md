@@ -156,6 +156,29 @@ const ehTela = (stream) => stream.getVideoTracks().length > 0
 O `metadata` continua útil para informação decorativa, nunca para decidir o que
 uma mídia é.
 
+### A lista tem 47 relays, mas o Trystero usa 5 — e isso é pouco
+
+`defaultRedundancy = 5`. Dos 47 endereços da lista, só cinco entram em uso, e
+são **os mesmos para todo mundo** (embaralhamento derivado do `appId`).
+
+**Sintoma:** pessoas específicas nunca se acham, sem erro em nenhuma das telas.
+
+**Causa:** antivírus e filtros de DNS bloqueiam endereços diferentes em cada
+máquina. Com uma reserva de cinco, basta cada pessoa perder um ou dois para a
+interseção entre duas delas desaparecer. Quem não sobrepõe com o anfitrião
+nunca aparece na sala.
+
+Foi o que aconteceu aqui: o Norton bloqueou `relay.agorist.space` numa das
+máquinas. Desligar o antivírus fez a conexão voltar **na hora**.
+
+**Conserto:** `relayConfig: { redundancy: 20 }`. Mesma lista da biblioteca,
+mais funda. Não é curadoria — e é justamente o oposto do erro anterior: o que
+faltava não era escolher melhor, era ter **mais de onde escolher**.
+
+**E avise na tela.** Conseguir alguns relays e não a maioria é a assinatura de
+um filtro escolhendo endereços, e o usuário não tem como adivinhar isso. Zero
+conectados não conta: é o estado normal de quem acabou de entrar.
+
 ### Curar a lista de relays foi um erro — e as medições não avisaram
 
 Trocamos a lista padrão do Trystero por três listas próprias, cada uma com um
