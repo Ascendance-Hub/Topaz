@@ -156,6 +156,27 @@ const ehTela = (stream) => stream.getVideoTracks().length > 0
 O `metadata` continua útil para informação decorativa, nunca para decidir o que
 uma mídia é.
 
+### Curar a lista de relays foi um erro — e as medições não avisaram
+
+Trocamos a lista padrão do Trystero por três listas próprias, cada uma com um
+critério melhor que a anterior: o socket abre; o NIP-11 não declara restrição;
+o relay entrega de ponta a ponta. **Todas mediram bem.** E a conexão piorou
+mesmo assim, a ponto de um par que antes conectava sempre passar a falhar
+quase toda vez.
+
+O erro de método: **medir em segundos o que se usa em minutos.** Abrir,
+publicar e receber uma vez não diz nada sobre inscrição longa, reconexão,
+limite de taxa, quantas assinaturas simultâneas o relay tolera, nem sobre
+dezenas de tópicos no mesmo socket.
+
+A lista padrão é a que os autores da biblioteca exercitam nesse regime. Sair
+dela exige evidência de **uso real**, não de sonda — e foi evidência de uso
+real que apontou de volta para ela.
+
+O que aprendemos sobre *verificar* um relay continua valendo para diagnosticar
+um endereço específico. O que não vale é usar essa verificação como base para
+substituir a lista inteira.
+
 ### Padrões de conexão
 
 - **ICE padrão:** apenas STUN (`stun.l.google.com:19302` e
