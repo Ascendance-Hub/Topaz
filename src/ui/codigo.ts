@@ -1,6 +1,33 @@
 // Sem O, 0, I, 1 e L — pares que as pessoas confundem ao digitar.
 const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
-export const TAMANHO_CODIGO = 8
+
+/**
+ * Dezesseis caracteres — cerca de 79 bits.
+ *
+ * O código não é apenas um identificador: é a única credencial da sala. Quem
+ * o descobre entra, ouve a call e vê as telas compartilhadas. E ele é
+ * atacável offline: o relay enxerga o tópico como `SHA-256(...:codigo)`, um
+ * hash rápido de passada única, então adivinhar é varrer o espaço inteiro
+ * sem falar com ninguém. Com os 8 caracteres originais eram ~40 bits — uma
+ * GPU cobre isso em minutos. Com 16, a mesma varredura leva mais tempo do
+ * que a idade do universo.
+ *
+ * A tentação era imitar o `_id` do MongoDB (timestamp + aleatório +
+ * contador), que resolve unicidade sem coordenação. Mas para um segredo essa
+ * estrutura trabalha contra: o atacante sabe aproximadamente quando a sala
+ * nasceu e que o contador anda em sequência, então boa parte dos bytes deixa
+ * de ser imprevisível. Sorteio uniforme e puro serve aos dois objetivos ao
+ * mesmo tempo — colisão fica desprezível e adivinhação, inviável.
+ */
+export const TAMANHO_CODIGO = 16
+
+/** De quantos em quantos caracteres o código é agrupado para leitura. */
+const TAMANHO_GRUPO = 4
+
+/** O comprimento com os hífens — usado como `maxLength` do campo, para que
+ *  colar um código agrupado não trunque. */
+export const TAMANHO_FORMATADO =
+  TAMANHO_CODIGO + Math.ceil(TAMANHO_CODIGO / TAMANHO_GRUPO) - 1
 
 /**
  * Fonte de bytes aleatórios: recebe quantos bytes quer e devolve exatamente
@@ -56,6 +83,29 @@ export function ehCodigoValido(codigo: string): boolean {
   return [...codigo].every((caractere) => ALFABETO.includes(caractere))
 }
 
+/**
+ * A forma legível: `K7X2-QW9F-M3PR-TVN4`. Dezesseis caracteres seguidos são
+ * difíceis de conferir a olho e piores ainda de ditar por voz.
+ *
+ * Só apresentação. O código canônico — o que identifica a sala na rede — é
+ * sempre o sem hífen, e `ehCodigoValido` recusa a forma agrupada de
+ * propósito: duas grafias válidas do mesmo código dariam duas salas
+ * diferentes, e as pessoas ficariam sozinhas cada uma na sua.
+ */
+export function formatarCodigo(codigo: string): string {
+  const grupos = codigo.match(new RegExp(`.{1,${TAMANHO_GRUPO}}`, 'g'))
+  return grupos ? grupos.join('-') : codigo
+}
+
+/**
+ * Traz qualquer grafia de volta à forma canônica: sem hífen, sem espaço,
+ * maiúscula. Único ponto de normalização — a URL e o campo digitado passam
+ * os dois por aqui, para que nunca divirjam.
+ */
+export function normalizarCodigo(bruto: string): string {
+  return bruto.replace(/[\s-]+/g, '').toUpperCase()
+}
+
 // O regex só isola o que vem depois de "#sala="; o formato em si (tamanho e
 // alfabeto) é responsabilidade de ehCodigoValido, para não duplicar essa
 // regra aqui.
@@ -64,7 +114,7 @@ const PADRAO_HASH_SALA = /^#sala=(.*)$/
 export function lerCodigoDaUrl(hash: string): string | null {
   const encontrado = PADRAO_HASH_SALA.exec(hash)
   if (!encontrado) return null
-  const codigo = encontrado[1]!.toUpperCase()
+  const codigo = normalizarCodigo(encontrado[1]!)
   return ehCodigoValido(codigo) ? codigo : null
 }
 
@@ -79,7 +129,16 @@ export function haCodigoNaUrl(hash: string): boolean {
   return PADRAO_HASH_SALA.test(hash)
 }
 
+/**
+ * O fragmento da URL para uma sala. Existe como função única para que a
+ * barra de endereços e o link copiado mostrem exatamente a mesma coisa —
+ * duas grafias do mesmo código confundem quem compara os dois.
+ */
+export function montarHashSala(codigo: string): string {
+  return `#sala=${formatarCodigo(codigo)}`
+}
+
 export function montarLinkSala(base: string, codigo: string): string {
   const semHash = base.split('#')[0]!
-  return `${semHash}#sala=${codigo}`
+  return `${semHash}${montarHashSala(codigo)}`
 }

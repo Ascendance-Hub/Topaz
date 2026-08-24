@@ -4,25 +4,25 @@ import { renderizarBarraSala, ROTULO_FALHA_COPIA } from './barra-sala'
 import { montarLinkSala } from '../codigo'
 
 describe('renderizarBarraSala', () => {
-  it('mostra o código da sala e nenhuma marca de anfitrião quando não sou host', () => {
-    const barra = renderizarBarraSala('CODIGO01', false)
-    expect(barra.querySelector('.codigo')!.textContent).toBe('CODIGO01')
+  it('mostra o código da sala agrupado e nenhuma marca de anfitrião quando não sou host', () => {
+    const barra = renderizarBarraSala('K7X2QW9FM3PRTVN4', false)
+    // A mesma grafia do link copiado e da barra de endereços.
+    expect(barra.querySelector('.codigo')!.textContent).toBe('K7X2-QW9F-M3PR-TVN4')
     expect(barra.textContent).not.toContain('anfitrião')
   })
 
   it('mostra "você é o anfitrião" quando souHost reflete host verdadeiro', () => {
-    const barra = renderizarBarraSala('CODIGO01', true)
+    const barra = renderizarBarraSala('K7X2QW9FM3PRTVN4', true)
     expect(barra.textContent).toContain('você é o anfitrião')
   })
 
   it('nunca interpreta o código como HTML — mesmo se ele contiver marcação', () => {
     // Não presume que `codigo` já passou por ehCodigoValido: o componente
     // precisa ser seguro por construção, não por confiar em quem chama.
-    const malicioso = '<img src=x onerror="window.__xss = true">'
-    const barra = renderizarBarraSala(malicioso, false)
+    const barra = renderizarBarraSala('<img src=x onerror="window.__xss = true">', false)
 
     expect(barra.querySelector('img')).toBeNull()
-    expect(barra.querySelector('.codigo')!.textContent).toBe(malicioso)
+    expect(barra.querySelector('.codigo')!.textContent).toContain('<img')
   })
 
   it('o botão de copiar usa montarLinkSala com a URL e o código atuais', async () => {

@@ -1,4 +1,4 @@
-import { montarLinkSala } from '../codigo'
+import { formatarCodigo, montarLinkSala } from '../codigo'
 
 export const ROTULO_COPIAR = 'Copiar link'
 export const ROTULO_COPIADO = 'Copiado!'
@@ -43,7 +43,10 @@ export function renderizarBarraSala(
 
   const cod = document.createElement('span')
   cod.className = 'codigo'
-  cod.textContent = codigo
+  // Agrupado, como no link copiado e na barra de endereços: quem confere se
+  // está na sala certa compara três lugares, e três grafias diferentes do
+  // mesmo código só geram dúvida.
+  cod.textContent = formatarCodigo(codigo)
   info.append(cod)
 
   if (souHost) info.append(' · você é o anfitrião')
