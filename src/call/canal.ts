@@ -1,5 +1,6 @@
 import { selfId } from 'trystero/nostr'
-import type { SalaTrystero, Transporte } from '../net/transport'
+import type { Transporte } from '../net/transport'
+import type { Salas } from '../net/salas'
 import type { CanalCall, MensagemCall } from './protocolo'
 
 /**
@@ -17,20 +18,18 @@ import type { CanalCall, MensagemCall } from './protocolo'
  * `Transporte` já mantém uma lista de ouvintes, e há teste dos dois lados
  * guardando essa propriedade.
  */
-export function criarCanalCall(sala: SalaTrystero, transporte: Transporte): CanalCall {
-  const callAction = sala.makeAction<MensagemCall>('call')
+export function criarCanalCall(salas: Salas, transporte: Transporte): CanalCall {
+  const callAction = salas.criarAcao<MensagemCall>('call')
   const aoReceber: ((msg: MensagemCall, de: string) => void)[] = []
 
-  callAction.onMessage = (msg, contexto) => {
-    for (const cb of aoReceber) cb(msg, contexto.peerId)
-  }
+  callAction.onMessage((msg, de) => {
+    for (const cb of aoReceber) cb(msg, de)
+  })
 
   return {
     meuId: () => selfId,
     enviar: (msg, para) => {
-      // O destinatário vai em `target` dentro das opções — o segundo argumento
-      // de `send` é o objeto de opções, não o peerId.
-      void callAction.send(msg, para === undefined ? undefined : { target: para })
+      callAction.send(msg, para)
     },
     aoReceber: (cb) => {
       aoReceber.push(cb)

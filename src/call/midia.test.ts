@@ -1,53 +1,45 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest'
 import { Midia } from './midia'
-import type { SalaTrystero } from '../net/transport'
+import { criarSalasFalsas } from '../net/salas.fake'
 
 /**
- * Sala falsa que espelha o pareamento REAL do Trystero, e é isso que dá valor
- * a este arquivo.
- *
- * Em `media.mjs`, quem publica com `addStream` alimenta `pendingStreamMetas`,
- * e essa fila é consumida por `receiveRemoteStream`, que dispara
- * `onPeerStream`. Já `onPeerTrack` é alimentado por `pendingTrackMetas`, que
- * só existe quando o remetente usou `addTrack`. Publicar de um jeito e escutar
- * do outro faz a mídia sumir em silêncio — foi exatamente o bug que os
- * jogadores encontraram: dados chegavam, áudio e vídeo não.
+ * Adaptador sobre a `Salas` falsa comum, preservando os nomes que esta suíte
+ * já usava. A fusão das três redes assumiu o papel que a sala crua tinha, mas
+ * as garantias testadas aqui não mudaram: publicar só para quem está ativo,
+ * invólucro novo a cada publicação, e o codificador ligando e desligando.
  */
 function criarSalaFalsa() {
-  const publicados: { stream: unknown; opcoes: unknown }[] = []
-  const sala = {
-    onPeerStream: null as ((stream: unknown, peerId: string, meta?: unknown) => void) | null,
-    onPeerTrack: null as unknown,
-    addStream: (stream: unknown, opcoes: unknown) => {
-      publicados.push({ stream, opcoes })
+  const ctx = criarSalasFalsas(['pa', 'pb'])
+  const publicados = ctx.publicados.map((p) => ({ stream: p.stream, opcoes: { target: p.alvos } }))
+  const espelho = {
+    get length() { return ctx.publicados.length },
+  }
+  void espelho
+  const bruta = {
+    removeStream: (..._a: unknown[]) => { void _a },
+    replaceTrack: (..._a: unknown[]) => { void _a },
+    getPeers: () => ({}),
+  }
+  void publicados
+  return {
+    sala: ctx.salas,
+    bruta,
+    ctx,
+    publicados: ctx.publicados,
+    entregar: ctx.entregarStream,
+    comSender: (peerId: string) => {
+      const params: { encodings: Record<string, unknown>[] } = { encodings: [{}] }
+      const faixa = { kind: 'video' }
+      const sender = {
+        track: faixa,
+        getParameters: () => params,
+        setParameters: vi.fn().mockResolvedValue(undefined),
+      }
+      ctx.definirSenders({ [peerId]: { getSenders: () => [sender] } })
+      return { sender, params, faixa }
     },
-    removeStream: vi.fn(),
-    replaceTrack: vi.fn(),
-    // Por padrão, os peers usados nos testes já completaram o handshake — é o
-    // caso comum. Quem quiser modelar peer ainda conectando sobrescreve.
-    getPeers: () => ({ pa: { getSenders: () => [] }, pb: { getSenders: () => [] } }),
   }
-
-  /** Senders observáveis, para conferir o liga-desliga do codificador. */
-  function comSender(peerId: string) {
-    const params: { encodings: Record<string, unknown>[] } = { encodings: [{}] }
-    const faixa = { kind: 'video' }
-    const sender = {
-      track: faixa,
-      getParameters: () => params,
-      setParameters: vi.fn().mockResolvedValue(undefined),
-    }
-    sala.getPeers = (() => ({ [peerId]: { getSenders: () => [sender] } })) as never
-    return { sender, params, faixa }
-  }
-
-  /** Entrega ao destinatário pelo MESMO caminho que o `addStream` alimenta. */
-  function entregar(stream: unknown, de: string, meta?: unknown): void {
-    sala.onPeerStream?.(stream, de, meta)
-  }
-
-  return { sala: sala as unknown as SalaTrystero, bruta: sala, publicados, entregar, comSender }
 }
 
 describe('Midia — recebimento', () => {
@@ -122,7 +114,7 @@ describe('Midia — sincronização do microfone', () => {
     midia.sincronizarMicrofone(['pa'])
 
     expect(publicados).toHaveLength(1)
-    expect(publicados[0]!.opcoes).toMatchObject({ target: ['pa'] })
+    expect(publicados[0]!.alvos).toEqual(['pa'])
   })
 
   it('não publica duas vezes para o mesmo peer', async () => {
@@ -147,7 +139,7 @@ describe('Midia — sincronização do microfone', () => {
     midia.sincronizarMicrofone(['pa', 'pb'])
 
     expect(publicados).toHaveLength(2)
-    expect(publicados[1]!.opcoes).toMatchObject({ target: ['pb'] })
+    expect(publicados[1]!.alvos).toEqual(['pb'])
   })
 
   it('quem foi pedido ANTES do microfone existir ainda recebe depois', async () => {
@@ -169,7 +161,7 @@ describe('Midia — sincronização do microfone', () => {
   })
 
   it('para de mandar o microfone para quem saiu da call', async () => {
-    const { sala, bruta, publicados } = criarSalaFalsa()
+    const { sala, ctx, publicados } = criarSalaFalsa()
     const midia = new Midia(sala)
     fingirMicrofone()
     await midia.ligarMicrofone()
@@ -177,7 +169,8 @@ describe('Midia — sincronização do microfone', () => {
 
     midia.sincronizarMicrofone([])
 
-    expect(bruta.removeStream).toHaveBeenCalledWith(expect.anything(), { target: ['pa'] })
+    expect(ctx.despublicados).toContainEqual(
+      { stream: expect.anything(), alvos: ['pa'] })
     // E se ele voltar, publica de novo em vez de achar que já mandou.
     midia.sincronizarMicrofone(['pa'])
     expect(publicados).toHaveLength(2)
@@ -239,14 +232,14 @@ describe('Midia — qualidade', () => {
   })
 
   it('reaplica em quem já está assistindo, sem esperar republicação', async () => {
-    const { sala, bruta } = criarSalaFalsa()
+    const { sala, ctx } = criarSalaFalsa()
     const params = { encodings: [{} as Record<string, unknown>] }
     const sender = {
       track: { kind: 'video' },
       getParameters: () => params,
       setParameters: vi.fn().mockResolvedValue(undefined),
     }
-    bruta.getPeers = (() => ({ pa: { getSenders: () => [sender] } })) as never
+    ctx.definirSenders({ pa: { getSenders: () => [sender] } })
     const midia = new Midia(sala)
 
     // Precisa haver tela publicada para alguém: sem espectador não há envio a
@@ -271,9 +264,9 @@ describe('Midia — qualidade', () => {
   })
 
   it('não mexe em nada quando ninguém está assistindo', () => {
-    const { sala, bruta } = criarSalaFalsa()
+    const { sala, ctx } = criarSalaFalsa()
     const sender = { track: { kind: 'video' }, getParameters: vi.fn(), setParameters: vi.fn() }
-    bruta.getPeers = (() => ({ pa: { getSenders: () => [sender] } })) as never
+    ctx.definirSenders({ pa: { getSenders: () => [sender] } })
     const midia = new Midia(sala)
 
     midia.definirQualidade(1080)
@@ -314,13 +307,13 @@ describe('Midia — assistir, parar e assistir de novo', () => {
   })
 
   it('não desmonta o envio quando o espectador para de assistir', async () => {
-    const { midia, bruta, comSender } = await comTelaCompartilhada()
+    const { midia, ctx, comSender } = await comTelaCompartilhada()
     comSender('pa')
     midia.sincronizarTela(['pa'])
 
     midia.sincronizarTela([])
 
-    expect(bruta.removeStream).not.toHaveBeenCalled()
+    expect(ctx.despublicados).toHaveLength(0)
   })
 
   it('desliga o codificador quando ninguém assiste', async () => {
@@ -345,13 +338,13 @@ describe('Midia — assistir, parar e assistir de novo', () => {
   })
 
   it('parar de compartilhar de vez desmonta o envio', async () => {
-    const { midia, bruta, comSender } = await comTelaCompartilhada()
+    const { midia, ctx, comSender } = await comTelaCompartilhada()
     comSender('pa')
     midia.sincronizarTela(['pa'])
 
     midia.pararTela()
 
-    expect(bruta.removeStream).toHaveBeenCalled()
+    expect(ctx.despublicados.length).toBeGreaterThan(0)
   })
 })
 
@@ -446,7 +439,7 @@ describe('Midia — áudio do compartilhamento', () => {
   })
 
   it('dá bitrate de música ao áudio da tela', async () => {
-    const { midia, bruta, faixaAudio } = await telaComSom()
+    const { midia, ctx, faixaAudio } = await telaComSom()
     const params: { encodings: Record<string, unknown>[] } = { encodings: [{}] }
     const senderAudio = {
       // A MESMA faixa que está na tela: o ajuste é dirigido, para o microfone
@@ -455,7 +448,7 @@ describe('Midia — áudio do compartilhamento', () => {
       getParameters: () => params,
       setParameters: vi.fn().mockResolvedValue(undefined),
     }
-    bruta.getPeers = (() => ({ pa: { getSenders: () => [senderAudio] } })) as never
+    ctx.definirSenders({ pa: { getSenders: () => [senderAudio] } })
 
     midia.sincronizarTela(['pa'])
     midia.definirQualidade(720)
@@ -491,7 +484,7 @@ describe('Midia — o microfone não vira música', () => {
       getParameters: () => params,
       setParameters: vi.fn().mockResolvedValue(undefined),
     }
-    contexto.bruta.getPeers = (() => ({ pa: { getSenders: () => [senderMicrofone] } })) as never
+    contexto.ctx.definirSenders({ pa: { getSenders: () => [senderMicrofone] } })
 
     midia.sincronizarTela(['pa'])
     midia.definirQualidade(720)
@@ -534,8 +527,8 @@ describe('Midia — trocar de microfone', () => {
   })
 
   it('substitui a faixa em vez de republicar', async () => {
-    const { sala, bruta, publicados } = criarSalaFalsa()
-    bruta.replaceTrack = vi.fn()
+    const { sala, ctx, publicados } = criarSalaFalsa()
+    
     const velha = { kind: 'audio', enabled: true, stop: vi.fn() }
     const nova = { kind: 'audio', enabled: true, stop: vi.fn() }
     const midia = new Midia(sala)
@@ -549,13 +542,13 @@ describe('Midia — trocar de microfone', () => {
     // `replaceTrack` troca a faixa sem renegociar: ninguém ouve corte. Uma
     // republicação faria o outro lado receber um stream novo e passar pelo
     // caminho de add/remove, que é onde os bugs moram.
-    expect(bruta.replaceTrack).toHaveBeenCalledWith(velha, nova)
+    expect(ctx.substituicoes).toContainEqual({ velha, nova })
     expect(publicados).toHaveLength(publicadosAntes)
   })
 
   it('encerra a faixa antiga, para o indicador do navegador apagar', async () => {
-    const { sala, bruta } = criarSalaFalsa()
-    bruta.replaceTrack = vi.fn()
+    const { sala } = criarSalaFalsa()
+    
     const velha = { kind: 'audio', enabled: true, stop: vi.fn() }
     const midia = new Midia(sala)
     fingirMicrofones({ padrao: velha, outro: { kind: 'audio', enabled: true, stop: vi.fn() } })
@@ -567,8 +560,8 @@ describe('Midia — trocar de microfone', () => {
   })
 
   it('o mudo sobrevive à troca de microfone', async () => {
-    const { sala, bruta } = criarSalaFalsa()
-    bruta.replaceTrack = vi.fn()
+    const { sala } = criarSalaFalsa()
+    
     const nova = { kind: 'audio', enabled: true, stop: vi.fn() }
     const midia = new Midia(sala)
     fingirMicrofones({ 'fone-usb': nova })
@@ -595,13 +588,13 @@ describe('Midia — trocar de microfone', () => {
 describe('Midia — peer que ainda não terminou de conectar', () => {
   /** `getPeers()` só lista quem já está ATIVO — é o mesmo critério que o
    *  Trystero usa para decidir a quem entregar. */
-  function comAtivos(bruta: Record<string, unknown>, ids: string[]) {
-    bruta['getPeers'] = () => Object.fromEntries(ids.map((id) => [id, { getSenders: () => [] }]))
+  function comAtivos(ctx: ReturnType<typeof criarSalaFalsa>['ctx'], ids: string[]) {
+    ctx.definirAtivos(ids)
   }
 
   it('não marca como publicado quem o Trystero vai descartar', async () => {
-    const { sala, bruta, publicados } = criarSalaFalsa()
-    comAtivos(bruta as unknown as Record<string, unknown>, [])
+    const { sala, ctx, publicados } = criarSalaFalsa()
+    comAtivos(ctx, [])
     const midia = new Midia(sala)
     fingirMicrofone()
     await midia.ligarMicrofone()
@@ -615,24 +608,22 @@ describe('Midia — peer que ainda não terminou de conectar', () => {
   })
 
   it('publica assim que o peer fica ativo, na sincronização seguinte', async () => {
-    const { sala, bruta, publicados } = criarSalaFalsa()
-    const brutaRec = bruta as unknown as Record<string, unknown>
-    comAtivos(brutaRec, [])
+    const { sala, ctx, publicados } = criarSalaFalsa()
+    comAtivos(ctx, [])
     const midia = new Midia(sala)
     fingirMicrofone()
     await midia.ligarMicrofone()
     midia.sincronizarMicrofone(['pa'])
 
-    comAtivos(brutaRec, ['pa'])
+    comAtivos(ctx, ['pa'])
     midia.sincronizarMicrofone(['pa'])
 
     expect(publicados).toHaveLength(1)
   })
 
   it('não republica para quem já recebeu', async () => {
-    const { sala, bruta, publicados } = criarSalaFalsa()
-    const brutaRec = bruta as unknown as Record<string, unknown>
-    comAtivos(brutaRec, ['pa'])
+    const { sala, ctx, publicados } = criarSalaFalsa()
+    comAtivos(ctx, ['pa'])
     const midia = new Midia(sala)
     fingirMicrofone()
     await midia.ligarMicrofone()

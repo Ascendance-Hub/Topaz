@@ -1,6 +1,6 @@
 # Verificação manual — pendente
 
-Tudo neste projeto foi verificado por testes automatizados (575, rodando sem
+Tudo neste projeto foi verificado por testes automatizados (585, rodando sem
 navegador) e por revisão de código. **Nada foi verificado num navegador de
 verdade.** Os itens abaixo só podem ser conferidos por uma pessoa.
 
@@ -90,6 +90,18 @@ exercitam o caminho real de rede.
 - [ ] Quem está na call **aparece na lista da sala**, sem exceção
 - [ ] Alguém que entra atrasado aparece sozinho em alguns segundos, sem
       ninguém precisar recarregar
+
+## Três redes de descoberta
+
+O site procura as pessoas por **nostr, MQTT e BitTorrent ao mesmo tempo**. São
+infraestruturas diferentes: antivírus que bloqueia os endereços de uma
+raramente bloqueia as três.
+
+- [ ] **Com o antivírus LIGADO**, duas pessoas que não se achavam agora se acham
+- [ ] Ninguém aparece duplicado na lista da sala
+- [ ] Uma mensagem no chat chega **uma vez**, não duas ou três
+- [ ] Sentar e apostar não acontecem em dobro
+- [ ] A tela compartilhada aparece uma vez só para quem assiste
 
 ## Teste de rede
 

@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from 'vitest'
 // outra aba/navegador) na mesma rede em memória usada pelos testes de
 // `Sessao`. `vi.mock` é hoisted para antes dos imports abaixo.
 vi.mock('./net/transport', () => ({
-  criarSalaTrystero: vi.fn(),
+  criarSalasTrystero: vi.fn(),
   criarTransporte: vi.fn(),
   // Sinalização saudável por padrão: estes testes são sobre a sala, não sobre
   // rede bloqueada, e zero relays mudaria a mensagem de falha.
@@ -14,32 +14,21 @@ vi.mock('./net/transport', () => ({
   relaysDetalhados: vi.fn(() => []),
 }))
 
-import { criarSalaTrystero, criarTransporte } from './net/transport'
+import { criarSalasTrystero, criarTransporte } from './net/transport'
 import { criarRedeFalsa } from './net/transport.fake'
 import { MS_DESCOBERTA, MS_SEM_CONEXAO, Sessao } from './net/sessao'
 import { TITULO_SEM_CONEXAO } from './ui/components/conexao'
 import { rngSemente } from './game/shoe'
 import { entrarNaSala, iniciarApp, MENSAGEM_ERRO_INICIAL } from './main'
-import type { SalaTrystero } from './net/transport'
+import { criarSalasFalsas } from './net/salas.fake'
 
 /**
- * Sala do Trystero de mentira. Existe porque `criarTransporte` é mockado para
- * a rede falsa, mas o canal da call e a mídia recebem a sala CRUA — e dar
- * `undefined` a elas obrigaria o código de produção a carregar guardas que só
- * o teste precisa.
+ * A fusão das três redes, de mentira. Existe porque `criarTransporte` é
+ * mockado para a rede falsa do jogo, mas o canal da call e a mídia recebem a
+ * fusão — e dar `undefined` a elas obrigaria o código de produção a carregar
+ * guardas que só o teste precisa.
  */
-function salaFalsa(): SalaTrystero {
-  return {
-    makeAction: () => ({ send: vi.fn(), onMessage: null }),
-    getPeers: () => ({}),
-    leave: vi.fn(),
-    addStream: vi.fn(),
-    removeStream: vi.fn(),
-    onPeerJoin: null,
-    onPeerLeave: null,
-    onPeerTrack: null,
-  } as unknown as SalaTrystero
-}
+const salaFalsa = () => criarSalasFalsas([]).salas
 
 describe('entrarNaSala — barra de sala continua atualizando o DOM real', () => {
   it('reflete a migração de anfitrião mesmo depois de vários desenhar()', () => {
@@ -63,7 +52,7 @@ describe('entrarNaSala — barra de sala continua atualizando o DOM real', () =>
 
     // 'pb' é a aba sob teste: nasce sem saber quem manda e só descobre pelo
     // primeiro snapshot do host — igual ao fluxo real.
-    vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
+    vi.mocked(criarSalasTrystero).mockImplementation(() => salaFalsa())
     vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
     const app = document.createElement('div')
@@ -103,7 +92,7 @@ describe('entrarNaSala — estado da conexão em vez de mesa travada', () => {
     vi.useFakeTimers()
     try {
       const rede = criarRedeFalsa({ conexaoDiferida: true })
-      vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
+      vi.mocked(criarSalasTrystero).mockImplementation(() => salaFalsa())
       vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
       const app = document.createElement('div')
@@ -136,7 +125,7 @@ describe('entrarNaSala — estado da conexão em vez de mesa travada', () => {
       // 'pb' na eleição e nunca publica nada — é o relay fora do ar / a rede
       // que bloqueia WebRTC da spec §14.
       rede.conectar('pa')
-      vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
+      vi.mocked(criarSalasTrystero).mockImplementation(() => salaFalsa())
       vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
       const app = document.createElement('div')
@@ -193,7 +182,7 @@ describe('entrarNaSala — chat da sala', () => {
     const outraAba = new Sessao(transporteA, () => rngSemente(1))
     outraAba.entrar('Alex')
 
-    vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
+    vi.mocked(criarSalasTrystero).mockImplementation(() => salaFalsa())
     vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
     const app = document.createElement('div')
     entrarNaSala(app, 'Bruno', 'CODIGO01')
@@ -277,7 +266,7 @@ describe('entrarNaSala — a sala é o espaço, a mesa é uma escolha', () => {
     const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
     outraAba.entrar('Alex')
 
-    vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
+    vi.mocked(criarSalasTrystero).mockImplementation(() => salaFalsa())
     vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
     const app = document.createElement('div')
@@ -365,7 +354,7 @@ describe('entrarNaSala — várias pessoas na mesma sala', () => {
     const rede = criarRedeFalsa({ conexaoDiferida: true })
     const ids = ['pa', 'pb']
     let proximo = 0
-    vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
+    vi.mocked(criarSalasTrystero).mockImplementation(() => salaFalsa())
     vi.mocked(criarTransporte).mockImplementation(() => rede.conectar(ids[proximo++]!))
 
     const appA = document.createElement('div')
@@ -459,7 +448,7 @@ describe('entrarNaSala — a sala avisa quando a mesa espera por você', () => {
     const rede = criarRedeFalsa({ conexaoDiferida: true })
     const ids = ['pa', 'pb']
     let proximo = 0
-    vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
+    vi.mocked(criarSalasTrystero).mockImplementation(() => salaFalsa())
     vi.mocked(criarTransporte).mockImplementation(() => rede.conectar(ids[proximo++]!))
 
     const appA = document.createElement('div')
@@ -537,7 +526,7 @@ describe('entrarNaSala — a call convive com o jogo', () => {
     const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
     outraAba.entrar('Alex')
 
-    vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
+    vi.mocked(criarSalasTrystero).mockImplementation(() => salaFalsa())
     vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
     const app = document.createElement('div')
@@ -612,7 +601,7 @@ describe('entrarNaSala — diagnóstico de "achou mas não conectou"', () => {
       const rede = criarRedeFalsa({ conexaoDiferida: true })
       const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
       outraAba.entrar('Alex')
-      vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
+      vi.mocked(criarSalasTrystero).mockImplementation(() => salaFalsa())
       vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
       const app = document.createElement('div')
@@ -633,7 +622,7 @@ describe('entrarNaSala — diagnóstico de "achou mas não conectou"', () => {
     vi.useFakeTimers()
     try {
       const rede = criarRedeFalsa({ conexaoDiferida: true })
-      vi.mocked(criarSalaTrystero).mockImplementation(() => salaFalsa())
+      vi.mocked(criarSalasTrystero).mockImplementation(() => salaFalsa())
       vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
       const app = document.createElement('div')

@@ -25,11 +25,7 @@ interface FakeSala {
   leave: ReturnType<typeof vi.fn>
 }
 
-vi.mock('trystero/nostr', () => ({
-  selfId: 'eu-mesmo',
-  defaultRelayUrls: ['wss://exemplo-a.test', 'wss://exemplo-b.test'],
-  getRelaySockets: () => ({}),
-  joinRoom: vi.fn(() => {
+function fabricarSala() {
     const canais = new Map<string, { send: ReturnType<typeof vi.fn>; onMessage: unknown }>()
     const sala: FakeSala = {
       canais,
@@ -48,10 +44,20 @@ vi.mock('trystero/nostr', () => ({
         return canal
       },
     } as unknown as FakeSala
-    salas.push(sala)
-    return sala
-  }),
+  salas.push(sala)
+  return sala
+}
+
+// As TRÊS redes são substituídas: a produção abre uma sala em cada, e é
+// justamente a convivência delas que este arquivo existe para exercitar.
+vi.mock('@trystero-p2p/nostr', () => ({
+  selfId: 'eu-mesmo',
+  defaultRelayUrls: ['wss://exemplo-a.test', 'wss://exemplo-b.test'],
+  getRelaySockets: () => ({}),
+  joinRoom: vi.fn(() => fabricarSala()),
 }))
+vi.mock('@trystero-p2p/mqtt', () => ({ joinRoom: vi.fn(() => fabricarSala()) }))
+vi.mock('@trystero-p2p/torrent', () => ({ joinRoom: vi.fn(() => fabricarSala()) }))
 
 import { entrarNaSala } from './main'
 
@@ -77,29 +83,42 @@ describe('entrar numa sala com o Trystero de mentira, mas a fiação de verdade'
     expect(app.querySelector('.chat')).not.toBeNull()
   })
 
-  it('abre exatamente UMA conexão Trystero', () => {
+  it('abre UMA sala por rede de descoberta, e não mais', () => {
     entrarNaSala(document.createElement('div'), 'Alex', 'CODIGO01')
 
-    // Um segundo `joinRoom` seria um handshake inteiro a mais para os mesmos
-    // peers, e foi para evitar isso que a conexão foi separada do transporte.
-    expect(salas).toHaveLength(1)
+    // Três redes, três salas — nostr, MQTT e BitTorrent. Uma sala a mais na
+    // mesma rede seria handshake duplicado com os mesmos peers.
+    expect(salas).toHaveLength(3)
   })
 
-  it('cria os canais do jogo E o da call na mesma sala', () => {
+  it('cria os canais do jogo E o da call em TODAS as redes', () => {
     entrarNaSala(document.createElement('div'), 'Alex', 'CODIGO01')
 
-    const canais = [...salas[0]!.canais.keys()].sort()
-    expect(canais).toEqual(['acao', 'call', 'chat', 'estado'])
+    // Cada rede precisa dos quatro canais: a pessoa pode ser alcançável por
+    // qualquer uma delas, e é por ela que tudo vai trafegar.
+    for (const sala of salas) {
+      expect([...sala.canais.keys()].sort()).toEqual(['acao', 'call', 'chat', 'estado'])
+    }
   })
 
   it('a entrada de um peer chega ao jogo E à call, sem um apagar o outro', () => {
     entrarNaSala(document.createElement('div'), 'Alex', 'CODIGO01')
-    const sala = salas[0]!
 
-    // Se a call tivesse roubado `onPeerJoin`, isto estouraria ou não avisaria
-    // ninguém — e a eleição de anfitrião pararia em silêncio.
-    expect(() => sala.onPeerJoin?.('pa')).not.toThrow()
+    expect(() => salas[0]!.onPeerJoin?.('pa')).not.toThrow()
     expect(salas[0]!.canais.get('call')!.send).toHaveBeenCalled()
+  })
+
+  it('a mesma pessoa descoberta por duas redes conta UMA vez', () => {
+    entrarNaSala(document.createElement('div'), 'Alex', 'CODIGO01')
+
+    salas[0]!.onPeerJoin?.('pa')
+    const enviosDepoisDaPrimeira = salas[1]!.canais.get('call')!.send.mock.calls.length
+    salas[1]!.onPeerJoin?.('pa')
+
+    // A segunda descoberta é ignorada: a rede reserva não vira um segundo
+    // caminho por onde tudo trafegaria em dobro.
+    expect(salas[1]!.canais.get('call')!.send.mock.calls.length)
+      .toBe(enviosDepoisDaPrimeira)
   })
 
   it('a saída de um peer não estoura', () => {
