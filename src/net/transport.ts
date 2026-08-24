@@ -1,4 +1,10 @@
-import { joinRoom, selfId, getRelaySockets, defaultRelayUrls } from 'trystero/nostr'
+import {
+  joinRoom as entrarNostr, selfId, getRelaySockets, defaultRelayUrls,
+} from '@trystero-p2p/nostr'
+import { joinRoom as entrarMqtt } from '@trystero-p2p/mqtt'
+import { joinRoom as entrarTorrent } from '@trystero-p2p/torrent'
+import { fundirSalas } from './salas'
+import type { Salas, SalaNomeada } from './salas'
 import type { Acao, EstadoJogo } from '../game/types'
 
 export const APP_ID = 'topaz-ascendance-hub'
@@ -63,7 +69,7 @@ export interface Transporte {
 }
 
 /** A conexão crua do Trystero. Dados e mídia viajam por ela. */
-export type SalaTrystero = ReturnType<typeof joinRoom>
+export type SalaTrystero = ReturnType<typeof entrarNostr>
 
 /**
  * Abre a conexão. Fica separada de `criarTransporte` porque a mesma conexão
@@ -73,21 +79,29 @@ export type SalaTrystero = ReturnType<typeof joinRoom>
  * Separar também torna `criarTransporte` testável com uma sala falsa: antes,
  * verificar que cada canal vai para o lugar certo exigia navegador.
  */
-export function criarSalaTrystero(codigoSala: string): SalaTrystero {
-  return joinRoom(
-    { appId: APP_ID, relayConfig: { redundancy: REDUNDANCIA } },
-    codigoSala,
-  )
+/**
+ * Abre a sala nas TRÊS redes de descoberta ao mesmo tempo.
+ *
+ * Nostr, MQTT e BitTorrent são infraestruturas completamente diferentes —
+ * outros servidores, outros protocolos, outras portas. Antivírus e filtros de
+ * DNS bloqueiam por reputação, e a lista inteira do nostr costuma cair na
+ * mesma categoria: uma máquina que alcança 5 de 20 relays nostr pode alcançar
+ * o MQTT inteiro.
+ *
+ * As três só servem para as pessoas se ACHAREM. Depois disso a conversa é
+ * direta entre os navegadores, como sempre foi — e `fundirSalas` garante uma
+ * conexão por pessoa, não três.
+ */
+export function criarSalasTrystero(codigo: string): Salas {
+  const config = { appId: APP_ID, relayConfig: { redundancy: REDUNDANCIA } }
+  const nomeadas: SalaNomeada[] = [
+    { nome: 'nostr', sala: entrarNostr(config, codigo) },
+    { nome: 'mqtt', sala: entrarMqtt(config, codigo) as SalaTrystero },
+    { nome: 'torrent', sala: entrarTorrent(config, codigo) as SalaTrystero },
+  ]
+  return fundirSalas(nomeadas)
 }
 
-/**
- * Quantos relays de sinalização estão de fato conectados.
- *
- * Sem isto, "não foi possível conectar" significa tanto "ninguém entrou na
- * sala" quanto "a sinalização está bloqueada" — e a segunda é justamente a que
- * a pessoa não tem como adivinhar sozinha, porque antivírus e firewall
- * bloqueiam em silêncio.
- */
 export interface RelayDetalhe {
   url: string
   /** Só o host, que é o que se compara entre duas telas. */
@@ -137,55 +151,51 @@ export function relaysConectados(): number {
   }
 }
 
-export function criarTransporte(sala: SalaTrystero): Transporte {
-  const acaoAction = sala.makeAction<Acao>('acao')
-  const estadoAction = sala.makeAction<EstadoJogo>('estado')
-  const chatAction = sala.makeAction<string>('chat')
+export function criarTransporte(salas: Salas): Transporte {
+  const acaoAction = salas.criarAcao<Acao>('acao')
+  const estadoAction = salas.criarAcao<EstadoJogo>('estado')
+  const chatAction = salas.criarAcao<string>('chat')
 
-  // Trystero só guarda um handler por slot (`onMessage`, `onPeerJoin`,
-  // `onPeerLeave`) — atribuir de novo substitui o anterior em vez de somar.
-  // A interface `Transporte`, porém, permite múltiplos registros (é o que a
-  // rede falsa já faz). Por isso mantemos as listas aqui e atribuímos a cada
-  // slot do Trystero um único despachante que itera a lista.
   const aoAcao: ((acao: Acao, peerId: string) => void)[] = []
   const aoEstado: ((estado: EstadoJogo, peerId: string) => void)[] = []
   const aoEntrar: ((peerId: string) => void)[] = []
   const aoSair: ((peerId: string) => void)[] = []
   const aoMensagem: ((texto: string, peerId: string) => void)[] = []
 
-  acaoAction.onMessage = (acao, contexto) => {
-    for (const cb of aoAcao) cb(acao, contexto.peerId)
-  }
-  estadoAction.onMessage = (estado, contexto) => {
-    for (const cb of aoEstado) cb(estado, contexto.peerId)
-  }
-  chatAction.onMessage = (texto, contexto) => {
-    for (const cb of aoMensagem) cb(texto, contexto.peerId)
-  }
-  sala.onPeerJoin = (peerId) => {
+  // A fusão já entrega `de` desduplicado: só o que veio pela rede dona.
+  acaoAction.onMessage((acao, de) => {
+    for (const cb of aoAcao) cb(acao, de)
+  })
+  estadoAction.onMessage((estado, de) => {
+    for (const cb of aoEstado) cb(estado, de)
+  })
+  chatAction.onMessage((texto, de) => {
+    for (const cb of aoMensagem) cb(texto, de)
+  })
+  salas.aoEntrarPeer((peerId) => {
     for (const cb of aoEntrar) cb(peerId)
-  }
-  sala.onPeerLeave = (peerId) => {
+  })
+  salas.aoSairPeer((peerId) => {
     for (const cb of aoSair) cb(peerId)
-  }
+  })
 
   return {
     meuId: () => selfId,
-    peers: () => Object.keys(sala.getPeers()),
+    peers: () => salas.peers(),
     enviarAcao: (acao) => {
-      void acaoAction.send(acao)
+      acaoAction.send(acao)
     },
     aoReceberAcao: (cb) => {
       aoAcao.push(cb)
     },
     enviarEstado: (estado) => {
-      void estadoAction.send(estado)
+      estadoAction.send(estado)
     },
     aoReceberEstado: (cb) => {
       aoEstado.push(cb)
     },
     enviarMensagem: (texto) => {
-      void chatAction.send(texto)
+      chatAction.send(texto)
     },
     aoReceberMensagem: (cb) => {
       aoMensagem.push(cb)
@@ -197,7 +207,7 @@ export function criarTransporte(sala: SalaTrystero): Transporte {
       aoSair.push(cb)
     },
     sair: () => {
-      void sala.leave()
+      salas.sair()
     },
   }
 }

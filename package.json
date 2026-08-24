@@ -10,6 +10,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@trystero-p2p/mqtt": "^0.25.3",
+    "@trystero-p2p/torrent": "^0.25.3",
     "trystero": "^0.25.3"
   },
   "devDependencies": {

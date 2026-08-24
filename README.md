@@ -3,6 +3,11 @@
 Hub de jogos de mesa para jogar com amigos direto do navegador. Sem servidor,
 sem cadastro: os navegadores conversam entre si por WebRTC.
 
+Para se acharem, usam **três redes de descoberta ao mesmo tempo** — nostr, MQTT
+e BitTorrent. São infraestruturas diferentes, então um antivírus que bloqueie
+os endereços de uma dificilmente bloqueia as três. Quem for encontrado por mais
+de uma conta uma vez só.
+
 **Jogar:** https://ascendance-hub.github.io/Topaz/
 
 ## Blackjack

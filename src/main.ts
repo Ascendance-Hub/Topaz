@@ -1,6 +1,6 @@
 import { Sessao } from './net/sessao'
 import {
-  criarSalaTrystero, criarTransporte, relaysConectados, relaysDetalhados,
+  criarSalasTrystero, criarTransporte, relaysConectados, relaysDetalhados,
 } from './net/transport'
 import { coletarCandidatos } from './net/coletar-candidatos'
 import { analisarCandidatos } from './net/diagnostico-rede'
@@ -49,12 +49,12 @@ function rngDaSessao() {
  * de fato na página, nunca um órfão de uma rodada anterior.
  */
 export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string): void {
-  const salaTrystero = criarSalaTrystero(codigo)
-  const transporte = criarTransporte(salaTrystero)
+  const salas = criarSalasTrystero(codigo)
+  const transporte = criarTransporte(salas)
   const sessao = new Sessao(transporte, rngDaSessao)
 
-  const protocolo = new ProtocoloCall(criarCanalCall(salaTrystero, transporte))
-  const midia = new Midia(salaTrystero)
+  const protocolo = new ProtocoloCall(criarCanalCall(salas, transporte))
+  const midia = new Midia(salas)
 
   /**
    * O apelido sai do `EstadoJogo` pelo peerId, não do payload do chat: assim

@@ -1,4 +1,4 @@
-import type { SalaTrystero } from '../net/transport'
+import type { Salas } from '../net/salas'
 import { escolherH264 } from './codec'
 
 /**
@@ -101,10 +101,10 @@ export class Midia {
    * os dados continuam chegando, e só áudio e vídeo somem. Foi assim que este
    * módulo nasceu quebrado, e por isso há teste espelhando esse pareamento.
    */
-  constructor(private sala: SalaTrystero) {
-    this.sala.onPeerStream = (stream, peerId, metadata) => {
+  constructor(private salas: Salas) {
+    this.salas.aoReceberStream((stream, peerId, metadata) => {
       for (const cb of this.aoMidia) cb(stream, peerId, metadata)
-    }
+    })
   }
 
   /** Restrições do microfone, respeitando o aparelho escolhido. */
@@ -145,7 +145,7 @@ export class Midia {
     // reabrir um que ele fechou.
     nova.enabled = !this.mudo
     if (velha) {
-      this.sala.replaceTrack(velha, nova)
+      this.salas.substituirFaixa(velha, nova)
       // Encerrar a antiga apaga o indicador daquele aparelho no navegador.
       velha.stop()
     }
@@ -190,7 +190,7 @@ export class Midia {
 
   desligarMicrofone(): void {
     if (!this.microfone) return
-    this.sala.removeStream(this.microfone)
+    this.salas.despublicarStream(this.microfone)
     this.micPara.clear()
     // Parar as faixas também: sem isso o indicador de microfone do navegador
     // fica aceso depois de sair da call, o que assusta com razão.
@@ -206,9 +206,7 @@ export class Midia {
     stream: MediaStream | null, publicado: Set<string>, alvos: string[], tipo: string,
   ): void {
     const sobrando = [...publicado].filter((id) => !alvos.includes(id))
-    if (stream && sobrando.length > 0) {
-      this.sala.removeStream(stream, { target: sobrando })
-    }
+    if (stream && sobrando.length > 0) this.salas.despublicarStream(stream, sobrando)
     // Esquece mesmo sem stream: se ele voltar, precisa ser publicado de novo.
     for (const id of sobrando) publicado.delete(id)
 
@@ -237,8 +235,7 @@ export class Midia {
     //
     // Remover continua usando o stream original: o Trystero casa os senders
     // pelas FAIXAS, não pelo objeto.
-    this.sala.addStream(new MediaStream(stream.getTracks()),
-      { target: faltando, metadata: { tipo } })
+    this.salas.publicarStream(new MediaStream(stream.getTracks()), faltando, { tipo })
     for (const id of faltando) publicado.add(id)
   }
 
@@ -284,8 +281,8 @@ export class Midia {
     const ativos = this.peersAtivos()
     const novos = alvos.filter((id) => !this.telaPara.has(id) && ativos.has(id))
     if (novos.length > 0) {
-      this.sala.addStream(new MediaStream(this.tela.getTracks()),
-        { target: novos, metadata: { tipo: 'tela' } })
+      this.salas.publicarStream(
+        new MediaStream(this.tela.getTracks()), novos, { tipo: 'tela' })
       for (const id of novos) this.telaPara.add(id)
     }
     for (const id of this.telaPara) {
@@ -299,7 +296,7 @@ export class Midia {
 
   pararTela(): void {
     if (!this.tela) return
-    this.sala.removeStream(this.tela)
+    this.salas.despublicarStream(this.tela)
     this.telaPara.clear()
     for (const faixa of this.tela.getTracks()) faixa.stop()
     this.tela = null
@@ -315,7 +312,7 @@ export class Midia {
    * padrão mesmo sem ser o preferido. É ele que aciona o encoder de hardware.
    */
   private ajustarEnvio(peerId: string, ativo: boolean): void {
-    const pc = this.sala.getPeers()[peerId]
+    const pc = this.salas.donoDe(peerId)?.getPeers()[peerId]
     if (!pc) return
     // `RTCRtpSender` pode não existir (navegador antigo), e uma exceção aqui
     // derrubaria o compartilhamento inteiro por causa de um ajuste opcional.
@@ -389,7 +386,7 @@ export class Midia {
   /** Quem já completou o handshake — o mesmo critério que o Trystero usa. */
   private peersAtivos(): Set<string> {
     try {
-      return new Set(Object.keys(this.sala.getPeers()))
+      return new Set(this.salas.peers())
     } catch {
       return new Set()
     }
