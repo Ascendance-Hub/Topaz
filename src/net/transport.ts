@@ -23,7 +23,24 @@ export const APP_ID = 'topaz-ascendance-hub'
  * `RELAYS` continua exportada, agora refletindo a escolha do Trystero, para a
  * tela de diagnóstico poder listar quais estão conectados.
  */
-export const RELAYS = defaultRelayUrls
+/**
+ * Quantos relays da lista padrão usar de fato.
+ *
+ * O Trystero traz 47 endereços e usa só **5** por omissão
+ * (`defaultRedundancy`), sempre os mesmos, derivados do `appId`. Cinco é
+ * pouco demais quando antivírus entram na conta: o Norton bloqueou um deles
+ * na máquina do autor, e cada pessoa tem um antivírus bloqueando endereços
+ * diferentes. Com uma reserva de cinco, a interseção entre duas pessoas
+ * desmorona rápido — quem não sobrepunha com o anfitrião nunca aparecia na
+ * sala, sem erro nenhum.
+ *
+ * Vinte não é curadoria: é a MESMA lista da biblioteca, só que mais funda. A
+ * lição da curadoria anterior continua valendo — o que faltava não era
+ * escolher melhor, era ter mais de onde escolher.
+ */
+export const REDUNDANCIA = 20
+
+export const RELAYS = defaultRelayUrls.slice(0, REDUNDANCIA)
 
 export interface Transporte {
   meuId(): string
@@ -57,7 +74,10 @@ export type SalaTrystero = ReturnType<typeof joinRoom>
  * verificar que cada canal vai para o lugar certo exigia navegador.
  */
 export function criarSalaTrystero(codigoSala: string): SalaTrystero {
-  return joinRoom({ appId: APP_ID }, codigoSala)
+  return joinRoom(
+    { appId: APP_ID, relayConfig: { redundancy: REDUNDANCIA } },
+    codigoSala,
+  )
 }
 
 /**

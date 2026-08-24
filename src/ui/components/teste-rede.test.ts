@@ -90,3 +90,31 @@ describe('lista de servidores de descoberta', () => {
     expect(painel.querySelector('.teste-rede-relay')).toBeNull()
   })
 })
+
+describe('aviso de antivírus bloqueando servidores', () => {
+  const comConectados = (quantos: number, total: number) =>
+    Array.from({ length: total }, (_, i) => ({
+      url: `wss://r${i}.test`, nome: `r${i}.test`, conectado: i < quantos,
+    }))
+
+  it('avisa quando poucos servidores respondem', () => {
+    const painel = renderizarTesteRede(null, false, vi.fn(), comConectados(4, 20))
+
+    expect(painel.textContent).toContain(TEXTOS.poucosRelays)
+  })
+
+  it('não avisa quando a maioria responde', () => {
+    const painel = renderizarTesteRede(null, false, vi.fn(), comConectados(18, 20))
+
+    expect(painel.textContent).not.toContain(TEXTOS.poucosRelays)
+  })
+
+  it('não avisa antes de os servidores terem tido tempo de conectar', () => {
+    // Zero conectados logo na abertura é o estado normal de quem acabou de
+    // entrar, não sintoma de bloqueio. Acusar antivírus aí seria alarme falso
+    // em toda visita.
+    const painel = renderizarTesteRede(null, false, vi.fn(), comConectados(0, 20))
+
+    expect(painel.textContent).not.toContain(TEXTOS.poucosRelays)
+  })
+})
