@@ -96,31 +96,22 @@ describe('convivência com outros consumidores da mesma sala', () => {
 })
 
 describe('relays de sinalização', () => {
-  it('usa uma lista própria, e não a padrão da biblioteca', () => {
-    // A lista padrão é escolhida por um embaralhamento derivado do `appId`:
-    // todo mundo cai nos MESMOS 5 relays. Se um sair do ar ou for marcado por
-    // antivírus, o efeito é igual para todos os jogadores, e nada avisa.
-    expect(RELAYS.length).toBeGreaterThanOrEqual(6)
+  it('usa a lista padrão do Trystero', () => {
+    // Recuo deliberado. Três listas curadas por nós, cada uma com critério
+    // melhor que a anterior, e a conexão piorou mesmo assim — o erro de
+    // método foi medir em segundos o que se usa em minutos. A lista padrão é
+    // a que os autores da biblioteca exercitam nesse regime.
+    expect(RELAYS.length).toBeGreaterThan(20)
   })
 
   it('só aceita endereços wss', () => {
-    // Página em https não abre socket ws sem TLS: seria bloqueado pelo
-    // navegador antes de chegar na rede.
+    // Página em https não abre socket ws sem TLS: o navegador barra antes de
+    // chegar à rede.
     for (const url of RELAYS) expect(url.startsWith('wss://')).toBe(true)
   })
 
-  it('não repete endereço, para redundância ser redundância de verdade', () => {
+  it('não repete endereço', () => {
     expect(new Set(RELAYS).size).toBe(RELAYS.length)
-  })
-
-  it('não usa os relays que já nos deram problema', () => {
-    // `hol.is` estava fora do ar e `relay.agorist.space` foi marcado como
-    // phishing pelo Norton. `nostr.wine` (pago) e `basspistol.org` abrem o
-    // socket e RECUSAM publicação — parecem vivos e descartam todo anúncio,
-    // que foi o que fez a descoberta ser intermitente.
-    for (const ruim of ['hol.is', 'agorist', 'nostr.wine', 'basspistol']) {
-      expect(RELAYS.some((u) => u.includes(ruim))).toBe(false)
-    }
   })
 })
 

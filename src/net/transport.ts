@@ -1,42 +1,29 @@
-import { joinRoom, selfId, getRelaySockets } from 'trystero/nostr'
+import { joinRoom, selfId, getRelaySockets, defaultRelayUrls } from 'trystero/nostr'
 import type { Acao, EstadoJogo } from '../game/types'
 
 export const APP_ID = 'topaz-ascendance-hub'
 
 /**
- * Os relays de sinalização, escolhidos por nós.
+ * Os relays de sinalização.
  *
- * O padrão do Trystero é um embaralhamento determinístico da lista dele
- * semeado pelo `appId`: todo mundo do Topaz caía nos MESMOS 5 relays. Isso é
- * um ponto único de falha coletivo — em 21/08/2026, um deles (`hol.is`) estava
- * fora do ar e outro (`relay.agorist.space`) foi marcado como phishing pelo
- * Norton, deixando 3 de pé sem ninguém ser avisado.
+ * **Voltou a ser a lista padrão do Trystero, e isto é um recuo deliberado.**
  *
- * Passar `relayConfig.urls` substitui a lista inteira, sem corte: os dez
- * abaixo são todos usados.
+ * Passamos por três listas curadas por nós, cada uma com um critério melhor
+ * que o anterior: o socket abre; o NIP-11 não declara restrição; o relay
+ * entrega de ponta a ponta. Todas mediram bem — e mesmo assim a conexão
+ * piorou, a ponto de um amigo que antes conectava sempre passar a falhar
+ * quase toda vez.
  *
- * O critério de escolha mudou depois de um erro: na primeira versão desta
- * lista eu escolhi por o socket ABRIR, e dois dos oito (`nostr.wine`, pago, e
- * `basspistol.org`) recusam publicação. Um relay assim parece vivo e descarta
- * todo anúncio, o que fazia a descoberta funcionar muito bem uma hora e falhar
- * na outra, conforme onde o anúncio de cada pessoa tivesse caído.
+ * O erro de método foi medir em SEGUNDOS o que se usa em MINUTOS. Abrir,
+ * publicar e receber uma vez não diz nada sobre inscrição longa, reconexão,
+ * limite de taxa nem quantas assinaturas simultâneas o relay tolera. A lista
+ * padrão é a que os autores da biblioteca exercitam nesse regime, e é a
+ * configuração sob a qual este projeto funcionava melhor.
  *
- * Agora os dez foram verificados nos DOIS critérios: o socket abre e o NIP-11
- * não declara `payment_required`, `auth_required`, `restricted_writes` nem
- * exigência de proof-of-work. Estão em ordem de latência medida.
+ * `RELAYS` continua exportada, agora refletindo a escolha do Trystero, para a
+ * tela de diagnóstico poder listar quais estão conectados.
  */
-export const RELAYS = [
-  'wss://relay.mostro.network',
-  'wss://strfry.shock.network',
-  'wss://nos.lol',
-  'wss://purplerelay.com',
-  'wss://relay.damus.io',
-  'wss://offchain.pub',
-  'wss://relay.mostr.pub',
-  'wss://nostr.bitcoiner.social',
-  'wss://relay.libernet.app',
-  'wss://nostr.data.haus',
-]
+export const RELAYS = defaultRelayUrls
 
 export interface Transporte {
   meuId(): string
@@ -70,7 +57,7 @@ export type SalaTrystero = ReturnType<typeof joinRoom>
  * verificar que cada canal vai para o lugar certo exigia navegador.
  */
 export function criarSalaTrystero(codigoSala: string): SalaTrystero {
-  return joinRoom({ appId: APP_ID, relayConfig: { urls: RELAYS } }, codigoSala)
+  return joinRoom({ appId: APP_ID }, codigoSala)
 }
 
 /**

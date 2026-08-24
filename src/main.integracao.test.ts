@@ -27,6 +27,8 @@ interface FakeSala {
 
 vi.mock('trystero/nostr', () => ({
   selfId: 'eu-mesmo',
+  defaultRelayUrls: ['wss://exemplo-a.test', 'wss://exemplo-b.test'],
+  getRelaySockets: () => ({}),
   joinRoom: vi.fn(() => {
     const canais = new Map<string, { send: ReturnType<typeof vi.fn>; onMessage: unknown }>()
     const sala: FakeSala = {
