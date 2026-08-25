@@ -272,6 +272,12 @@ como mostrá-lo de novo, porque a chave guardada é não extraível de propósit
 - [ ] Em Ajustes, trocar a foto atualiza o círculo na fileira da call
 - [ ] Em tela larga o trilho é uma coluna à esquerda; em tela estreita vira
       faixa horizontal, sem estourar
+- [ ] Numa tela **grande** (1440px ou mais), os três itens do trilho ficam
+      juntos no topo, do tamanho do próprio texto — não espalhados pela altura
+- [ ] Numa tela grande com a sala vazia, o miolo fica **centrado**, não colado
+      no topo com um vão de feltro embaixo
+- [ ] Com a mesa aberta (conteúdo alto), o topo **não** fica cortado e a
+      rolagem alcança tudo
 
 ## Grupos
 
