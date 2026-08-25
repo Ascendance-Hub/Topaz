@@ -678,6 +678,43 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   // meio segundo de atraso para acender seria pior que não ter anel. Ainda
   // assim é bem mais barato que medir a cada quadro.
   const tiqueVoz = setInterval(() => monitorVoz.tique(Date.now()), MS_AMOSTRAGEM)
+
+  // ---- Sonda de voz -----------------------------------------------------
+  //
+  // Ligada por `?diag=voz` na URL, e desligada para todo mundo por padrão.
+  //
+  // Existe porque os limiares nasceram estimados e só se acertam com voz real
+  // — e porque "o anel não acende" tem três causas indistinguíveis a olho: o
+  // áudio não chega ao analisador, o limiar está alto demais, ou o desenho não
+  // atualiza. O número separa as três em dez segundos.
+  //
+  // Reporta o PICO desde a última linha, além do nível instantâneo: falar é
+  // intermitente, e uma amostra tirada no meio de uma sílaba fechada mede
+  // silêncio. É o pico que diz qual limiar serviria.
+  if (new URLSearchParams(location.search).get('diag') === 'voz') {
+    const picos = new Map<string, number>()
+    setInterval(() => {
+      const lidos = monitorVoz.niveis()
+      if (lidos.length === 0) {
+        console.log('[voz] ninguém sendo medido — o microfone não chegou ao analisador')
+        return
+      }
+      console.log('[voz] ' + lidos.map((l) => {
+        const pico = Math.max(picos.get(l.id) ?? 0, l.nivel)
+        picos.set(l.id, 0)
+        return `${l.id}: agora=${l.nivel.toFixed(4)} pico=${pico.toFixed(4)}`
+          + (l.falando ? ' FALANDO' : '')
+      }).join('   '))
+    }, 900)
+    // Amostra mais fina que a linha impressa, senão o pico seria só uma
+    // fotografia a cada 0,9 s — que é justamente o que perde a sílaba.
+    setInterval(() => {
+      for (const l of monitorVoz.niveis()) {
+        picos.set(l.id, Math.max(picos.get(l.id) ?? 0, l.nivel))
+      }
+    }, MS_AMOSTRAGEM)
+  }
+
   encerrar = () => {
     clearInterval(tique)
     clearInterval(tiqueVoz)
