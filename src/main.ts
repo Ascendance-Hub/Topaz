@@ -12,10 +12,10 @@ import { renderizarConexao } from './ui/components/conexao'
 import { criarChat } from './ui/components/chat'
 import { renderizarNavSala, renderizarSalaParada } from './ui/components/sala'
 import { renderizarControlesCall } from './ui/components/call'
-import type { AcoesCall } from './ui/components/call'
-import { criarVideoRemoto, mostrarVideo } from './ui/components/video-remoto'
-import { renderizarMixer, chaveVoz, chaveTela } from './ui/components/mixer'
-import { renderizarParticipantes } from './ui/components/participantes'
+import { renderizarMixer } from './ui/components/mixer'
+import { AreaDeMidia } from './ui/area-midia'
+import { criarAcoesCall } from './ui/acoes-da-call'
+import { EU, montarParticipantes, renderizarParticipantes } from './ui/components/participantes'
 import { fotoLembrada, fotoRecebida } from './perfil/foto-navegador'
 import { renderizarIdentidade } from './ui/components/identidade'
 import { entrarComSegredo, identidadeAtual, sairDaIdentidade } from './identidade/atual'
@@ -23,18 +23,11 @@ import type { Identidade } from './identidade/atual'
 import { Apresentacao } from './identidade/apresentacao'
 import type { Participante } from './ui/components/participantes'
 import { MonitorDeVoz, MS_AMOSTRAGEM } from './call/monitor-voz'
-import {
-  aplicarSaida, limparMidia, removerMidiaDe, soltarMidia, suportaTrocarSaida,
-} from './ui/dom-midia'
-import { ehTela } from './call/classificar'
+import { suportaTrocarSaida } from './ui/dom-midia'
 import { criarCanalCall } from './call/canal'
 import { ProtocoloCall } from './call/protocolo'
 import { Midia } from './call/midia'
-import {
-  escolherMicrofone, escolherSaida, lembrarMicrofone, lembrarSaida, microfoneLembrado,
-  microfones, motivoSemMicrofone, saidaLembrada, saidasDeAudio,
-} from './call/dispositivos'
-import type { Dispositivo } from './call/dispositivos'
+import { AparelhosEmUso } from './call/aparelhos-em-uso'
 import { renderizar } from './ui/render'
 import { rngSemente } from './game/shoe'
 import { mesaEsperaPor } from './game/rules'
@@ -145,20 +138,25 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       && mesaEsperaPor(sessao.estado(), sessao.meuId())
   }
 
-  let aparelhos: Dispositivo[] = []
-  /** As saídas de áudio. Fica vazia quando o navegador não sabe trocar, e aí
-   *  a barra nem desenha o seletor. */
-  let saidas: Dispositivo[] = []
-  let saidaAtual: string | null = null
   /**
-   * Por que o microfone não abriu, ou `null` se abriu.
+   * Microfones, saídas e o motivo de o microfone não ter aberto.
    *
-   * Preenchido significa que a pessoa está na call **só ouvindo**. Antes disto
-   * existir, negar a permissão fazia o `getUserMedia` rejeitar sem `catch`:
-   * `protocolo.entrar()` nunca rodava e o botão "Entrar na call" não fazia
-   * nada visível.
+   * A saída escolhida precisa ser reaplicada a cada elemento novo — quem entra
+   * depois nasceria na saída padrão do sistema.
    */
-  let semMicrofone: string | null = null
+  const aparelhos = new AparelhosEmUso(
+    midia, suportaTrocarSaida, () => area.aplicarSaidaNosNovos(),
+  )
+
+  /** O mixer é remontado a cada desenho: canais aparecem e somem conforme
+   *  quem entra na call e quem está sendo assistido. */
+  function montarMixer(): HTMLElement {
+    const atual = protocolo.estado()
+    return renderizarMixer(
+      area.canais(atual.naCall, atual.assistindo),
+      (chave, volume) => area.definirVolume(chave, volume),
+    )
+  }
 
   /**
    * Quem está falando agora, medido localmente sobre o áudio que já chega.
@@ -197,10 +195,6 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // enfeite ausente por uma página em branco.
     console.warn('não deu para carregar a identidade desta máquina', erro)
   })
-  /** O `selfId` não serve de chave para mim: o meu microfone é local e nunca
-   *  chega por `aoReceberMidia`. Uma chave própria evita confundir os dois. */
-  const EU = 'eu'
-
   monitorVoz.aoMudar((id, falando) => {
     if (falando) falantes.add(id)
     else falantes.delete(id)
@@ -209,330 +203,60 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     desenharParticipantes()
   })
 
-  /** Quem aparece na fileira: eu, se estou na call, e quem mais estiver. */
+  /** Junta o que a sala sabe e deixa a decisão com `montarParticipantes`. */
   function participantesAgora(): Participante[] {
     const atual = protocolo.estado()
-    if (!atual.euNaCall) return []
-    const eu: Participante = {
-      peerId: EU,
-      nome: apelido,
-      euMesmo: true,
-      falando: falantes.has(EU),
-      // Só o meu estado de microfone é conhecido: o dos outros não trafega, e
-      // inventar um ícone a partir de silêncio mentiria para quem está só
-      // ouvindo em silêncio.
-      mudo: midia.microfoneMudo(),
-      semMicrofone: semMicrofone !== null,
-      // A minha sai do armazenamento, não do mapa: eu nunca recebo a minha
-      // própria foto pela rede.
-      foto: fotoLembrada() ?? undefined,
-    }
-    const outros = atual.naCall.map((peerId): Participante => ({
-      peerId,
-      nome: apelidoDe(peerId),
-      falando: falantes.has(peerId),
-      foto: fotos.get(peerId),
-      selo: selos.get(peerId),
-    }))
-    return [eu, ...outros]
-  }
-
-  /** Manda a voz e as telas para a saída escolhida. Precisa rodar de novo a
-   *  cada elemento novo — quem entra depois nasceria na saída padrão. */
-  function aplicarSaidaEscolhida(): void {
-    if (!saidaAtual) return
-    aplicarSaida(audios, saidaAtual)
-    aplicarSaida(videos, saidaAtual)
-  }
-
-  /**
-   * Relê a lista de microfones.
-   *
-   * Chamada ao entrar na call e sempre que o sistema avisa que algo mudou —
-   * um fone plugado ou arrancado no meio da conversa deixaria a lista velha, e
-   * a pessoa escolheria um aparelho que não existe mais.
-   *
-   * Os NOMES só aparecem depois da permissão concedida, então isto só rende de
-   * verdade depois de entrar na call.
-   */
-  async function relerMicrofones(): Promise<void> {
-    try {
-      const lista = await navigator.mediaDevices.enumerateDevices()
-      aparelhos = microfones(lista)
-      // Sem `setSinkId` a lista fica vazia de propósito: um seletor que a
-      // pessoa mexe e não muda nada faz ela achar que o site quebrou.
-      saidas = suportaTrocarSaida() ? saidasDeAudio(lista) : []
-    } catch {
-      aparelhos = []
-      saidas = []
-    }
-
-    const saidaEscolhida = escolherSaida(saidas, saidaAtual ?? saidaLembrada())
-    if (saidaEscolhida && saidaEscolhida !== saidaAtual) {
-      saidaAtual = saidaEscolhida
-      aplicarSaidaEscolhida()
-    }
-
-    const escolhido = escolherMicrofone(aparelhos, midia.microfoneAtual() ?? microfoneLembrado())
-    if (escolhido && escolhido !== midia.microfoneAtual()) {
-      // Trocar o microfone também abre um `getUserMedia`, e ele rejeita pelos
-      // mesmos motivos do primeiro. Sem este catch, um fone arrancado no meio
-      // da conversa deixava a interface parada em silêncio.
-      try {
-        await midia.trocarMicrofone(escolhido)
-        semMicrofone = null
-      } catch (erro: unknown) {
-        semMicrofone = motivoSemMicrofone(erro)
-      }
-    }
-    desenhar()
-  }
-
-  /**
-   * Abre o microfone, guardando o motivo se não der.
-   *
-   * Nunca rejeita: quem chama continua o fluxo de qualquer jeito, porque
-   * entrar na call sem microfone é um desfecho válido — o inválido era não
-   * entrar e não dizer nada.
-   */
-  async function abrirMicrofone(): Promise<void> {
-    try {
-      await midia.ligarMicrofone()
-      semMicrofone = null
-    } catch (erro: unknown) {
-      semMicrofone = motivoSemMicrofone(erro)
-    }
+    return montarParticipantes({
+      euNaCall: atual.euNaCall,
+      naCall: atual.naCall,
+      meuApelido: apelido,
+      minhaFoto: fotoLembrada() ?? undefined,
+      meuMicrofoneMudo: midia.microfoneMudo(),
+      euSemMicrofone: aparelhos.semMicrofone() !== null,
+      falantes,
+      fotos,
+      selos,
+      apelidoDe,
+    })
   }
 
   try {
-    navigator.mediaDevices.addEventListener('devicechange', () => void relerMicrofones())
+    // Um fone plugado ou arrancado no meio da conversa deixaria a lista velha.
+    navigator.mediaDevices.addEventListener(
+      'devicechange', () => void aparelhos.reler().then(desenhar),
+    )
   } catch {
     // Navegador sem `mediaDevices`: a call não vai funcionar mesmo, e a sala
     // não pode quebrar por causa disso.
   }
 
-  const acoesCall: AcoesCall = {
-    entrar: () => {
-      // O microfone sobe ANTES de anunciar: anunciar primeiro faria os outros
-      // esperarem um áudio que ainda não existe.
-      //
-      // Mas a falha dele NÃO impede a entrada. Antes, `ligarMicrofone()` sem
-      // `catch` fazia a permissão negada matar o botão em silêncio — nada
-      // acontecia e a pessoa não sabia por quê. Agora ela entra só ouvindo, e
-      // a barra diz o motivo.
-      void abrirMicrofone().then(async () => {
-        protocolo.entrar()
-        // Só agora os nomes dos aparelhos existem: a permissão acabou de ser
-        // concedida. (Com a permissão negada a lista vem anônima, o que é
-        // exatamente o motivo de o seletor não aparecer nesse caso.)
-        await relerMicrofones()
-        // E sincroniza de novo depois de capturar: quem anunciou durante a
-        // janela de permissão só é alcançado aqui.
-        sincronizarMidia()
-        desenhar()
-      })
-    },
-    tentarMicrofone: () => {
-      // A pessoa liberou a permissão no cadeado, ou fechou o programa que
-      // segurava o aparelho. Só o microfone sobe — ela já está na call.
-      void abrirMicrofone().then(async () => {
-        await relerMicrofones()
-        sincronizarMidia()
-        desenhar()
-      })
-    },
-    trocarSaida: (deviceId) => {
-      saidaAtual = deviceId
-      lembrarSaida(deviceId)
-      aplicarSaidaEscolhida()
-      desenhar()
-    },
-    sair: () => {
-      protocolo.sair()
-      // O motivo era do estado "entrei sem microfone". Fora da call ele não
-      // descreve mais nada, e ficaria pendurado na próxima entrada.
-      semMicrofone = null
-      midia.desligarMicrofone()
-      midia.pararTela()
-      // Sair precisa calar tudo de verdade: um `<video>` escondido continua
-      // tocando, e era isso que deixava o som da tela saindo depois de sair.
-      // `limparMidia` também larga os `srcObject` — tirar da árvore sem soltar
-      // deixava stream e decodificador vivos até a coleta de lixo passar.
-      limparMidia(videos)
-      limparMidia(audios)
-      // Fecha o contexto de áudio junto: manter um AudioContext aberto fora da
-      // call segura a placa de som sem motivo.
+  /**
+   * A área de mídia: as telas e as vozes.
+   *
+   * Criada UMA vez e nunca substituída — recriar um elemento de mídia
+   * reinicia o fluxo, e a mesa é redesenhada a cada anúncio do anfitrião.
+   */
+  const area = new AreaDeMidia({
+    apelidoDe,
+    saidaAtual: () => aparelhos.saidaAtual(),
+    aoOuvirVoz: (peerId, stream) => monitorVoz.observar(peerId, stream),
+    aoPerderVoz: (peerId) => monitorVoz.esquecer(peerId),
+  })
+
+  midia.aoReceberMidia((stream, de) => {
+    area.receber(stream, de, protocolo.estado().assistindo.includes(de))
+  })
+
+  const acoesCall = criarAcoesCall({
+    protocolo, midia, aparelhos, area,
+    pararDeMedirVoz: () => {
       monitorVoz.encerrar()
       falantes.clear()
     },
-    compartilhar: () => {
-      void midia.compartilharTela(() => {
-        // Chegou aqui porque a pessoa usou a barra nativa do Chrome. Sem isto,
-        // a interface continuaria dizendo que ela compartilha.
-        protocolo.definirCompartilhando(false)
-        midia.pararTela()
-      }).then(() => {
-        protocolo.definirCompartilhando(true)
-        sincronizarMidia()
-      })
-    },
-    pararTela: () => {
-      protocolo.definirCompartilhando(false)
-      midia.pararTela()
-    },
-    alternarMeuMicrofone: () => {
-      midia.alternarMicrofone()
-      desenhar()
-    },
-    alternarSilenciarTodos: () => {
-      todosSilenciados = !todosSilenciados
-      const atual = protocolo.estado()
-      ajustarVideos(atual.assistindo, atual.compartilhando)
-      desenhar()
-    },
-    trocarMicrofone: (deviceId) => {
-      lembrarMicrofone(deviceId)
-      void midia.trocarMicrofone(deviceId).then(desenhar)
-    },
-    assistir: (peerId) => protocolo.assistir(peerId),
-    pararDeAssistir: (peerId) => protocolo.pararDeAssistir(peerId),
-    definirQualidade: (altura) => {
-      midia.definirQualidade(altura)
-      desenhar()
-    },
-    definirTipoConteudo: (tipo) => {
-      midia.definirTipoConteudo(tipo)
-      desenhar()
-    },
-  }
-
-  // Área de áudio remoto: criada uma vez e nunca substituída, pelo mesmo motivo
-  // do chat — recriar um <audio> reinicia o fluxo.
-  const audios = document.createElement('div')
-  audios.className = 'call-audios'
-  // A área de vídeo segue a mesma regra: criada uma vez, nunca substituída.
-  const videos = document.createElement('div')
-  videos.className = 'call-videos'
-
-  function removerVideoDe(peerId: string): void {
-    removerMidiaDe(videos, peerId)
-  }
-
-  /** Tira a pessoa do áudio E do medidor de voz. O medidor precisa sair
-   *  junto: um analisador esquecido é vazamento, e o anel ficaria aceso. */
-  function removerAudioDe(peerId: string): void {
-    removerMidiaDe(audios, peerId)
-    monitorVoz.esquecer(peerId)
-  }
-
-  /**
-   * O stream de tela chega UMA vez por sessão de compartilhamento — depois
-   * disso, assistir e parar só ligam e desligam o codificador do outro lado,
-   * sem renegociar. Então o elemento é escondido, nunca removido: removê-lo
-   * faria a tela não voltar, porque não haveria stream novo para recriá-lo.
-   *
-   * Ele só sai de vez quando a pessoa para de compartilhar (ou sai da sala),
-   * aí sim não há mais nada para mostrar.
-   */
-  let todosSilenciados = false
-  /** Volume por canal, de 0 a 1. Ausente = 1, que é o padrão de mídia. */
-  const volumes = new Map<string, number>()
-
-  const volumeDe = (chave: string): number => volumes.get(chave) ?? 1
-
-  /**
-   * Aplica os volumes aos elementos que existem agora.
-   *
-   * Roda a cada desenho porque elementos aparecem e somem conforme a call
-   * muda, e um volume ajustado antes precisa valer para o elemento novo.
-   */
-  function aplicarVolumes(): void {
-    for (const el of audios.querySelectorAll<HTMLAudioElement>('audio[data-de]')) {
-      el.volume = volumeDe(chaveVoz(el.dataset['de'] ?? ''))
-    }
-    for (const caixa of videos.querySelectorAll<HTMLElement>('[data-de]')) {
-      const video = caixa.querySelector('video')
-      if (video) video.volume = volumeDe(chaveTela(caixa.dataset['de'] ?? ''))
-    }
-  }
-
-  /** Um canal de voz por pessoa na call, e um de tela por quem compartilha. */
-  function canaisDeAudio() {
-    const atual = protocolo.estado()
-    const vozes = atual.naCall.map((peerId) => ({
-      chave: chaveVoz(peerId), nome: apelidoDe(peerId), volume: volumeDe(chaveVoz(peerId)),
-    }))
-    const telas = atual.assistindo.map((peerId) => ({
-      chave: chaveTela(peerId),
-      nome: `Tela de ${apelidoDe(peerId)}`,
-      volume: volumeDe(chaveTela(peerId)),
-    }))
-    return [...vozes, ...telas]
-  }
-
-  function ajustarVideos(assistindo: string[], compartilhando: string[]): void {
-    for (const caixa of videos.querySelectorAll<HTMLElement>('[data-de]')) {
-      const de = caixa.dataset['de'] ?? ''
-      if (!compartilhando.includes(de)) {
-        removerMidiaDe(videos, de)
-        continue
-      }
-      mostrarVideo(caixa, assistindo.includes(de) && !todosSilenciados)
-    }
-    for (const el of audios.querySelectorAll<HTMLAudioElement>('audio')) {
-      el.muted = todosSilenciados
-    }
-  }
-
-  midia.aoReceberMidia((stream, de, meta) => {
-    // A metadata vem de quem publicou (`{ tipo: 'microfone' }` ou
-    // `{ tipo: 'tela' }`), e é mais confiável do que adivinhar pelo tipo da
-    // faixa: uma tela sem áudio e um microfone são ambos "uma faixa só".
-    // A classificação sai das FAIXAS do stream, não do metadado. Ver
-    // `ehTela`: a fila que pareia metadado e faixa no Trystero desalinha, e o
-    // rótulo passa a mentir — era isso que fazia alguém sumir do áudio.
-    void meta
-    if (ehTela(stream)) {
-      // Uma tela por peer: se ele reabrir o compartilhamento, a nova substitui
-      // a velha em vez de empilhar quadros congelados.
-      // Sessão de compartilhamento nova: substitui a caixa inteira, para não
-      // ficar um quadro congelado da sessão anterior.
-      removerVideoDe(de)
-      const caixa = criarVideoRemoto(de, stream, apelidoDe(de))
-      videos.append(caixa)
-      mostrarVideo(caixa, protocolo.estado().assistindo.includes(de))
-      // Elemento novo nasce na saída padrão do sistema; a saída escolhida é
-      // estado da pessoa e precisa valer para quem chegou agora também.
-      aplicarSaidaEscolhida()
-      return
-    }
-
-    // Um elemento por peer. Cada republicação (sair e voltar da call) traz um
-    // stream novo, e sem trocar o elemento os antigos se acumulavam segurando
-    // streams mortos.
-    removerAudioDe(de)
-    const el = document.createElement('audio')
-    el.autoplay = true
-    el.dataset['de'] = de
-    el.srcObject = stream
-    // O navegador pode recusar tocar sem gesto do usuário. Entrar na call é um
-    // clique, então quase sempre há permissão — mas engolir a rejeição faria a
-    // call ficar muda sem nenhuma pista do motivo.
-    void el.play().catch((erro) => {
-      console.warn('áudio da call bloqueado pelo navegador:', erro)
-    })
-    audios.append(el)
-    aplicarSaidaEscolhida()
-    // Passa a medir a voz desta pessoa. Idempotente, e trocar o stream (sair e
-    // voltar da call) troca o analisador junto — senão o anel dela nunca mais
-    // acenderia, porque o stream antigo está morto.
-    monitorVoz.observar(de, stream)
+    sincronizarMidia: () => sincronizarMidia(),
+    desenhar: () => desenhar(),
   })
 
-  /**
-   * Quem entra na call depois de mim precisa receber meu microfone: o
-   * `addStream` inicial só alcançou quem já estava lá.
-   */
   /**
    * Uma função só, idempotente, chamada a cada mudança E depois de cada
    * captura ficar pronta. Não guarda "o que mudou": descreve o que deveria
@@ -551,64 +275,9 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // último e o codificador desliga — que é o ponto de todo o desenho.
     midia.sincronizarTela(atual.assistidoPor)
 
-    ajustarVideos(atual.assistindo, atual.compartilhando)
+    area.ajustar(atual.assistindo, atual.compartilhando)
+    area.previaDaMinhaTela(atual.euCompartilhando ? midia.telaLocal() : null)
     sincronizarMedidorDeVoz(atual.naCall, atual.euNaCall)
-    sincronizarPreviaDaMinhaTela(atual.euCompartilhando)
-  }
-
-  /**
-   * A prévia da minha própria tela, para eu conferir o que estou mostrando.
-   *
-   * Pedido de quem usa, e barato: é a captura crua num `<video>`, sem passar
-   * por WebRTC. Não liga codificador e não conta como espectador — assistir a
-   * própria tela continua não acordando o encoder de ninguém.
-   *
-   * Fica FORA do `[data-de]` de propósito: `ajustarVideos` e `aplicarVolumes`
-   * percorrem esse atributo pensando em telas de outras pessoas, e a minha
-   * apareceria como se alguém estivesse compartilhando duas vezes.
-   *
-   * Sempre MUDA. O áudio do sistema que vai junto com a tela voltaria pela
-   * minha própria caixa de som e realimentaria o microfone — microfonia, e das
-   * ruins, porque quem a causa é justamente quem não está ouvindo o resultado.
-   */
-  function sincronizarPreviaDaMinhaTela(euCompartilhando: boolean): void {
-    const atual = videos.querySelector<HTMLVideoElement>('.video-local')
-    const tela = euCompartilhando ? midia.telaLocal() : null
-
-    if (!tela) {
-      if (atual) {
-        soltarMidia(atual)
-        atual.parentElement?.remove()
-      }
-      return
-    }
-    // Idempotente: com a mesma captura já na tela, não há o que fazer.
-    if (atual?.srcObject === tela) return
-    if (atual) atual.parentElement?.remove()
-
-    const caixa = document.createElement('div')
-    caixa.className = 'video-local-caixa'
-
-    // Mesmo vocabulário do vídeo remoto: um rótulo com nome próprio faria a
-    // folha de estilo ter duas maneiras de dizer a mesma coisa.
-    const rotulo = document.createElement('span')
-    rotulo.className = 'video-nome'
-    rotulo.textContent = 'Sua tela'
-
-    const video = document.createElement('video')
-    video.className = 'video-local'
-    video.autoplay = true
-    video.playsInline = true
-    video.muted = true
-    video.srcObject = tela
-    void video.play().catch(() => {
-      // Sem áudio e com gesto do usuário logo antes, isto praticamente não
-      // acontece — mas engolir em silêncio deixaria um retângulo preto.
-      console.warn('a prévia da própria tela não começou a tocar')
-    })
-
-    caixa.append(video, rotulo)
-    videos.append(caixa)
   }
 
   /**
@@ -618,8 +287,9 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * Quem sai da call deixaria para trás um analisador pendurado num stream
    * morto: vazamento, e o anel dele congelado aceso.
    *
-   * O meu microfone entra aqui porque ele NUNCA chega por `aoReceberMidia` —
-   * sai daqui direto para a rede. Sem isto eu seria o único sem anel.
+   * O meu microfone entra aqui porque ele NUNCA chega pelo caminho de mídia
+   * recebida — sai daqui direto para a rede. Sem isto eu seria o único sem
+   * anel.
    */
   function sincronizarMedidorDeVoz(naCall: string[], euNaCall: boolean): void {
     const meu = midia.microfoneLocal()
@@ -643,10 +313,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     conectados: conectadosComigo().length,
   })
   let nav = renderizarNavSala(mesaAberta, alternarMesa, mesaEspera())
-  let mixer = renderizarMixer(canaisDeAudio(), (chave, volume) => {
-    volumes.set(chave, volume)
-    aplicarVolumes()
-  })
+  let mixer = montarMixer()
 
   /**
    * A coluna lateral: conversa e volumes.
@@ -670,7 +337,9 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   // qualquer aplicativo de call põe, e essa é a metade convencional do
   // desenho — a diferença fica no material, não na disposição.
   let participantes = renderizarParticipantes([])
-  app.replaceChildren(barra, nav, palco, participantes, controles, lateral, videos, audios)
+  app.replaceChildren(
+    barra, nav, palco, participantes, controles, lateral, area.videos, area.audios,
+  )
 
   /** Só a fileira, sem redesenhar o resto. Chamada a cada mudança de quem
    *  está falando, que acontece muitas vezes por minuto. */
@@ -697,20 +366,19 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       renderizarControlesCall(
         protocolo.estado(), acoesCall, midia.qualidade(), midia.tipoConteudo(),
         {
-          apelidoDe, meuMicrofoneMudo: midia.microfoneMudo(), todosSilenciados,
-          microfones: aparelhos, microfoneAtual: midia.microfoneAtual(),
-          semMicrofone, saidas, saidaAtual,
+          apelidoDe, meuMicrofoneMudo: midia.microfoneMudo(),
+          todosSilenciados: area.silenciados(),
+          microfones: aparelhos.microfones(), microfoneAtual: midia.microfoneAtual(),
+          semMicrofone: aparelhos.semMicrofone(),
+          saidas: aparelhos.saidas(), saidaAtual: aparelhos.saidaAtual(),
         })
     controles.replaceWith(novosControles)
     controles = novosControles
 
-    const novoMixer = renderizarMixer(canaisDeAudio(), (chave, volume) => {
-      volumes.set(chave, volume)
-      aplicarVolumes()
-    })
+    const novoMixer = montarMixer()
     mixer.replaceWith(novoMixer)
     mixer = novoMixer
-    aplicarVolumes()
+    area.aplicarVolumes()
     desenharParticipantes()
 
     // Enquanto ninguém é anfitrião a mesa ainda não existe: mostrar a mesa
