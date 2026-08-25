@@ -1,12 +1,36 @@
 import { avaliar, ehBlackjackNatural, valorCarta } from './hand'
-import type { Carta, EstadoJogo, Jogador, Mao, ResultadoMao, TipoAcao } from './types'
+import type {
+  Carta, ConfigPartida, EstadoJogo, Jogador, Mao, ResultadoMao, TipoAcao,
+} from './types'
+
+/**
+ * O formato padrão de uma partida.
+ *
+ * São os mesmos números de sempre, com UMA mudança: o alvo saiu de 1500 para
+ * 2500. Com 1000 iniciais e aposta máxima de 500, o alvo antigo fazia uma
+ * única mão ganha encerrar a partida — a pessoa apostava 500 na primeira mão,
+ * ganhava, chegava a 1500 e o jogo acabava. Com 2500 são necessárias umas três
+ * vitórias cheias.
+ */
+export const CONFIG_PADRAO: ConfigPartida = Object.freeze({
+  fichasIniciais: 1000,
+  alvo: 2500,
+  apostaMax: 500,
+  segundosTurno: 30,
+})
+
+/** Limites do que o anfitrião pode escolher. Existem para que nenhuma escolha
+ *  produza uma partida impossível de jogar ou de terminar. */
+export const LIMITES = Object.freeze({
+  fichasIniciais: { min: 100, max: 100_000 },
+  alvo: { min: 200, max: 1_000_000 },
+  apostaMax: { min: 25, max: 100_000 },
+  segundosTurno: { min: 10, max: 300 },
+})
 
 export const REGRAS = Object.freeze({
   numBaralhos: 6,
-  stackInicial: 1000,
-  alvoVitoria: 1500,
   apostaMin: 25,
-  apostaMax: 500,
   fichas: [25, 100, 500] as const,
   maxCadeiras: 7,
   maxMaos: 3,
@@ -20,6 +44,59 @@ export const REGRAS = Object.freeze({
   msEntreCartasDealer: 700,
   msMostrarResultado: 2500,
 })
+
+/** Encaixa um número entre um mínimo e um máximo. */
+function entre(valor: unknown, min: number, max: number, padrao: number): number {
+  if (typeof valor !== 'number' || !Number.isFinite(valor)) return padrao
+  return Math.min(max, Math.max(min, Math.round(valor)))
+}
+
+/**
+ * Põe uma configuração recebida em forma utilizável.
+ *
+ * Ela chega pela rede — de um cliente modificado, ou de uma versão do site que
+ * não conhecemos — então nada aqui pode confiar no formato. O que não é número
+ * vira o padrão, e o que é número é encaixado nos limites.
+ *
+ * Duas relações importam mais que os limites individuais, porque cada uma
+ * produziria uma partida que não dá para jogar:
+ *
+ * - **Aposta máxima acima das fichas iniciais** deixaria a mesa apostando o
+ *   que ninguém tem, com os botões nascendo desabilitados.
+ * - **Alvo abaixo ou igual às fichas iniciais** encerraria a partida antes da
+ *   primeira carta. É a versão extrema do defeito que motivou este trabalho:
+ *   1000 iniciais com alvo 1500 e aposta 500 acabava numa mão.
+ */
+export function normalizarConfig(bruta: unknown): ConfigPartida {
+  const c = (typeof bruta === 'object' && bruta !== null ? bruta : {}) as Record<string, unknown>
+
+  const fichasIniciais = entre(
+    c['fichasIniciais'], LIMITES.fichasIniciais.min, LIMITES.fichasIniciais.max,
+    CONFIG_PADRAO.fichasIniciais,
+  )
+  const apostaMax = Math.min(
+    fichasIniciais,
+    entre(c['apostaMax'], Math.max(LIMITES.apostaMax.min, REGRAS.apostaMin),
+      LIMITES.apostaMax.max, CONFIG_PADRAO.apostaMax),
+  )
+  const alvoBruto = c['alvo']
+  const alvo = alvoBruto === null
+    ? null
+    : Math.max(
+      fichasIniciais + REGRAS.apostaMin,
+      entre(alvoBruto, LIMITES.alvo.min, LIMITES.alvo.max, CONFIG_PADRAO.alvo ?? 2500),
+    )
+
+  return {
+    fichasIniciais,
+    alvo,
+    apostaMax,
+    segundosTurno: entre(
+      c['segundosTurno'], LIMITES.segundosTurno.min, LIMITES.segundosTurno.max,
+      CONFIG_PADRAO.segundosTurno,
+    ),
+  }
+}
 
 /**
  * Ainda pode disputar: não foi eliminado e tem fichas para a aposta mínima

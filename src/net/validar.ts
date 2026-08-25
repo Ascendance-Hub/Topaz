@@ -1,4 +1,5 @@
 import type { EstadoJogo, Fase } from '../game/types'
+import { LIMITES } from '../game/rules'
 
 /**
  * Os guardas do que chega pela rede.
@@ -66,6 +67,29 @@ const ehCarta = (valor: unknown): boolean => ehObjeto(valor)
 const ehMao = (valor: unknown): boolean =>
   ehObjeto(valor) && ehListaDe(valor['cartas'], MAX_CARTAS, ehCarta)
 
+/**
+ * A configuração da partida, que agora viaja no estado.
+ *
+ * Recusa em vez de encaixar nos limites: encaixar deixaria a MINHA cópia do
+ * estado diferente da do anfitrião, e a partir daí duas pessoas jogariam a
+ * mesma partida com regras diferentes — que é exatamente o que pôr a
+ * configuração no estado veio evitar.
+ */
+const ehConfig = (valor: unknown): boolean => {
+  if (!ehObjeto(valor)) return false
+  const c = valor
+  if (!ehInteiroEntre(c['fichasIniciais'], LIMITES.fichasIniciais.min, LIMITES.fichasIniciais.max)) {
+    return false
+  }
+  if (!ehInteiroEntre(c['apostaMax'], 1, LIMITES.apostaMax.max)) return false
+  if (!ehInteiroEntre(c['segundosTurno'], LIMITES.segundosTurno.min, LIMITES.segundosTurno.max)) {
+    return false
+  }
+  // `null` é "até sobrar um", e é um valor legítimo — não a ausência do campo.
+  if (c['alvo'] === null) return true
+  return ehInteiroEntre(c['alvo'], LIMITES.alvo.min, LIMITES.alvo.max)
+}
+
 const ehJogador = (valor: unknown): boolean =>
   ehObjeto(valor) &&
   typeof valor['peerId'] === 'string' &&
@@ -80,6 +104,7 @@ export function ehEstadoPlausivel(valor: unknown): valor is EstadoJogo {
   const e = valor as Record<string, unknown>
 
   if (typeof e['hostAtual'] !== 'string') return false
+  if (!ehConfig(e['config'])) return false
   if (!FASES.includes(e['fase'] as Fase)) return false
   if (!ehInteiroEntre(e['rodada'], 0, MAX_RODADA)) return false
   if (!ehListaDe(e['jogadores'], MAX_JOGADORES, ehJogador)) return false

@@ -51,7 +51,29 @@ export type Fase =
   | 'acerto'
   | 'fim'
 
+/**
+ * O formato da partida, escolhido pelo anfitrião.
+ *
+ * Mora no `EstadoJogo` e não numa constante de módulo por um motivo só: assim
+ * ele **viaja com o estado**. Todo mundo concorda sozinho, inclusive quem
+ * entra no meio — e não existe o caso de dois navegadores jogarem com regras
+ * diferentes sem ninguém perceber.
+ *
+ * O que NÃO está aqui continua constante em `REGRAS`: pagamentos, número de
+ * baralhos, limite de cadeiras. Configurar tudo daria uma tela de ajustes que
+ * ninguém lê e uma superfície de erro que ninguém precisa.
+ */
+export type ConfigPartida = {
+  fichasIniciais: number
+  /** Fichas para vencer, ou `null` para jogar até sobrar um. */
+  alvo: number | null
+  apostaMax: number
+  segundosTurno: number
+}
+
 export type EstadoJogo = {
+  /** O formato desta partida. Ver `ConfigPartida`. */
+  config: ConfigPartida
   fase: Fase
   jogadores: Jogador[]
   vezDe: string | null
@@ -82,5 +104,7 @@ export type Acao =
   | { tipo: 'dividir'; maoId: string }
   | { tipo: 'iniciar' }
   | { tipo: 'novaPartida' }
+  /** Muda o formato da partida. Só o anfitrião, e só entre partidas. */
+  | { tipo: 'configurar'; config: ConfigPartida }
 
 export type TipoAcao = Acao['tipo']

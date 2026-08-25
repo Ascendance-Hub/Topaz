@@ -265,8 +265,11 @@ function areaDealer(estado: EstadoJogo, anteriores: ContagensCartas): HTMLElemen
  * largura inline é o mesmo valor em forma estática — é o que sobra, e
  * continua correto, quando `prefers-reduced-motion` desliga a animação.
  */
-function barraPrazo(prazoTurno: number, agora: number): HTMLElement {
-  const total = REGRAS.segundosTurno * 1000
+function barraPrazo(prazoTurno: number, agora: number, segundosTurno: number): HTMLElement {
+  // A duração vem da configuração da partida, não de uma constante: com o
+  // anfitrião podendo mudar o tempo de jogada, uma barra fixa em 30s andaria
+  // no ritmo errado — e o ritmo dela é a única pista de quanto falta.
+  const total = segundosTurno * 1000
   const restante = Math.min(total, Math.max(0, prazoTurno - agora))
   const barra = div('barra-prazo')
   const preenchida = document.createElement('div')
@@ -336,7 +339,7 @@ function painelProprio(
   painel.append(acoes)
 
   if (estado.prazoTurno !== null && vezDele) {
-    painel.append(barraPrazo(estado.prazoTurno, Date.now()))
+    painel.append(barraPrazo(estado.prazoTurno, Date.now(), estado.config.segundosTurno))
   }
 
   return painel

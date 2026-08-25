@@ -1730,3 +1730,78 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 .teste-rede-detalhes > .teste-rede-relays {
   margin-top: 12px;
 }
+
+/* ---------------------------------------------------------------------------
+   O FORMATO DA PARTIDA
+   ---------------------------------------------------------------------------
+   Campos numéricos com rótulo à esquerda e dica embaixo. Nada de coluna dupla:
+   são quatro escolhas que se leem de cima para baixo, e duas colunas fariam a
+   pessoa varrer a tela procurando o par de cada rótulo.
+
+   Campo desabilitado continua LEGÍVEL de propósito — quem não é anfitrião
+   precisa saber com que regras está jogando, e um cinza apagado transformaria
+   a informação em enfeite.
+   ------------------------------------------------------------------------ */
+.config-partida-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.config-partida-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.config-partida-rotulo {
+  flex: 1 1 160px;
+  color: var(--creme-fraco);
+  font-size: 13.5px;
+}
+
+.config-partida-linha .campo {
+  flex: 0 0 130px;
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.config-partida-dica {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--creme-tenue);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.config-partida-modo {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--creme-fraco);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.config-partida-modo input { accent-color: var(--topazio); cursor: pointer; }
+
+/* Só a interação sai; a leitura fica. */
+.config-partida .campo:disabled {
+  opacity: 1;
+  color: var(--creme-fraco);
+  background: rgba(0, 0, 0, 0.22);
+  border-color: var(--latao-fraco);
+  cursor: not-allowed;
+}
+.config-partida-modo input:disabled { cursor: not-allowed; }
+
+.config-partida [data-partida='aviso'] {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-left: 2px solid var(--latao);
+  background: rgba(185, 138, 46, 0.08);
+  color: var(--creme-fraco);
+}
+
+.config-partida [data-partida='salvar'] { align-self: flex-start; }

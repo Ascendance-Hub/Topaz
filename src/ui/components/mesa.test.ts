@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest'
 import { renderizarMesa } from './mesa'
-import { REGRAS } from '../../game/rules'
+import { REGRAS, CONFIG_PADRAO } from '../../game/rules'
 import { aplicar, avancar, criarContexto } from '../../game/machine'
 import type { Contexto } from '../../game/machine'
 import { rngSemente } from '../../game/shoe'
@@ -19,7 +19,7 @@ function criarJogador(over: Partial<Jogador> & Pick<Jogador, 'peerId'>): Jogador
   return {
     apelido: over.peerId,
     cadeira: null,
-    fichas: REGRAS.stackInicial,
+    fichas: CONFIG_PADRAO.fichasIniciais,
     maos: [],
     maoAtiva: 0,
     seguro: 0,
@@ -49,6 +49,7 @@ function criarEstado(over: Partial<EstadoJogo> = {}): EstadoJogo {
     cartasRestantes: 300,
     hostAtual: 'p1',
     rodada: 1,
+    config: { ...CONFIG_PADRAO },
     proximoIdMao: 1,
     vencedor: null,
     naPartida: fase === 'aguardando' ? [] : jogadores.map((j) => j.peerId),
@@ -771,7 +772,7 @@ describe('fixtures vindas do motor', () => {
     eu.maos[0]!.cartas = [carta('10', 'copas'), carta('9', 'paus'), carta('5', 'espadas')]
     // Encerra a mão pelo caminho normal do motor (parar numa mão estourada
     // é o que o prazo de turno faz por ele).
-    ctx = avancar(ctx, REGRAS.segundosTurno * 1000 + 1, RNG())
+    ctx = avancar(ctx, CONFIG_PADRAO.segundosTurno * 1000 + 1, RNG())
 
     const mesa = renderizarMesa(ctx.estado, 'eu', semAcao)
     const minhaMao = mesa.querySelector('.painel-proprio .mao')!
@@ -782,7 +783,7 @@ describe('fixtures vindas do motor', () => {
 
 describe('barra do relógio de turno', () => {
   const AGORA = 1_700_000_000_000
-  const TOTAL = REGRAS.segundosTurno * 1000
+  const TOTAL = CONFIG_PADRAO.segundosTurno * 1000
 
   function mesaComPrazo(restante: number): HTMLElement {
     const estado = criarEstado({

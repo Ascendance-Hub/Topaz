@@ -140,3 +140,42 @@ describe('ehEstadoPlausivel — tamanho das listas de dentro', () => {
     expect(ehEstadoPlausivel({ ...estadoReal(), maoDealer: muitas(21) })).toBe(true)
   })
 })
+
+describe('ehEstadoPlausivel — a configuração da partida', () => {
+  it('aceita a configuração padrão', () => {
+    expect(ehEstadoPlausivel(estadoReal())).toBe(true)
+  })
+
+  it('recusa estado sem configuração nenhuma', () => {
+    const { config: _, ...semConfig } = estadoReal()
+    expect(ehEstadoPlausivel(semConfig)).toBe(false)
+  })
+
+  it('aceita alvo nulo — é o "até sobrar um"', () => {
+    const e = { ...estadoReal(), config: { ...estadoReal().config, alvo: null } }
+    expect(ehEstadoPlausivel(e)).toBe(true)
+  })
+
+  it('recusa números absurdos em vez de encaixá-los', () => {
+    // Encaixar deixaria a MINHA cópia diferente da do anfitrião, e duas
+    // pessoas jogariam a mesma partida com regras diferentes — exatamente o
+    // que pôr a configuração no estado veio evitar.
+    for (const ruim of [
+      { fichasIniciais: 1e12 },
+      { apostaMax: -5 },
+      { segundosTurno: 0 },
+      { alvo: 1e15 },
+      { fichasIniciais: 'mil' },
+      { segundosTurno: 30.5 },
+    ]) {
+      const e = { ...estadoReal(), config: { ...estadoReal().config, ...ruim } }
+      expect(ehEstadoPlausivel(e)).toBe(false)
+    }
+  })
+
+  it('recusa configuração que nem é objeto', () => {
+    for (const ruim of [null, 42, 'texto', []]) {
+      expect(ehEstadoPlausivel({ ...estadoReal(), config: ruim })).toBe(false)
+    }
+  })
+})

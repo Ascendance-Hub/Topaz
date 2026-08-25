@@ -1,6 +1,5 @@
 import { classificacao } from '../../game/classificacao'
 import type { Colocacao } from '../../game/classificacao'
-import { REGRAS } from '../../game/rules'
 import type { Acao, EstadoJogo } from '../../game/types'
 
 function div(classe: string, texto?: string): HTMLElement {
@@ -33,7 +32,12 @@ function subtitulo(estado: EstadoJogo, grupos: Colocacao[]): string {
   const topo = grupos[0]
   const empateNoAlvo = topo !== undefined
     && topo.jogadores.length > 1
-    && topo.jogadores.every((j) => j.eliminadoEm === null && j.fichas >= REGRAS.alvoVitoria)
+    // Sem alvo não existe "empate no alvo": a partida vai até sobrar um, e
+    // quem está no topo empatado simplesmente continua jogando.
+    && estado.config.alvo !== null
+    && topo.jogadores.every(
+      (j) => j.eliminadoEm === null && j.fichas >= estado.config.alvo!,
+    )
 
   if (empateNoAlvo) {
     const nomes = listar(topo.jogadores.map((j) => j.apelido))

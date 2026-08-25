@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderizar } from './render'
-import { REGRAS } from '../game/rules'
+import { CONFIG_PADRAO } from '../game/rules'
 import type { Carta, EstadoJogo, Jogador, Mao, Naipe, Valor } from '../game/types'
 
 // `renderizar` só decide *se* anima; a geometria do voo em si (testada por
@@ -28,7 +28,7 @@ function criarJogador(over: Partial<Jogador> & Pick<Jogador, 'peerId'>): Jogador
   return {
     apelido: over.peerId,
     cadeira: null,
-    fichas: REGRAS.stackInicial,
+    fichas: CONFIG_PADRAO.fichasIniciais,
     maos: [],
     maoAtiva: 0,
     seguro: 0,
@@ -58,6 +58,7 @@ function criarEstado(over: Partial<EstadoJogo> = {}): EstadoJogo {
     cartasRestantes: 300,
     hostAtual: 'p1',
     rodada: 1,
+    config: { ...CONFIG_PADRAO },
     proximoIdMao: 1,
     vencedor: null,
     naPartida: fase === 'aguardando' ? [] : jogadores.map((j) => j.peerId),
