@@ -49,7 +49,10 @@ export function renderizarLobby(
   sub.className = 'sub'
   sub.textContent = codigoDaUrl
     ? `Entrando na sala ${formatarCodigo(codigoDaUrl)}`
-    : 'Blackjack com os amigos'
+    // O cartão vive dentro da home, que já diz o que o site é. Aqui a linha
+    // serve para instruir, não para apresentar: quem chegou até este cartão
+    // quer saber o que fazer agora.
+    : 'Crie uma sala e mande o link para quem você quer chamar.'
 
   const aviso = document.createElement('p')
   aviso.className = 'aviso'

@@ -188,6 +188,22 @@ export class Midia {
   }
 
   /**
+   * O meu microfone, para quem precisa MEDIR o que ele capta.
+   *
+   * O medidor de voz é o único caso: o áudio dos outros chega por
+   * `aoReceberMidia`, mas o meu nunca passa por ali — ele sai daqui direto
+   * para a rede. Sem este acesso, eu seria o único da fileira sem anel, que é
+   * justamente quem mais precisa dele: ver o próprio anel acender é como a
+   * pessoa descobre que o microfone funciona sem perguntar "tá me ouvindo?".
+   *
+   * Devolve o stream vivo, não uma cópia: analisar exige as faixas de
+   * verdade.
+   */
+  microfoneLocal(): MediaStream | null {
+    return this.microfone
+  }
+
+  /**
    * `enabled = false` continua enviando a faixa, mas em silêncio — é o mudo
    * que todo app de call usa. Desligar a captura acenderia e apagaria o
    * indicador do navegador a cada clique, e obrigaria a renegociar.

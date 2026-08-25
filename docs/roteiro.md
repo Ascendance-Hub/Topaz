@@ -24,6 +24,12 @@ duas exceções marcadas 🕓, escritas em 2026-08-24 e ainda não vistas com ge
   qualidade e `contentHint` no seletor, **áudio do sistema junto** com bitrate
   de música, tela cheia e Picture-in-Picture.
 - **Mixer de volume** — um canal por voz e um por tela, separados de propósito.
+- 🕓 **Home de apresentação** — a primeira tela deixou de ser um cartão de
+  entrar e virou uma página: o que o site faz, o que está protegido, e o teste
+  de rede acessível antes mesmo de entrar numa sala. A ação vem antes da
+  apresentação, porque o trabalho da página é deixar entrar.
+- 🕓 **Quem está falando** — anel de topázio em volta de quem fala, medido
+  localmente sobre o áudio que já chega. Nada disso trafega.
 - **Descoberta por três redes** — nostr, MQTT e BitTorrent ao mesmo tempo,
   deduplicando por pessoa. Foi o que destravou os amigos que não se achavam.
 - **Privacidade e guardas de rede** — fontes locais, CSP, código de sala de 16
@@ -183,13 +189,21 @@ eliminam.
 ### Próximo ciclo grande
 
 - **Grupos persistentes** — salvos no navegador, tipo servidor do Discord.
-  Já tem base para isso; falta o ciclo de design.
+  Desenhado em
+  `docs/superpowers/specs/2026-08-24-home-e-grupos-design.md`: um grupo é um
+  **marcador local** (nome, código, cor). Quem está no grupo é quem está na
+  sala agora. A home já foi feita para receber a faixa "Seus grupos" acima da
+  apresentação.
 - **Iniciar o jogo direto do grupo**, sem passar pela sala de espera. Depende
   dos grupos.
 
 ### Adiado de propósito
 
 Nada aqui é defeito; são coisas que cabem depois.
+
+- **Compartilhar o estado do microfone** — hoje a fileira de participantes só
+  sabe se **eu** estou mudo ou sem microfone; o dos outros não trafega. Mostrar
+  o ícone deles exigiria mandar isso pelo protocolo da call.
 
 - **Degradar a tela conforme o número de espectadores** — a malha é N²: quem
   compartilha sobe uma cópia por pessoa que assiste. Em 1080p são 6 Mbps cada,

@@ -156,6 +156,38 @@ permissão do microfone (ou desligue o microfone no sistema antes).
 - [ ] A escolha sobrevive a recarregar a página
 - [ ] Em Safari (ou Firefox antigo) o seletor simplesmente não aparece
 
+## Home
+
+- [ ] Abrir o site sem link mostra a apresentação, com o cartão de entrar
+      visível sem rolar
+- [ ] **Não** aparece "Servidores de descoberta: 0 de 20" na home (fora da sala
+      não há socket aberto, e essa contagem leria como falha total)
+- [ ] "Testar minha rede" funciona na home, antes de entrar em qualquer sala
+- [ ] Abrir um link de convite encolhe o herói: o botão "Entrar na sala"
+      aparece sem rolar
+- [ ] Um link truncado mostra o aviso sem precisar rolar
+- [ ] Só existe um `<h1>` na página (o título "Topaz" do cartão fica escondido)
+- [ ] Em tela de celular, nada estoura para os lados
+
+## Quem está falando
+
+⚠️ **Os limiares nasceram estimados** (`LIMIAR_LIGA = 0.04`,
+`LIMIAR_DESLIGA = 0.02`). Esta é a parte que precisa de ajuste com voz real,
+em microfones diferentes.
+
+- [ ] Falar acende o anel em volta do **seu** círculo
+- [ ] O anel do amigo acende quando ele fala, e não quando você fala
+- [ ] O anel **não pisca** nas pausas entre palavras de uma frase normal
+- [ ] Ficar calado apaga o anel em menos de um segundo
+- [ ] Ventilador, ar-condicionado ou teclado **não** acendem o anel
+- [ ] Falar baixinho ainda acende (se não acender, `LIMIAR_LIGA` está alto)
+- [ ] Silenciar a pessoa no mixer **não** apaga o anel dela — quem silenciou
+      precisa saber que ela está falando
+- [ ] Mutar o próprio microfone apaga o seu anel
+- [ ] Quem sai da call some da fileira e não deixa anel aceso
+- [ ] Sair e voltar da call faz o anel dela voltar a funcionar
+- [ ] A voz **não** sai dobrada (o analisador não pode estar ligado à saída)
+
 ## Teste de rede
 
 Aparece para quem está sozinho na sala ou não conseguiu conectar — que é

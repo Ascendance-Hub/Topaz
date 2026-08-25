@@ -6,7 +6,7 @@ import { coletarCandidatos } from './net/coletar-candidatos'
 import { analisarCandidatos } from './net/diagnostico-rede'
 import type { Analise } from './net/diagnostico-rede'
 import { renderizarTesteRede } from './ui/components/teste-rede'
-import { renderizarLobby } from './ui/components/lobby'
+import { renderizarHome } from './ui/components/home'
 import { renderizarBarraSala } from './ui/components/barra-sala'
 import { renderizarConexao } from './ui/components/conexao'
 import { criarChat } from './ui/components/chat'
@@ -15,6 +15,9 @@ import { renderizarControlesCall } from './ui/components/call'
 import type { AcoesCall } from './ui/components/call'
 import { criarVideoRemoto, mostrarVideo } from './ui/components/video-remoto'
 import { renderizarMixer, chaveVoz, chaveTela } from './ui/components/mixer'
+import { renderizarParticipantes } from './ui/components/participantes'
+import type { Participante } from './ui/components/participantes'
+import { MonitorDeVoz, MS_AMOSTRAGEM } from './call/monitor-voz'
 import { aplicarSaida, limparMidia, removerMidiaDe, suportaTrocarSaida } from './ui/dom-midia'
 import { ehTela } from './call/classificar'
 import { criarCanalCall } from './call/canal'
@@ -119,6 +122,47 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * nada visível.
    */
   let semMicrofone: string | null = null
+
+  /**
+   * Quem está falando agora, medido localmente sobre o áudio que já chega.
+   *
+   * Nada disso trafega: ninguém publica "estou falando". O anel de cada pessoa
+   * é desenhado a partir do som dela que este navegador está recebendo.
+   */
+  const monitorVoz = new MonitorDeVoz()
+  const falantes = new Set<string>()
+  /** O `selfId` não serve de chave para mim: o meu microfone é local e nunca
+   *  chega por `aoReceberMidia`. Uma chave própria evita confundir os dois. */
+  const EU = 'eu'
+
+  monitorVoz.aoMudar((id, falando) => {
+    if (falando) falantes.add(id)
+    else falantes.delete(id)
+    // Só a fileira: redesenhar a página inteira dez vezes por segundo por
+    // causa de um anel seria caro e faria a mesa piscar.
+    desenharParticipantes()
+  })
+
+  /** Quem aparece na fileira: eu, se estou na call, e quem mais estiver. */
+  function participantesAgora(): Participante[] {
+    const atual = protocolo.estado()
+    if (!atual.euNaCall) return []
+    const eu: Participante = {
+      peerId: EU,
+      nome: apelido,
+      euMesmo: true,
+      falando: falantes.has(EU),
+      // Só o meu estado de microfone é conhecido: o dos outros não trafega, e
+      // inventar um ícone a partir de silêncio mentiria para quem está só
+      // ouvindo em silêncio.
+      mudo: midia.microfoneMudo(),
+      semMicrofone: semMicrofone !== null,
+    }
+    const outros = atual.naCall.map((peerId): Participante => ({
+      peerId, nome: apelidoDe(peerId), falando: falantes.has(peerId),
+    }))
+    return [eu, ...outros]
+  }
 
   /** Manda a voz e as telas para a saída escolhida. Precisa rodar de novo a
    *  cada elemento novo — quem entra depois nasceria na saída padrão. */
@@ -243,6 +287,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       // deixava stream e decodificador vivos até a coleta de lixo passar.
       limparMidia(videos)
       limparMidia(audios)
+      // Fecha o contexto de áudio junto: manter um AudioContext aberto fora da
+      // call segura a placa de som sem motivo.
+      monitorVoz.encerrar()
+      falantes.clear()
     },
     compartilhar: () => {
       void midia.compartilharTela(() => {
@@ -295,6 +343,13 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
 
   function removerVideoDe(peerId: string): void {
     removerMidiaDe(videos, peerId)
+  }
+
+  /** Tira a pessoa do áudio E do medidor de voz. O medidor precisa sair
+   *  junto: um analisador esquecido é vazamento, e o anel ficaria aceso. */
+  function removerAudioDe(peerId: string): void {
+    removerMidiaDe(audios, peerId)
+    monitorVoz.esquecer(peerId)
   }
 
   /**
@@ -382,7 +437,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // Um elemento por peer. Cada republicação (sair e voltar da call) traz um
     // stream novo, e sem trocar o elemento os antigos se acumulavam segurando
     // streams mortos.
-    removerMidiaDe(audios, de)
+    removerAudioDe(de)
     const el = document.createElement('audio')
     el.autoplay = true
     el.dataset['de'] = de
@@ -395,6 +450,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     })
     audios.append(el)
     aplicarSaidaEscolhida()
+    // Passa a medir a voz desta pessoa. Idempotente, e trocar o stream (sair e
+    // voltar da call) troca o analisador junto — senão o anel dela nunca mais
+    // acenderia, porque o stream antigo está morto.
+    monitorVoz.observar(de, stream)
   })
 
   /**
@@ -420,6 +479,28 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     midia.sincronizarTela(atual.assistidoPor)
 
     ajustarVideos(atual.assistindo, atual.compartilhando)
+    sincronizarMedidorDeVoz(atual.naCall, atual.euNaCall)
+  }
+
+  /**
+   * Deixa o medidor de voz observando exatamente quem está na call.
+   *
+   * Reconciliação, não detecção de borda — a mesma regra do resto da mídia.
+   * Quem sai da call deixaria para trás um analisador pendurado num stream
+   * morto: vazamento, e o anel dele congelado aceso.
+   *
+   * O meu microfone entra aqui porque ele NUNCA chega por `aoReceberMidia` —
+   * sai daqui direto para a rede. Sem isto eu seria o único sem anel.
+   */
+  function sincronizarMedidorDeVoz(naCall: string[], euNaCall: boolean): void {
+    const meu = midia.microfoneLocal()
+    if (euNaCall && meu) monitorVoz.observar(EU, meu)
+    else monitorVoz.esquecer(EU)
+
+    const devem = new Set(euNaCall ? naCall : [])
+    for (const id of monitorVoz.observando()) {
+      if (id !== EU && !devem.has(id)) monitorVoz.esquecer(id)
+    }
   }
 
   protocolo.aoMudar(() => {
@@ -456,7 +537,19 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   // elemento a cada ida e volta faria as cartas voarem de novo sem motivo.
   const palco = document.createElement('div')
   palco.className = 'palco'
-  app.replaceChildren(barra, nav, palco, controles, lateral, videos, audios)
+  // A fileira de pessoas fica logo acima da barra de controles: é onde
+  // qualquer aplicativo de call põe, e essa é a metade convencional do
+  // desenho — a diferença fica no material, não na disposição.
+  let participantes = renderizarParticipantes([])
+  app.replaceChildren(barra, nav, palco, participantes, controles, lateral, videos, audios)
+
+  /** Só a fileira, sem redesenhar o resto. Chamada a cada mudança de quem
+   *  está falando, que acontece muitas vezes por minuto. */
+  function desenharParticipantes(): void {
+    const nova = renderizarParticipantes(participantesAgora())
+    participantes.replaceWith(nova)
+    participantes = nova
+  }
 
   function desenhar(): void {
     const novaBarra = renderizarBarraSala(codigo, sessao.souHost(), {
@@ -489,6 +582,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     mixer.replaceWith(novoMixer)
     mixer = novoMixer
     aplicarVolumes()
+    desenharParticipantes()
 
     // Enquanto ninguém é anfitrião a mesa ainda não existe: mostrar a mesa
     // vazia com "Aguardando jogadores…" confundiria "ninguém entrou ainda"
@@ -580,8 +674,14 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     sessao.tique(Date.now())
     sincronizarMidia()
   }, 500)
+  // Ritmo próprio, dez vezes mais rápido: o anel precisa acompanhar a fala, e
+  // meio segundo de atraso para acender seria pior que não ter anel. Ainda
+  // assim é bem mais barato que medir a cada quadro.
+  const tiqueVoz = setInterval(() => monitorVoz.tique(Date.now()), MS_AMOSTRAGEM)
   encerrar = () => {
     clearInterval(tique)
+    clearInterval(tiqueVoz)
+    monitorVoz.encerrar()
     midia.desligarMicrofone()
     midia.pararTela()
     sessao.encerrar()
@@ -600,7 +700,35 @@ export const MENSAGEM_ERRO_INICIAL = 'Não foi possível carregar o Topaz. Recar
  */
 export function iniciarApp(app: HTMLElement): void {
   try {
-    app.replaceChildren(renderizarLobby((apelido, codigo) => entrarNaSala(app, apelido, codigo)))
+    // O teste de rede também mora na home, e não só dentro da sala: quem
+    // recebeu um link e não consegue entrar nunca chega à sala para achá-lo.
+    let analise: Analise | null = null
+    let rodando = false
+
+    const desenharHome = (): void => {
+      app.replaceChildren(renderizarHome(
+        (apelido, codigo) => entrarNaSala(app, apelido, codigo),
+        // Sem a lista de servidores, de propósito. Aqui ninguém entrou em sala
+        // ainda, então nenhum socket está aberto e a contagem sairia "0 de 20"
+        // — que lê como falha catastrófica para quem acabou de abrir a página.
+        // A lista só quer dizer alguma coisa DENTRO da sala. O teste de NAT em
+        // si funciona sozinho: ele fala com os servidores STUN direto.
+        { testeRede: renderizarTesteRede(analise, rodando, testar) },
+      ))
+    }
+
+    function testar(): void {
+      if (rodando) return
+      rodando = true
+      desenharHome()
+      void coletarCandidatos().then(({ candidatos, erros }) => {
+        analise = analisarCandidatos(candidatos, erros)
+        rodando = false
+        desenharHome()
+      })
+    }
+
+    desenharHome()
   } catch {
     app.textContent = MENSAGEM_ERRO_INICIAL
   }

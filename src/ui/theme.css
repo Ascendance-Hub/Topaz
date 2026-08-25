@@ -884,3 +884,261 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   background: rgba(240, 179, 74, 0.08);
 }
 .teste-rede-relay[data-conectado='0'] { opacity: 0.45; text-decoration: line-through; }
+
+/* ---------------------------------------------------------------------------
+   A HOME
+   ---------------------------------------------------------------------------
+   Uma página de apresentação, não um cartão de entrada. A ordem é deliberada:
+   a AÇÃO vem antes de qualquer explicação, porque o trabalho da página é
+   deixar entrar — quem já sabe o que quer não deve rolar para achar o botão.
+
+   A ousadia é gasta num lugar só: o herói. O resto é disciplinado de
+   propósito, para que a tese respire.
+   ------------------------------------------------------------------------ */
+.home {
+  max-width: 940px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+}
+
+.home-heroi {
+  text-align: center;
+  padding: 12vh 0 8px;
+}
+
+/* A marca é pequena e larga; quem manda no herói é a frase, não o nome. */
+.home-marca {
+  font-family: var(--corpo);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.42em;
+  color: var(--latao);
+  margin-bottom: 26px;
+}
+
+.home-chamada {
+  font-family: var(--display);
+  /* Escala com a tela sem passar de um tamanho que quebre a linha em duas
+     partes desequilibradas. */
+  font-size: clamp(38px, 7vw, 68px);
+  font-weight: 400;
+  line-height: 1.04;
+  letter-spacing: 0.01em;
+  color: var(--creme);
+  margin: 0;
+}
+
+.home-subchamada {
+  max-width: 46ch;
+  margin: 20px auto 0;
+  color: var(--creme-fraco);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* A assinatura: dois pontos e uma linha, sem nada no meio. Um diagrama de
+   serviço teria um terceiro ponto ali — a ausência dele é o argumento. */
+.home-topologia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin: 40px auto 0;
+  width: min(300px, 60%);
+}
+.home-ponto {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--topazio);
+  box-shadow: 0 0 14px rgba(240, 179, 74, 0.55);
+  flex: none;
+}
+.home-linha {
+  flex: 1;
+  height: 1px;
+  /* Some nas pontas para a linha parecer luz, não um traço de diagrama. */
+  background: linear-gradient(90deg, var(--topazio), var(--latao-fraco), var(--topazio));
+}
+
+/* O cartão de entrar vive dentro da home agora: sem o empurrão de 14vh que ele
+   usava quando era a tela inteira, e sem o próprio título — o herói logo acima
+   já é o h1 da página, e dois h1 numa página só confundem leitor de tela. */
+.home-acao .lobby {
+  margin: 34px auto 0;
+}
+.home-acao .lobby h1 {
+  display: none;
+}
+
+.home-titulo {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--topazio);
+  letter-spacing: 0.02em;
+  margin-bottom: 14px;
+}
+
+.home-texto {
+  color: var(--creme-fraco);
+  font-size: 14.5px;
+  line-height: 1.65;
+  margin: 0;
+  max-width: 62ch;
+}
+
+.home-recursos,
+.home-seguranca,
+.home-rede {
+  margin-top: 72px;
+  /* O fio de latão faz o papel de divisor entre seções sem caixa nenhuma:
+     menos moldura, mais silêncio entre os blocos. */
+  border-top: 1px solid var(--latao-fraco);
+  padding-top: 30px;
+}
+
+.home-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 22px;
+}
+
+.home-recurso {
+  padding: 22px 24px;
+  background: linear-gradient(180deg, rgba(20, 59, 44, 0.42), rgba(13, 42, 32, 0.22));
+  border: 1px solid var(--latao-fraco);
+  border-radius: 16px;
+}
+.home-recurso h3 {
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 400;
+  color: var(--creme);
+  margin-bottom: 10px;
+}
+
+/* A única frase da página sobre a qual a pessoa pode AGIR. Merece peso. */
+.home-destaque {
+  margin-top: 16px;
+  padding: 14px 18px;
+  border-left: 2px solid var(--topazio);
+  background: rgba(240, 179, 74, 0.06);
+  color: var(--creme);
+  font-size: 14.5px;
+  line-height: 1.6;
+  max-width: 62ch;
+}
+
+.home-rede .teste-rede {
+  margin-top: 20px;
+}
+
+/* ---------------------------------------------------------------------------
+   A FILEIRA DE QUEM ESTÁ NA CALL
+   ---------------------------------------------------------------------------
+   A forma é convencional de propósito — círculo com inicial, nome embaixo,
+   anel em quem fala. É a Lei de Jakob: a pessoa passa a maior parte do tempo
+   em OUTROS aplicativos de call, e reconhecer isto sem aprender nada vale mais
+   que ser original aqui. A diferença fica no material: latão, feltro e o anel
+   de topázio no lugar do verde que todo mundo usa.
+   ------------------------------------------------------------------------ */
+.participantes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 18px;
+  margin: 22px auto 0;
+  max-width: 940px;
+}
+
+.participante {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  width: 74px;
+}
+
+.participante-circulo {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, var(--feltro-alto), var(--penumbra));
+  border: 1px solid var(--latao-fraco);
+  /* Duas sombras, sempre declaradas: a transição precisa de algo de onde sair,
+     senão o anel aparece de estalo em vez de acender. */
+  box-shadow: 0 0 0 0 rgba(240, 179, 74, 0), 0 0 0 0 rgba(240, 179, 74, 0);
+  transition: box-shadow 140ms ease-out, border-color 140ms ease-out;
+}
+
+.participante-inicial {
+  font-family: var(--display);
+  font-size: 21px;
+  color: var(--creme);
+  line-height: 1;
+}
+
+.participante-nome {
+  font-size: 11.5px;
+  color: var(--creme-fraco);
+  max-width: 74px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Falando: o anel. Duas camadas — o aro rente ao círculo dá a borda nítida, e
+   o halo largo é a luz que ele joga no feltro. */
+.participante[data-falando='1'] .participante-circulo {
+  border-color: var(--topazio);
+  box-shadow:
+    0 0 0 3px var(--topazio),
+    0 0 22px 4px rgba(240, 179, 74, 0.35);
+}
+.participante[data-falando='1'] .participante-nome {
+  color: var(--creme);
+}
+
+/* Você. Só um traço de latão sob o nome — o suficiente para se achar na
+   fileira sem competir com o anel de quem está falando. */
+.participante[data-eu='1'] .participante-nome {
+  border-bottom: 1px solid var(--latao-fraco);
+  padding-bottom: 2px;
+}
+
+/* Mudo é escolha e se desfaz num clique: só apaga um pouco. */
+.participante[data-mudo='1'] .participante-circulo {
+  opacity: 0.55;
+}
+
+/* Sem microfone é impedimento, não escolha — e o tracejado diz isso sem
+   depender de cor, que é o que some para quem não distingue tons. */
+.participante[data-sem-microfone='1'] .participante-circulo {
+  opacity: 0.5;
+  border-style: dashed;
+  border-color: var(--creme-tenue);
+}
+
+/* Quem pediu menos movimento continua vendo o anel — ele é informação, não
+   enfeite. O que sai é a transição. */
+@media (prefers-reduced-motion: reduce) {
+  .participante-circulo {
+    transition: none;
+  }
+}
+
+/* Chegou por convite: o herói encolhe para o cartão de entrar caber na
+   primeira tela. A apresentação continua ali embaixo para quem quiser. */
+.home[data-convite='1'] .home-heroi {
+  padding-top: 5vh;
+}
+.home[data-convite='1'] .home-chamada {
+  font-size: clamp(30px, 4.5vw, 42px);
+}
+.home[data-convite='1'] .home-topologia {
+  margin-top: 24px;
+}
