@@ -1690,6 +1690,9 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 }
 
 .teste-rede-resumo {
+  /* `inline-block` porque `<summary>` é bloco por padrão: a pílula esticava
+     de ponta a ponta do painel e virava uma faixa, não um botão. */
+  display: inline-block;
   cursor: pointer;
   padding: 8px 12px;
   border-radius: 999px;

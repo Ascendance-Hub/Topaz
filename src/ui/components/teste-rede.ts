@@ -46,9 +46,22 @@ const PARA_TEXTO: Record<string, string> = {
  * Este teste responde a segunda metade, e responde na máquina de quem está
  * com o problema.
  */
+/**
+ * Se o bloco de detalhes está aberto, e como avisar quando a pessoa mexe.
+ *
+ * Mora fora do componente porque o painel é reconstruído a cada desenho da
+ * sala: guardado aqui dentro, o estado morreria a cada clique em qualquer
+ * outro botão da tela.
+ */
+export interface EstadoDetalhes {
+  aberto?: boolean | undefined
+  aoAlternar?: ((aberto: boolean) => void) | undefined
+}
+
 export function renderizarTesteRede(
   analise: Analise | null, rodando: boolean, aoRodar: () => void,
   relays?: RelayDetalhe[],
+  detalhes: EstadoDetalhes = {},
 ): HTMLElement {
   const painel = document.createElement('div')
   painel.className = 'teste-rede'
@@ -88,10 +101,15 @@ export function renderizarTesteRede(
 
     const bloco = document.createElement('details')
     bloco.className = 'teste-rede-detalhes'
-    // Aberto sozinho quando há algo errado: quem está com problema não deveria
-    // precisar descobrir que existe um clique para ver o diagnóstico.
-    bloco.open = poucos
+    // A escolha da pessoa manda; `poucos` só decide na PRIMEIRA vez.
+    //
+    // Sem isto, o bloco reabria a cada `desenhar()` — e como a sala redesenha
+    // a cada clique nos controles da call, parecia que compartilhar tela ou
+    // silenciar alguém abria o diagnóstico. É o mesmo defeito do chat que
+    // perdia o texto: estado vivo num nó que é reconstruído.
+    bloco.open = detalhes.aberto ?? poucos
     if (poucos) bloco.dataset['ruim'] = '1'
+    bloco.ontoggle = () => detalhes.aoAlternar?.(bloco.open)
 
     const resumo = document.createElement('summary')
     resumo.className = 'teste-rede-resumo'

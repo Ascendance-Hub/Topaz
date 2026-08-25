@@ -450,7 +450,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       palco.replaceChildren(renderizarConexao(status, relaysConectados()))
       if (status === 'sem-conexao') {
         palco.append(
-        renderizarTesteRede(analiseRede, testandoRede, testarRede, relaysDetalhados()))
+        renderizarTesteRede(
+          analiseRede, testandoRede, testarRede, relaysDetalhados(), estadoDetalhes))
       }
       return
     }
@@ -485,7 +486,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // conectar", e o teste responde a segunda metade na máquina certa.
     if (conectadosComigo().length <= 1) {
       palco.append(
-        renderizarTesteRede(analiseRede, testandoRede, testarRede, relaysDetalhados()))
+        renderizarTesteRede(
+          analiseRede, testandoRede, testarRede, relaysDetalhados(), estadoDetalhes))
     }
   }
 
@@ -508,6 +510,12 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   let encerrar: () => void = () => {}
 
   let analiseRede: Analise | null = null
+  /** Sobrevive ao redesenho: a sala é reconstruída a cada clique na call. */
+  let detalhesRede: boolean | undefined
+  const estadoDetalhes = {
+    get aberto() { return detalhesRede },
+    aoAlternar: (aberto: boolean) => { detalhesRede = aberto },
+  }
   let testandoRede = false
 
   function testarRede(): void {

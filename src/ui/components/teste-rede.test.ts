@@ -171,3 +171,45 @@ describe('os detalhes de conexão ficam dobrados', () => {
     expect(painel.querySelector('details')).toBeNull()
   })
 })
+
+describe('a escolha de abrir os detalhes sobrevive ao redesenho', () => {
+  const relays = (vivos: number, total = 20) =>
+    Array.from({ length: total }, (_, i) => ({
+      url: `wss://r${i}`, nome: `r${i}.exemplo`, conectado: i < vivos,
+    }))
+
+  it('a escolha da pessoa manda sobre o padrão', () => {
+    // O defeito que isto conserta: a sala é redesenhada a cada clique nos
+    // controles da call, e o bloco reabria toda vez — parecia que compartilhar
+    // tela ou silenciar alguém abria o diagnóstico sozinho.
+    const painel = renderizarTesteRede(
+      null, false, vi.fn(), relays(3), { aberto: false })
+
+    expect(painel.querySelector<HTMLDetailsElement>('details')!.open).toBe(false)
+  })
+
+  it('quem quis abrir continua com ele aberto, mesmo com a rede saudável', () => {
+    const painel = renderizarTesteRede(
+      null, false, vi.fn(), relays(18), { aberto: true })
+
+    expect(painel.querySelector<HTMLDetailsElement>('details')!.open).toBe(true)
+  })
+
+  it('sem escolha registrada, o padrão continua valendo', () => {
+    const painel = renderizarTesteRede(null, false, vi.fn(), relays(3), {})
+
+    expect(painel.querySelector<HTMLDetailsElement>('details')!.open).toBe(true)
+  })
+
+  it('mexer no bloco avisa quem guarda a escolha', () => {
+    const aoAlternar = vi.fn()
+    const painel = renderizarTesteRede(
+      null, false, vi.fn(), relays(18), { aoAlternar })
+    const bloco = painel.querySelector<HTMLDetailsElement>('details')!
+
+    bloco.open = true
+    bloco.dispatchEvent(new Event('toggle'))
+
+    expect(aoAlternar).toHaveBeenCalledWith(true)
+  })
+})
