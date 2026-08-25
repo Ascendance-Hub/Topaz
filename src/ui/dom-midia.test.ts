@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest'
-import { elementosDe, limparMidia, removerMidiaDe, soltarMidia } from './dom-midia'
+import {
+  aplicarSaida, elementosDe, limparMidia, removerMidiaDe, soltarMidia, suportaTrocarSaida,
+} from './dom-midia'
 
 /** Uma caixa de vídeo como `criarVideoRemoto` monta: o `data-de` fica na
  *  caixa, e o elemento de mídia é filho dela. */
@@ -126,5 +128,89 @@ describe('removerMidiaDe', () => {
 
     expect(() => removerMidiaDe(area, 'pz')).not.toThrow()
     expect(area.children).toHaveLength(1)
+  })
+})
+
+describe('saída de áudio', () => {
+  const proto = HTMLMediaElement.prototype as unknown as Record<string, unknown>
+
+  /**
+   * Troca o `setSinkId` do protótipo e devolve ao original no fim.
+   *
+   * Devolver ao original importa: o happy-dom **tem** `setSinkId`, ao
+   * contrário do que eu presumi ao escrever isto. Um `delete` cego apagaria o
+   * método para os testes seguintes do arquivo inteiro.
+   */
+  function comPrototipo<T>(falso: unknown, corpo: () => T): T {
+    const original = proto['setSinkId']
+    if (falso === undefined) delete proto['setSinkId']
+    else proto['setSinkId'] = falso
+    try {
+      return corpo()
+    } finally {
+      if (original === undefined) delete proto['setSinkId']
+      else proto['setSinkId'] = original
+    }
+  }
+
+  function comSuporte(): { chamadas: string[]; falso: unknown } {
+    const chamadas: string[] = []
+    return {
+      chamadas,
+      falso: function (id: string) {
+        chamadas.push(id)
+        return Promise.resolve()
+      },
+    }
+  }
+
+  it('sem suporte no navegador, não finge que dá', () => {
+    // Safari não tem setSinkId, e o Firefox só ganhou tarde. Um seletor que a
+    // pessoa mexe e não muda nada é pior que seletor nenhum — ela conclui que
+    // o site quebrou. Por isso quem monta a UI pergunta antes.
+    comPrototipo(undefined, () => {
+      expect(suportaTrocarSaida()).toBe(false)
+    })
+  })
+
+  it('sem suporte, aplicar não lança', () => {
+    comPrototipo(undefined, () => {
+      const area = document.createElement('div')
+      area.append(audioDe('pa'))
+
+      expect(() => aplicarSaida(area, 'fone')).not.toThrow()
+    })
+  })
+
+  it('manda todo áudio e vídeo da área para a saída escolhida', () => {
+    const { chamadas, falso } = comSuporte()
+
+    comPrototipo(falso, () => {
+      const area = document.createElement('div')
+      area.append(audioDe('pa'), caixaComVideo('pb'))
+
+      expect(suportaTrocarSaida()).toBe(true)
+      aplicarSaida(area, 'fone-usb')
+
+      // O vídeo também: a tela compartilhada leva o áudio do sistema junto, e
+      // deixá-lo no alto-falante enquanto a voz vai para o fone é meio caminho.
+      expect(chamadas).toEqual(['fone-usb', 'fone-usb'])
+    })
+  })
+
+  it('recusa do navegador não vira rejeição solta', async () => {
+    const recusa = () => Promise.reject(new Error('NotAllowedError'))
+
+    comPrototipo(recusa, () => {
+      const area = document.createElement('div')
+      area.append(audioDe('pa'))
+
+      expect(() => aplicarSaida(area, 'x')).not.toThrow()
+    })
+
+    // Uma promessa rejeitada sem tratamento enche o console e, em alguns
+    // navegadores, derruba o tratador que a chamou. Se o `catch` sumisse, este
+    // ciclo do laço de eventos acusaria.
+    await Promise.resolve()
   })
 })

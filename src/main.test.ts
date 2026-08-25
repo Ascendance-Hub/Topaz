@@ -642,3 +642,86 @@ describe('entrarNaSala — diagnóstico de "achou mas não conectou"', () => {
     }
   })
 })
+
+describe('entrarNaSala — microfone negado não pode matar o botão', () => {
+  /**
+   * Troca `navigator.mediaDevices` por um que recusa a permissão, como o
+   * navegador faz quando a pessoa clica em "Bloquear".
+   */
+  function microfoneNegado(): () => void {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices')
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: () =>
+          Promise.reject(Object.assign(new Error('denied'), { name: 'NotAllowedError' })),
+        enumerateDevices: () => Promise.resolve([]),
+        addEventListener: () => {},
+      },
+    })
+    return () => {
+      if (original) Object.defineProperty(navigator, 'mediaDevices', original)
+      else Reflect.deleteProperty(navigator as unknown as object, 'mediaDevices')
+    }
+  }
+
+  /** Deixa as promessas da cadeia de entrada resolverem, sem mexer no relógio
+   *  falso — a cadeia é toda de microtarefas. */
+  async function escoarPromessas(): Promise<void> {
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+  }
+
+  function salaComCall() {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
+    outraAba.entrar('Alex')
+
+    vi.mocked(criarSalasTrystero).mockImplementation(() => salaFalsa())
+    vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
+
+    const app = document.createElement('div')
+    entrarNaSala(app, 'Bruno', 'CODIGO01')
+    rede.bombear()
+    vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+    outraAba.tique(Date.now())
+    return { app }
+  }
+
+  it('entra na call mesmo assim, só ouvindo', async () => {
+    // O defeito: `void midia.ligarMicrofone().then(...)` sem catch. A promessa
+    // rejeitava, `protocolo.entrar()` nunca rodava, e clicar em "Entrar na
+    // call" não fazia NADA — sem aviso, sem erro na tela.
+    vi.useFakeTimers()
+    const desfazer = microfoneNegado()
+    try {
+      const { app } = salaComCall()
+
+      app.querySelector<HTMLButtonElement>('[data-call="entrar"]')!.click()
+      await escoarPromessas()
+
+      expect(app.querySelector('[data-call="sair"]')).not.toBeNull()
+      expect(app.querySelector('[data-call="entrar"]')).toBeNull()
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+
+  it('diz o motivo e oferece tentar de novo', async () => {
+    vi.useFakeTimers()
+    const desfazer = microfoneNegado()
+    try {
+      const { app } = salaComCall()
+
+      app.querySelector<HTMLButtonElement>('[data-call="entrar"]')!.click()
+      await escoarPromessas()
+
+      // Entrar sem microfone é aceitável. Entrar sem saber, não.
+      expect(app.querySelector('.call-sem-microfone')!.textContent).toContain('bloqueou')
+      expect(app.querySelector('[data-call="tentar-microfone"]')).not.toBeNull()
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+})

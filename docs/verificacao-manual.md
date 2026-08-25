@@ -132,6 +132,30 @@ Recarregar resolve.
 - [ ] Na aba Network do navegador, **nenhuma requisição sai para
       `fonts.googleapis.com` ou `fonts.gstatic.com`**
 
+## Microfone negado e saída de áudio
+
+Escritos em 2026-08-24, ainda não vistos com gente de verdade.
+
+**Entrar só ouvindo.** Recarregue e clique em "Entrar na call" negando a
+permissão do microfone (ou desligue o microfone no sistema antes).
+
+- [ ] A pessoa **entra na call** — aparece "Sair da call", não fica no "Entrar"
+- [ ] Um aviso em vermelho diz o motivo e cita o cadeado da barra de endereços
+- [ ] O botão "Mutar meu microfone" **não** aparece — não há o que mutar
+- [ ] Ela **ouve** quem está falando
+- [ ] Libere o microfone no cadeado e clique em "Ativar microfone": ela passa a
+      falar, e o aviso some sem precisar recarregar
+- [ ] Sair e entrar de novo com a permissão concedida não deixa o aviso preso
+
+**Saída de áudio.** Precisa de mais de uma saída (fone + alto-falante).
+
+- [ ] O seletor aparece com dois ou mais aparelhos, e **não** aparece com um só
+- [ ] Trocar move a voz das pessoas para o aparelho escolhido
+- [ ] Trocar move **também o som da tela compartilhada**, não só a voz
+- [ ] Quem entra na call depois já sai pelo aparelho escolhido
+- [ ] A escolha sobrevive a recarregar a página
+- [ ] Em Safari (ou Firefox antigo) o seletor simplesmente não aparece
+
 ## Teste de rede
 
 Aparece para quem está sozinho na sala ou não conseguiu conectar — que é

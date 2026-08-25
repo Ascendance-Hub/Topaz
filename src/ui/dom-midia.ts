@@ -56,3 +56,44 @@ export function limparMidia(container: ParentNode): void {
   for (const el of [...container.children]) soltarTudoDentro(el)
   container.replaceChildren()
 }
+
+/**
+ * `setSinkId` manda um elemento de mídia para uma saída de áudio específica.
+ * Existe no Chrome e no Edge; Safari não tem, e o Firefox só ganhou tarde.
+ */
+type MidiaComSaida = HTMLMediaElement & { setSinkId?: (id: string) => Promise<void> }
+
+/**
+ * Se este navegador sabe trocar a saída de áudio.
+ *
+ * Quem monta a interface pergunta antes de desenhar o seletor: um controle que
+ * a pessoa mexe e não muda nada é pior do que não ter controle nenhum — ela
+ * conclui que o site está quebrado, em vez de que o navegador não suporta.
+ */
+export function suportaTrocarSaida(): boolean {
+  return typeof HTMLMediaElement !== 'undefined'
+    && 'setSinkId' in HTMLMediaElement.prototype
+}
+
+/**
+ * Manda todo o áudio e vídeo da área para a saída escolhida.
+ *
+ * O vídeo entra junto de propósito: a tela compartilhada leva o áudio do
+ * sistema, e mandar a voz para o fone deixando o som do jogo no alto-falante
+ * seria resolver metade do problema.
+ *
+ * Roda sobre os elementos que existem AGORA, então precisa ser chamada de novo
+ * quando alguém novo aparece — a saída escolhida é estado da pessoa, e um
+ * elemento criado depois nasceria na saída padrão.
+ */
+export function aplicarSaida(container: ParentNode, deviceId: string): void {
+  if (!suportaTrocarSaida()) return
+  for (const el of container.querySelectorAll('video, audio')) {
+    // A promessa pode ser recusada (permissão, aparelho que sumiu). Sem o
+    // catch isso vira rejeição não tratada: enche o console e, dependendo de
+    // onde foi chamada, derruba o tratador que a chamou.
+    void (el as MidiaComSaida).setSinkId?.(deviceId).catch((erro: unknown) => {
+      console.warn('não deu para trocar a saída de áudio:', erro)
+    })
+  }
+}

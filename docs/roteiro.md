@@ -6,14 +6,19 @@ as coisas andam — não é plano de implementação (esses vivem em
 
 ## Pronto
 
-Tudo abaixo está na `main` e **verificado em uso real**, não só por teste.
+Tudo abaixo está na `main` e **verificado em uso real**, não só por teste — com
+duas exceções marcadas 🕓, escritas em 2026-08-24 e ainda não vistas com gente.
 
 - **Blackjack multijogador** — regras completas, eleição e migração de
   anfitrião, reconexão, partida com eliminação.
 - **Chat da sala** — texto livre, canal próprio fora do estado do jogo, painel
   que sobrevive aos re-renders da mesa.
 - **Call de voz** — entrar e sair, mudo próprio, silenciar todo mundo, seletor
-  de microfone trocável no meio da call (via `replaceTrack`, sem renegociar).
+  de microfone trocável no meio da call (via `replaceTrack`, sem renegociar) e
+  🕓 **seletor de saída de áudio** (`setSinkId`), que leva junto o som das telas.
+- 🕓 **Entrar só ouvindo** — microfone negado, ausente ou ocupado não impede mais
+  a entrada: a barra diz o motivo e oferece "Ativar microfone". Antes disso, a
+  permissão negada matava o botão em silêncio.
 - **Compartilhamento de tela** — assinatura explícita (o codificador só liga
   quando alguém pede para assistir), H.264 forçado por `setParameters`,
   qualidade e `contentHint` no seletor, **áudio do sistema junto** com bitrate
@@ -113,8 +118,8 @@ Decisões já tomadas neste ciclo:
   ⚠️ Revisto em 2026-08-24: o padrão passou a ser **1080p**. Ver "Pronto".
 - **Seletor de microfone**, trocável no meio da call via `replaceTrack` (sem
   renegociar). Junto vai o seletor de saída de áudio, que é a mesma UI.
-  ⚠️ O de microfone foi feito; o de saída de áudio (`setSinkId`) **não**, e é a
-  única parte do acabamento da call que ficou faltando.
+  ✅ Os dois foram feitos. O de saída não aparece em navegador sem `setSinkId`
+  (Safari, Firefox antigo): um seletor que não muda nada é pior que nenhum.
 - Coexistência de mesa e tela resolvida por **Picture-in-Picture nativo**, com
   vídeo flutuante em página como padrão.
 - **Celular: a call não funciona**, e a interface diz isso sem rodeios. O
@@ -164,14 +169,6 @@ eliminam.
 
 ### Defeitos conhecidos
 
-- **Negar o microfone mata o botão em silêncio.** `main.ts` faz
-  `void midia.ligarMicrofone().then(...)` sem `catch`. Se a permissão é negada,
-  `getUserMedia` rejeita, `protocolo.entrar()` nunca roda, e clicar em "Entrar
-  na call" simplesmente não faz nada — sem aviso, sem erro visível. É o
-  "entrar só ouvindo" que estava adiado, mas o defeito é maior que a feature:
-  hoje a pessoa fica sem entender por que o botão não responde.
-  **Prioridade alta** — falha silenciosa é a classe de bug que mais custou
-  neste projeto.
 - **A conexão reserva não é adotada.** Quando a rede dona de um peer cai, a
   duplicata das outras redes não é promovida — o `onPeerJoin` dela já tinha
   sido ignorado. Ela custa memória e não serve para nada. Fechá-la não é a
@@ -194,8 +191,6 @@ eliminam.
 
 Nada aqui é defeito; são coisas que cabem depois.
 
-- **Seletor de saída de áudio** (`setSinkId`) — a única parte do acabamento da
-  call que não foi feita. Mesma UI do seletor de microfone.
 - **Degradar a tela conforme o número de espectadores** — a malha é N²: quem
   compartilha sobe uma cópia por pessoa que assiste. Em 1080p são 6 Mbps cada,
   então quatro espectadores são 24 Mbps de subida. A maior otimização já está

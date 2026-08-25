@@ -15,13 +15,14 @@ import { renderizarControlesCall } from './ui/components/call'
 import type { AcoesCall } from './ui/components/call'
 import { criarVideoRemoto, mostrarVideo } from './ui/components/video-remoto'
 import { renderizarMixer, chaveVoz, chaveTela } from './ui/components/mixer'
-import { limparMidia, removerMidiaDe } from './ui/dom-midia'
+import { aplicarSaida, limparMidia, removerMidiaDe, suportaTrocarSaida } from './ui/dom-midia'
 import { ehTela } from './call/classificar'
 import { criarCanalCall } from './call/canal'
 import { ProtocoloCall } from './call/protocolo'
 import { Midia } from './call/midia'
 import {
-  escolherMicrofone, lembrarMicrofone, microfoneLembrado, microfones,
+  escolherMicrofone, escolherSaida, lembrarMicrofone, lembrarSaida, microfoneLembrado,
+  microfones, motivoSemMicrofone, saidaLembrada, saidasDeAudio,
 } from './call/dispositivos'
 import type { Dispositivo } from './call/dispositivos'
 import { renderizar } from './ui/render'
@@ -105,6 +106,27 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   }
 
   let aparelhos: Dispositivo[] = []
+  /** As saídas de áudio. Fica vazia quando o navegador não sabe trocar, e aí
+   *  a barra nem desenha o seletor. */
+  let saidas: Dispositivo[] = []
+  let saidaAtual: string | null = null
+  /**
+   * Por que o microfone não abriu, ou `null` se abriu.
+   *
+   * Preenchido significa que a pessoa está na call **só ouvindo**. Antes disto
+   * existir, negar a permissão fazia o `getUserMedia` rejeitar sem `catch`:
+   * `protocolo.entrar()` nunca rodava e o botão "Entrar na call" não fazia
+   * nada visível.
+   */
+  let semMicrofone: string | null = null
+
+  /** Manda a voz e as telas para a saída escolhida. Precisa rodar de novo a
+   *  cada elemento novo — quem entra depois nasceria na saída padrão. */
+  function aplicarSaidaEscolhida(): void {
+    if (!saidaAtual) return
+    aplicarSaida(audios, saidaAtual)
+    aplicarSaida(videos, saidaAtual)
+  }
 
   /**
    * Relê a lista de microfones.
@@ -118,15 +140,51 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    */
   async function relerMicrofones(): Promise<void> {
     try {
-      aparelhos = microfones(await navigator.mediaDevices.enumerateDevices())
+      const lista = await navigator.mediaDevices.enumerateDevices()
+      aparelhos = microfones(lista)
+      // Sem `setSinkId` a lista fica vazia de propósito: um seletor que a
+      // pessoa mexe e não muda nada faz ela achar que o site quebrou.
+      saidas = suportaTrocarSaida() ? saidasDeAudio(lista) : []
     } catch {
       aparelhos = []
+      saidas = []
     }
+
+    const saidaEscolhida = escolherSaida(saidas, saidaAtual ?? saidaLembrada())
+    if (saidaEscolhida && saidaEscolhida !== saidaAtual) {
+      saidaAtual = saidaEscolhida
+      aplicarSaidaEscolhida()
+    }
+
     const escolhido = escolherMicrofone(aparelhos, midia.microfoneAtual() ?? microfoneLembrado())
     if (escolhido && escolhido !== midia.microfoneAtual()) {
-      await midia.trocarMicrofone(escolhido)
+      // Trocar o microfone também abre um `getUserMedia`, e ele rejeita pelos
+      // mesmos motivos do primeiro. Sem este catch, um fone arrancado no meio
+      // da conversa deixava a interface parada em silêncio.
+      try {
+        await midia.trocarMicrofone(escolhido)
+        semMicrofone = null
+      } catch (erro: unknown) {
+        semMicrofone = motivoSemMicrofone(erro)
+      }
     }
     desenhar()
+  }
+
+  /**
+   * Abre o microfone, guardando o motivo se não der.
+   *
+   * Nunca rejeita: quem chama continua o fluxo de qualquer jeito, porque
+   * entrar na call sem microfone é um desfecho válido — o inválido era não
+   * entrar e não dizer nada.
+   */
+  async function abrirMicrofone(): Promise<void> {
+    try {
+      await midia.ligarMicrofone()
+      semMicrofone = null
+    } catch (erro: unknown) {
+      semMicrofone = motivoSemMicrofone(erro)
+    }
   }
 
   try {
@@ -139,20 +197,44 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   const acoesCall: AcoesCall = {
     entrar: () => {
       // O microfone sobe ANTES de anunciar: anunciar primeiro faria os outros
-      // esperarem um áudio que ainda não existe, e se a permissão fosse negada
-      // eu apareceria na call mudo sem saber.
-      void midia.ligarMicrofone().then(async () => {
+      // esperarem um áudio que ainda não existe.
+      //
+      // Mas a falha dele NÃO impede a entrada. Antes, `ligarMicrofone()` sem
+      // `catch` fazia a permissão negada matar o botão em silêncio — nada
+      // acontecia e a pessoa não sabia por quê. Agora ela entra só ouvindo, e
+      // a barra diz o motivo.
+      void abrirMicrofone().then(async () => {
         protocolo.entrar()
         // Só agora os nomes dos aparelhos existem: a permissão acabou de ser
-        // concedida.
+        // concedida. (Com a permissão negada a lista vem anônima, o que é
+        // exatamente o motivo de o seletor não aparecer nesse caso.)
         await relerMicrofones()
         // E sincroniza de novo depois de capturar: quem anunciou durante a
         // janela de permissão só é alcançado aqui.
         sincronizarMidia()
+        desenhar()
       })
+    },
+    tentarMicrofone: () => {
+      // A pessoa liberou a permissão no cadeado, ou fechou o programa que
+      // segurava o aparelho. Só o microfone sobe — ela já está na call.
+      void abrirMicrofone().then(async () => {
+        await relerMicrofones()
+        sincronizarMidia()
+        desenhar()
+      })
+    },
+    trocarSaida: (deviceId) => {
+      saidaAtual = deviceId
+      lembrarSaida(deviceId)
+      aplicarSaidaEscolhida()
+      desenhar()
     },
     sair: () => {
       protocolo.sair()
+      // O motivo era do estado "entrei sem microfone". Fora da call ele não
+      // descreve mais nada, e ficaria pendurado na próxima entrada.
+      semMicrofone = null
       midia.desligarMicrofone()
       midia.pararTela()
       // Sair precisa calar tudo de verdade: um `<video>` escondido continua
@@ -291,6 +373,9 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       const caixa = criarVideoRemoto(de, stream, apelidoDe(de))
       videos.append(caixa)
       mostrarVideo(caixa, protocolo.estado().assistindo.includes(de))
+      // Elemento novo nasce na saída padrão do sistema; a saída escolhida é
+      // estado da pessoa e precisa valer para quem chegou agora também.
+      aplicarSaidaEscolhida()
       return
     }
 
@@ -309,6 +394,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       console.warn('áudio da call bloqueado pelo navegador:', erro)
     })
     audios.append(el)
+    aplicarSaidaEscolhida()
   })
 
   /**
@@ -391,6 +477,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
         {
           apelidoDe, meuMicrofoneMudo: midia.microfoneMudo(), todosSilenciados,
           microfones: aparelhos, microfoneAtual: midia.microfoneAtual(),
+          semMicrofone, saidas, saidaAtual,
         })
     controles.replaceWith(novosControles)
     controles = novosControles
