@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { classificacao } from './classificacao'
-import { REGRAS } from './rules'
+import { REGRAS, CONFIG_PADRAO } from './rules'
 import type { EstadoJogo, Jogador } from './types'
 
 /**
@@ -22,6 +22,7 @@ function estadoCom(jogadores: Jogador[], vencedor: string | null): EstadoJogo {
   return {
     fase: 'fim', jogadores, vezDe: null, prazoTurno: null, maoDealer: [],
     dealerTemOculta: false, cartasRestantes: 0, hostAtual: 'p1', rodada: 20,
+    config: { ...CONFIG_PADRAO },
     proximoIdMao: 1, vencedor, naPartida: jogadores.map((j) => j.peerId),
   }
 }

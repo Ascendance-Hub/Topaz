@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderizarSalaParada, AVISO_SOZINHO } from './sala'
 import type { EstadoJogo, Jogador } from '../../game/types'
+import { CONFIG_PADRAO } from '../../game/rules'
 
 function jogador(peerId: string, apelido: string): Jogador {
   return {
@@ -13,6 +14,7 @@ function jogador(peerId: string, apelido: string): Jogador {
 
 function estadoCom(...jogadores: Jogador[]): EstadoJogo {
   return {
+    config: { ...CONFIG_PADRAO },
     fase: 'aguardando', jogadores, vezDe: null, prazoTurno: null,
     maoDealer: [], dealerTemOculta: false, cartasRestantes: 312,
     hostAtual: 'eu', rodada: 0, proximoIdMao: 1, vencedor: null, naPartida: [],

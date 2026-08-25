@@ -287,6 +287,26 @@ como mostrá-lo de novo, porque a chave guardada é não extraível de propósit
 ⚠️ Grupo é um atalho **por navegador**. Noutro computador a lista começa vazia
 — é o mesmo preço da foto e da identidade, e a interface diz isso.
 
+## Formato da partida
+
+- [ ] Em Ajustes → A partida, o anfitrião vê os quatro campos editáveis
+- [ ] Quem **não** é anfitrião vê os mesmos valores, **legíveis** e travados,
+      com o motivo escrito
+- [ ] Com a partida em andamento, nem o anfitrião edita — e a tela diz por quê
+- [ ] Marcar "Jogar até sobrar um" apaga o campo de alvo
+- [ ] Salvar com "até sobrar um" faz a partida seguir mesmo com alguém muito à
+      frente; ela só acaba quando sobra um
+- [ ] Mudar as fichas iniciais **não** dá dinheiro a quem já está na sala
+- [ ] Quem entra depois recebe as fichas novas
+- [ ] "Nova partida" redistribui com o valor novo
+- [ ] Mudar o tempo de jogada muda o ritmo da barra de prazo na mesa
+- [ ] O amigo vê a mudança sem recarregar
+
+**O defeito que isto conserta:**
+
+- [ ] Com o padrão novo (alvo 2500), apostar 500 e ganhar a primeira mão
+      **não** encerra mais a partida
+
 ## Teste de rede
 
 Aparece para quem está sozinho na sala ou não conseguiu conectar — que é

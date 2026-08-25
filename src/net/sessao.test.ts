@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { criarRedeFalsa } from './transport.fake'
 import { elegerHost, mesaPrevalece, Sessao, MS_DESCOBERTA, MS_SEM_CONEXAO } from './sessao'
 import { rngSemente } from '../game/shoe'
-import { REGRAS } from '../game/rules'
+import { REGRAS, CONFIG_PADRAO } from '../game/rules'
 import type { EstadoJogo } from '../game/types'
 
 const rng = () => rngSemente(99)
@@ -38,6 +38,7 @@ function abrirSala(ids: string[]) {
 
 function estadoFalso(over: Partial<EstadoJogo> = {}): EstadoJogo {
   return {
+    config: { ...CONFIG_PADRAO },
     fase: 'apostas', jogadores: [], vezDe: null, prazoTurno: null,
     maoDealer: [], dealerTemOculta: false, cartasRestantes: 312,
     hostAtual: 'px', rodada: 1, proximoIdMao: 1,
@@ -385,7 +386,7 @@ describe('Sessao', () => {
     expect(a.estado().jogadores.map((j) => j.apelido).sort()).toEqual(['Ana', 'Bruno', 'Carla'])
     const bruno = a.estado().jogadores.find((j) => j.apelido === 'Bruno')!
     expect(bruno.cadeira).toBe(0)
-    expect(bruno.fichas).toBe(REGRAS.stackInicial)
+    expect(bruno.fichas).toBe(CONFIG_PADRAO.fichasIniciais)
   })
 })
 
@@ -411,7 +412,7 @@ describe('migração de host', () => {
     tA!.sair()
 
     const bruno = b!.estado().jogadores.find((j) => j.peerId === 'pb')!
-    expect(bruno.fichas).toBe(REGRAS.stackInicial)
+    expect(bruno.fichas).toBe(CONFIG_PADRAO.fichasIniciais)
     expect(bruno.cadeira).toBe(0)
   })
 
@@ -558,7 +559,7 @@ describe('reconexão', () => {
 
     const voltou = a!.estado().jogadores.find((j) => j.apelido === 'Bruno')!
     expect(voltou.cadeira).toBe(2)
-    expect(voltou.fichas).toBe(REGRAS.stackInicial)
+    expect(voltou.fichas).toBe(CONFIG_PADRAO.fichasIniciais)
   })
 
   it('remove o ausente depois da janela de reconexão', () => {

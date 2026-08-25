@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { criarContexto, aplicar, avancar, cartasVisiveis, decidirFim } from './machine'
 import { rngSemente } from './shoe'
-import { REGRAS } from './rules'
+import { REGRAS, CONFIG_PADRAO } from './rules'
 import type { Contexto } from './machine'
 import type { EstadoJogo, Jogador } from './types'
 
@@ -37,7 +37,7 @@ describe('entrar e sentar', () => {
     let ctx = criarContexto('p1', RNG())
     ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
     expect(ctx.estado.jogadores[0]).toMatchObject({
-      peerId: 'p1', apelido: 'Alex', cadeira: null, fichas: REGRAS.stackInicial,
+      peerId: 'p1', apelido: 'Alex', cadeira: null, fichas: CONFIG_PADRAO.fichasIniciais,
     })
   })
 
@@ -173,7 +173,7 @@ describe('apostas', () => {
     let ctx = comDoisJogadores()
     ctx = aplicar(ctx, 'p1', { tipo: 'apostar', valor: 100 }, 0, RNG())
     const p1 = ctx.estado.jogadores.find((j) => j.peerId === 'p1')!
-    expect(p1.fichas).toBe(REGRAS.stackInicial - 100)
+    expect(p1.fichas).toBe(CONFIG_PADRAO.fichasIniciais - 100)
     expect(p1.maos[0]!.aposta).toBe(100)
   })
 
@@ -203,19 +203,19 @@ describe('apostas', () => {
   it('deixa de fora quem não apostou até o prazo', () => {
     let ctx = comDoisJogadores()
     ctx = aplicar(ctx, 'p1', { tipo: 'apostar', valor: 100 }, 0, RNG())
-    ctx = avancar(ctx, REGRAS.segundosTurno * 1000 + 1, RNG())
+    ctx = avancar(ctx, CONFIG_PADRAO.segundosTurno * 1000 + 1, RNG())
     expect(ctx.estado.fase).not.toBe('apostas')
     expect(ctx.estado.jogadores.find((j) => j.peerId === 'p2')!.maos).toHaveLength(0)
   })
 
   it('não distribui e reinicia o prazo quando o prazo expira sem nenhuma aposta', () => {
     let ctx = comDoisJogadores()
-    ctx = avancar(ctx, REGRAS.segundosTurno * 1000 + 1, RNG())
+    ctx = avancar(ctx, CONFIG_PADRAO.segundosTurno * 1000 + 1, RNG())
     expect(ctx.estado.fase).toBe('apostas')
     expect(ctx.estado.maoDealer).toHaveLength(0)
     expect(ctx.estado.jogadores.every((j) => j.maos.length === 0)).toBe(true)
     expect(ctx.estado.prazoTurno).toBe(
-      REGRAS.segundosTurno * 1000 + 1 + REGRAS.segundosTurno * 1000,
+      CONFIG_PADRAO.segundosTurno * 1000 + 1 + CONFIG_PADRAO.segundosTurno * 1000,
     )
   })
 })
@@ -238,7 +238,9 @@ describe('sapata nunca vaza no estado', () => {
     ctx = aplicar(ctx, 'p2', { tipo: 'apostar', valor: 100 }, 0, RNG())
     ctx = avancar(ctx, 0, RNG())
     expect(Object.keys(ctx.estado).sort()).toEqual([
-      'cartasRestantes', 'dealerTemOculta', 'fase', 'hostAtual',
+      // `config` viaja no estado de propósito: é assim que todo mundo joga com
+      // o mesmo formato sem precisar combinar nada.
+      'config', 'cartasRestantes', 'dealerTemOculta', 'fase', 'hostAtual',
       'maoDealer', 'jogadores', 'prazoTurno', 'proximoIdMao',
       'rodada', 'vezDe', 'vencedor', 'naPartida',
     ].sort())
@@ -259,7 +261,7 @@ describe('turnos', () => {
 
   it('define prazo do turno', () => {
     const ctx = emTurnos()
-    expect(ctx.estado.prazoTurno).toBe(REGRAS.segundosTurno * 1000)
+    expect(ctx.estado.prazoTurno).toBe(CONFIG_PADRAO.segundosTurno * 1000)
   })
 
   it('adiciona carta ao pedir', () => {
@@ -285,7 +287,7 @@ describe('turnos', () => {
 
   it('para automaticamente quando o prazo expira', () => {
     let ctx = emTurnos()
-    ctx = avancar(ctx, REGRAS.segundosTurno * 1000 + 1, RNG())
+    ctx = avancar(ctx, CONFIG_PADRAO.segundosTurno * 1000 + 1, RNG())
     expect(ctx.estado.vezDe).toBe('p2')
     expect(ctx.estado.jogadores[0]!.maos[0]!.encerrada).toBe(true)
     expect(ctx.estado.jogadores[0]!.rodadasInativo).toBe(1)
@@ -294,7 +296,7 @@ describe('turnos', () => {
   it('vira espectador após duas rodadas inativo', () => {
     let ctx = emTurnos()
     ctx.estado.jogadores[0]!.rodadasInativo = 1
-    ctx = avancar(ctx, REGRAS.segundosTurno * 1000 + 1, RNG())
+    ctx = avancar(ctx, CONFIG_PADRAO.segundosTurno * 1000 + 1, RNG())
     expect(ctx.estado.jogadores[0]!.cadeira).toBeNull()
   })
 })
@@ -429,9 +431,9 @@ describe('seguro', () => {
     const p1 = ctx.estado.jogadores.find((j) => j.peerId === 'p1')!
     const p2 = ctx.estado.jogadores.find((j) => j.peerId === 'p2')!
     // p1: -100 (aposta) -50 (seguro) +0 (mão perdida) +150 (seguro pago 2:1) = 1000
-    expect(p1.fichas).toBe(REGRAS.stackInicial)
+    expect(p1.fichas).toBe(CONFIG_PADRAO.fichasIniciais)
     // p2: -100 (aposta), sem seguro, mão perdida
-    expect(p2.fichas).toBe(REGRAS.stackInicial - 100)
+    expect(p2.fichas).toBe(CONFIG_PADRAO.fichasIniciais - 100)
   })
 
   it('perde o seguro quando o dealer não tem blackjack', () => {
@@ -465,8 +467,8 @@ describe('seguro', () => {
     const p1 = ctx.estado.jogadores.find((j) => j.peerId === 'p1')!
     const p2 = ctx.estado.jogadores.find((j) => j.peerId === 'p2')!
     // p1: -100 (aposta) -50 (seguro perdido) +0 (11 perde de 17) = 850
-    expect(p1.fichas).toBe(REGRAS.stackInicial - 150)
-    expect(p2.fichas).toBe(REGRAS.stackInicial - 100)
+    expect(p1.fichas).toBe(CONFIG_PADRAO.fichasIniciais - 150)
+    expect(p2.fichas).toBe(CONFIG_PADRAO.fichasIniciais - 100)
   })
 })
 
@@ -484,7 +486,7 @@ describe('reconexão', () => {
     const recuperado = ctx.estado.jogadores.find((j) => j.apelido === 'Alex')!
     expect(recuperado.peerId).toBe('p1-novo')
     expect(recuperado.cadeira).toBe(0)
-    expect(recuperado.fichas).toBe(REGRAS.stackInicial - 100)
+    expect(recuperado.fichas).toBe(CONFIG_PADRAO.fichasIniciais - 100)
     expect(recuperado.desconectadoEm).toBeNull()
   })
 })
@@ -512,7 +514,7 @@ describe('acerto', () => {
     let agora = 0
     let guarda = 0
     while (ctx.estado.fase !== 'apostas' && guarda++ < 50) {
-      agora += REGRAS.segundosTurno * 1000 + 1
+      agora += CONFIG_PADRAO.segundosTurno * 1000 + 1
       if (ctx.estado.vezDe) {
         const jogador = ctx.estado.jogadores.find((j) => j.peerId === ctx.estado.vezDe)!
         const m = jogador.maos[jogador.maoAtiva]!
@@ -561,7 +563,7 @@ describe('a vez nunca volta para quem já jogou', () => {
     expect(ctx.estado.vezDe).toBe('p2')
     ctx.estado.jogadores[1]!.rodadasInativo = REGRAS.rodadasParaEspectador - 1
 
-    ctx = avancar(ctx, REGRAS.segundosTurno * 1000 + 1, RNG())
+    ctx = avancar(ctx, CONFIG_PADRAO.segundosTurno * 1000 + 1, RNG())
 
     // 'p2' saiu da lista de sentados; a vez tem de seguir para 'p3'. Com o
     // findIndex devolvendo -1, `indice + 1` apontava para o primeiro da
@@ -579,7 +581,7 @@ describe('a vez nunca volta para quem já jogou', () => {
     // Antes, `levantar` limpava cadeira e mãos sem mexer na vez: a mesa
     // inteira esperava os 30s do prazo por alguém que já tinha saído.
     expect(ctx.estado.vezDe).toBe('p2')
-    expect(ctx.estado.prazoTurno).toBe(REGRAS.segundosTurno * 1000)
+    expect(ctx.estado.prazoTurno).toBe(CONFIG_PADRAO.segundosTurno * 1000)
   })
 
   it('o último da mesa levantando encerra os turnos em vez de dar a vez a alguém encerrado', () => {
@@ -598,7 +600,7 @@ describe('a vez nunca volta para quem já jogou', () => {
 describe('cadeira de quem não aposta', () => {
   it('libera a cadeira depois de duas janelas de aposta sem apostar', () => {
     let ctx = comDoisJogadores()
-    const prazo = REGRAS.segundosTurno * 1000
+    const prazo = CONFIG_PADRAO.segundosTurno * 1000
 
     // Primeira janela vence sem nenhuma aposta: só conta inatividade.
     ctx = avancar(ctx, prazo + 1, RNG())
@@ -633,7 +635,7 @@ describe('cadeira de quem não aposta', () => {
     ctx.estado.jogadores[0]!.rodadasInativo = REGRAS.rodadasParaEspectador - 1
     ctx = aplicar(ctx, 'p1', { tipo: 'apostar', valor: 100 }, 0, RNG())
 
-    ctx = avancar(ctx, REGRAS.segundosTurno * 1000 + 1, RNG())
+    ctx = avancar(ctx, CONFIG_PADRAO.segundosTurno * 1000 + 1, RNG())
 
     const p1 = ctx.estado.jogadores.find((j) => j.peerId === 'p1')!
     const p2 = ctx.estado.jogadores.find((j) => j.peerId === 'p2')!
@@ -738,7 +740,7 @@ describe('eliminação', () => {
  */
 function jogarPartidaInteira(
   inicial: Contexto,
-  aposta: (jogador: Jogador) => number = (j) => Math.min(REGRAS.apostaMax, j.fichas),
+  aposta: (jogador: Jogador) => number = (j) => Math.min(CONFIG_PADRAO.apostaMax, j.fichas),
 ): Contexto {
   let ctx = inicial
   let agora = 0
@@ -833,7 +835,7 @@ describe('partida inteira e partida seguinte', () => {
     expect(ctx.estado.fase).toBe('aguardando')
     expect(ctx.estado.naPartida).toEqual([])
     for (const jogador of ctx.estado.jogadores) {
-      expect(jogador.fichas).toBe(REGRAS.stackInicial)
+      expect(jogador.fichas).toBe(CONFIG_PADRAO.fichasIniciais)
       expect(jogador.eliminadoEm).toBeNull()
       expect(jogador.cadeira).toBeNull()
     }
@@ -891,7 +893,7 @@ describe('nenhuma fase gira para sempre sem ninguém que possa jogar', () => {
 
     let agora = 0
     for (let i = 0; i < 200; i++) {
-      agora += REGRAS.segundosTurno * 1000 + 1
+      agora += CONFIG_PADRAO.segundosTurno * 1000 + 1
       ctx = avancar(ctx, agora, RNG())
     }
 
@@ -910,12 +912,12 @@ describe('nenhuma fase gira para sempre sem ninguém que possa jogar', () => {
     expect(ctx.estado.vezDe).toBe('p1')
 
     purgar(ctx, 'p1')
-    ctx = avancar(ctx, REGRAS.segundosTurno * 1000 + 1, RNG())
+    ctx = avancar(ctx, CONFIG_PADRAO.segundosTurno * 1000 + 1, RNG())
 
     // Antes, o `if (jogador)` simplesmente não fazia nada: o prazo continuava
     // vencido e todo tique seguinte caía no mesmo nada, com a mesa parada.
     expect(ctx.estado.vezDe).toBe('p2')
-    expect(ctx.estado.prazoTurno).toBe(REGRAS.segundosTurno * 1000 * 2 + 1)
+    expect(ctx.estado.prazoTurno).toBe(CONFIG_PADRAO.segundosTurno * 1000 * 2 + 1)
   })
 
   it('turnos com todo mundo purgado chega a fim em vez de girar', () => {
@@ -924,7 +926,7 @@ describe('nenhuma fase gira para sempre sem ninguém que possa jogar', () => {
 
     let agora = 0
     for (let i = 0; i < 200; i++) {
-      agora += REGRAS.segundosTurno * 1000 + 1
+      agora += CONFIG_PADRAO.segundosTurno * 1000 + 1
       ctx = avancar(ctx, agora, RNG())
     }
 
@@ -953,6 +955,7 @@ describe('decidirFim', () => {
     return {
       fase: 'acerto', jogadores, vezDe: null, prazoTurno: null, maoDealer: [],
       dealerTemOculta: false, cartasRestantes: 100, hostAtual: 'p1', rodada: 5,
+      config: { ...CONFIG_PADRAO },
       proximoIdMao: 1, vencedor: null,
       naPartida: naPartida ?? jogadores.map((j) => j.peerId),
     }
@@ -960,20 +963,20 @@ describe('decidirFim', () => {
 
   it('quem atinge o alvo vence', () => {
     expect(decidirFim(estado([
-      jogador('p1', REGRAS.alvoVitoria, null), jogador('p2', 400, null),
+      jogador('p1', (CONFIG_PADRAO.alvo ?? 0), null), jogador('p2', 400, null),
     ]))).toEqual({ acabou: true, vencedor: 'p1' })
   })
 
   it('entre dois no alvo, vence quem tem mais fichas', () => {
     expect(decidirFim(estado([
-      jogador('p1', REGRAS.alvoVitoria + 200, null),
-      jogador('p2', REGRAS.alvoVitoria + 50, null),
+      jogador('p1', (CONFIG_PADRAO.alvo ?? 0) + 200, null),
+      jogador('p2', (CONFIG_PADRAO.alvo ?? 0) + 50, null),
     ]))).toEqual({ acabou: true, vencedor: 'p1' })
   })
 
   it('empate exato no alvo acaba a partida sem vencedor', () => {
     expect(decidirFim(estado([
-      jogador('p1', REGRAS.alvoVitoria, null), jogador('p2', REGRAS.alvoVitoria, null),
+      jogador('p1', (CONFIG_PADRAO.alvo ?? 0), null), jogador('p2', (CONFIG_PADRAO.alvo ?? 0), null),
     ]))).toEqual({ acabou: true, vencedor: null })
   })
 
@@ -1072,7 +1075,7 @@ describe('fim de partida ligado à rodada', () => {
     expect(ctx.estado.naPartida).toEqual([])
     expect(ctx.estado.rodada).toBe(1)
     for (const jogador of ctx.estado.jogadores) {
-      expect(jogador.fichas).toBe(REGRAS.stackInicial)
+      expect(jogador.fichas).toBe(CONFIG_PADRAO.fichasIniciais)
       expect(jogador.eliminadoEm).toBeNull()
       expect(jogador.cadeira).toBeNull()
     }
@@ -1087,5 +1090,155 @@ describe('fim de partida ligado à rodada', () => {
     ctx = aplicar(ctx, 'p2', { tipo: 'novaPartida' }, 0, RNG())
 
     expect(ctx.estado.fase).toBe('fim')
+  })
+})
+
+describe('configurar a partida', () => {
+  const config = (extras = {}) => ({ ...CONFIG_PADRAO, ...extras })
+
+  /**
+   * Dois sentados, mas a mesa AINDA na sala de espera.
+   *
+   * `comDoisJogadores` já chama `iniciar`, e configurar só vale em
+   * `aguardando` — usá-lo aqui testaria a recusa, não a mudança.
+   */
+  function aguardando(): Contexto {
+    let ctx = criarContexto('p1', RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'entrar', apelido: 'Alex' }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'entrar', apelido: 'Bruno' }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'sentar', cadeira: 0 }, 0, RNG())
+    ctx = aplicar(ctx, 'p2', { tipo: 'sentar', cadeira: 1 }, 0, RNG())
+    return ctx
+  }
+
+  it('o anfitrião muda o formato antes de a partida começar', () => {
+    let ctx = aguardando()
+
+    ctx = aplicar(ctx, ctx.estado.hostAtual, {
+      tipo: 'configurar', config: config({ alvo: 5000 }),
+    }, 0, RNG())
+
+    expect(ctx.estado.config.alvo).toBe(5000)
+  })
+
+  it('quem NÃO é anfitrião não muda nada', () => {
+    // Sem isto, qualquer pessoa na sala mudaria o alvo da partida dos outros.
+    let ctx = aguardando()
+    const antes = ctx.estado.config.alvo
+
+    ctx = aplicar(ctx, 'p2', { tipo: 'configurar', config: config({ alvo: 5000 }) }, 0, RNG())
+
+    expect(ctx.estado.config.alvo).toBe(antes)
+  })
+
+  it('não muda com a partida em andamento', () => {
+    // Trocaria a regra com dinheiro na mesa: quem estivesse na frente pela
+    // regra antiga perderia sem ter feito nada errado.
+    let ctx = comDoisJogadores()
+    const antes = ctx.estado.config.alvo
+
+    ctx = aplicar(ctx, ctx.estado.hostAtual, {
+      tipo: 'configurar', config: config({ alvo: 5000 }),
+    }, 0, RNG())
+
+    expect(ctx.estado.fase).not.toBe('aguardando')
+    expect(ctx.estado.config.alvo).toBe(antes)
+  })
+
+  it('configuração inválida é encaixada, não aceita crua', () => {
+    let ctx = aguardando()
+
+    ctx = aplicar(ctx, ctx.estado.hostAtual, {
+      tipo: 'configurar',
+      config: config({ fichasIniciais: 500, apostaMax: 99_999 }),
+    }, 0, RNG())
+
+    expect(ctx.estado.config.apostaMax).toBeLessThanOrEqual(500)
+  })
+
+  it('quem chega DEPOIS recebe as fichas iniciais novas', () => {
+    let ctx = aguardando()
+
+    ctx = aplicar(ctx, ctx.estado.hostAtual, {
+      tipo: 'configurar', config: config({ fichasIniciais: 3000 }),
+    }, 0, RNG())
+    ctx = aplicar(ctx, 'p3', { tipo: 'entrar', apelido: 'Carla' }, 0, RNG())
+
+    expect(ctx.estado.jogadores.find((j) => j.peerId === 'p3')!.fichas).toBe(3000)
+  })
+
+  it('quem JÁ estava mantém as fichas até a próxima partida', () => {
+    // As fichas só são redistribuídas em `novaPartida`. Mudar o valor inicial
+    // no meio não dá dinheiro a ninguém — o que seria uma forma de o anfitrião
+    // premiar quem ele quisesse.
+    let ctx = aguardando()
+    const antes = ctx.estado.jogadores[0]!.fichas
+
+    ctx = aplicar(ctx, ctx.estado.hostAtual, {
+      tipo: 'configurar', config: config({ fichasIniciais: 3000 }),
+    }, 0, RNG())
+    ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
+
+    expect(ctx.estado.jogadores[0]!.fichas).toBe(antes)
+  })
+
+  it('a partida seguinte redistribui com o valor novo', () => {
+    const base = comDoisJogadores().estado
+    const ctx = aplicar(
+      {
+        sapata: [], ocultaDealer: null,
+        estado: {
+          ...base, fase: 'fim',
+          config: { ...CONFIG_PADRAO, fichasIniciais: 3000 },
+        },
+      },
+      base.hostAtual, { tipo: 'novaPartida' }, 0, RNG(),
+    )
+
+    expect(ctx.estado.jogadores.every((j) => j.fichas === 3000)).toBe(true)
+  })
+})
+
+describe('fim de partida com o alvo configurado', () => {
+  it('sem alvo, ninguém vence por fichas — vai até sobrar um', () => {
+    const base = comDoisJogadores().estado
+    const estado = {
+      ...base,
+      config: { ...CONFIG_PADRAO, alvo: null },
+      naPartida: ['p1', 'p2'],
+      jogadores: base.jogadores.map((j) => ({ ...j, fichas: 999_999 })),
+    }
+
+    expect(decidirFim(estado).acabou).toBe(false)
+  })
+
+  it('sem alvo, sobrar um encerra', () => {
+    const base = comDoisJogadores().estado
+    const estado = {
+      ...base,
+      config: { ...CONFIG_PADRAO, alvo: null },
+      naPartida: ['p1', 'p2'],
+      jogadores: [
+        { ...base.jogadores[0]!, fichas: 2000 },
+        { ...base.jogadores[1]!, fichas: 0, eliminadoEm: 3 },
+      ],
+    }
+
+    expect(decidirFim(estado)).toEqual({ acabou: true, vencedor: 'p1' })
+  })
+
+  it('com alvo, chegar nele encerra', () => {
+    const base = comDoisJogadores().estado
+    const estado = {
+      ...base,
+      config: { ...CONFIG_PADRAO, alvo: 2000 },
+      naPartida: ['p1', 'p2'],
+      jogadores: [
+        { ...base.jogadores[0]!, fichas: 2000 },
+        { ...base.jogadores[1]!, fichas: 500 },
+      ],
+    }
+
+    expect(decidirFim(estado)).toEqual({ acabou: true, vencedor: 'p1' })
   })
 })

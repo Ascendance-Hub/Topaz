@@ -2,6 +2,7 @@ import { criarSapata, precisaReembaralhar } from './shoe'
 import { avaliar, estourou } from './hand'
 import {
   REGRAS, acoesDisponiveis, aindaEmJogo, dealerDeveComprar, pagamento, resultadoDe,
+  CONFIG_PADRAO, normalizarConfig,
 } from './rules'
 import type { Acao, Carta, EstadoJogo, Jogador, Mao, Rng } from './types'
 
@@ -104,7 +105,7 @@ function recuperarVezOrfa(ctx: Contexto, agora: number): void {
 
   if (proximo) {
     estado.vezDe = proximo.peerId
-    estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
+    estado.prazoTurno = agora + estado.config.segundosTurno * 1000
   } else {
     estado.vezDe = null
     estado.prazoTurno = null
@@ -116,7 +117,10 @@ function recuperarVezOrfa(ctx: Contexto, agora: number): void {
 export function decidirFim(estado: EstadoJogo): { acabou: boolean; vencedor: string | null } {
   const emJogo = aptos(estado)
 
-  const noAlvo = emJogo.filter((j) => j.fichas >= REGRAS.alvoVitoria)
+  // `alvo` nulo é "até sobrar um": a partida segue enquanto houver mais de
+  // uma pessoa apta, e o desfecho cai nas regras abaixo.
+  const alvo = estado.config.alvo
+  const noAlvo = alvo === null ? [] : emJogo.filter((j) => j.fichas >= alvo)
   if (noAlvo.length > 0) {
     const maior = Math.max(...noAlvo.map((j) => j.fichas))
     const lideres = noAlvo.filter((j) => j.fichas === maior)
@@ -154,6 +158,7 @@ export function criarContexto(hostId: string, rng: Rng): Contexto {
     sapata,
     ocultaDealer: null,
     estado: {
+      config: { ...CONFIG_PADRAO },
       fase: 'aguardando',
       jogadores: [],
       vezDe: null,
@@ -183,6 +188,16 @@ export function aplicar(
   const jogador = estado.jogadores.find((j) => j.peerId === peerId)
 
   switch (acao.tipo) {
+    case 'configurar': {
+      // Só o anfitrião, e só entre partidas. Mudar o alvo no meio do jogo
+      // trocaria a regra com dinheiro na mesa — e quem estivesse na frente
+      // pela regra antiga perderia sem ter feito nada errado.
+      if (peerId !== estado.hostAtual) break
+      if (estado.fase !== 'aguardando') break
+      estado.config = normalizarConfig(acao.config)
+      break
+    }
+
     case 'entrar': {
       if (jogador) {
         jogador.apelido = acao.apelido
@@ -206,7 +221,7 @@ export function aplicar(
       }
       estado.jogadores.push({
         peerId, apelido: acao.apelido, cadeira: null,
-        fichas: REGRAS.stackInicial, maos: [], maoAtiva: 0,
+        fichas: estado.config.fichasIniciais, maos: [], maoAtiva: 0,
         seguro: 0, rodadasInativo: 0, desconectadoEm: null,
         decidiuSeguro: false,
         eliminadoEm: null,
@@ -248,7 +263,7 @@ export function aplicar(
       if (naMesa.length === 0) break
       estado.naPartida = naMesa.map((j) => j.peerId)
       estado.fase = 'apostas'
-      estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
+      estado.prazoTurno = agora + estado.config.segundosTurno * 1000
       break
     }
 
@@ -256,7 +271,7 @@ export function aplicar(
       if (estado.fase !== 'fim') break
       if (peerId !== estado.hostAtual) break
       for (const j of estado.jogadores) {
-        j.fichas = REGRAS.stackInicial
+        j.fichas = estado.config.fichasIniciais
         j.eliminadoEm = null
         // As cadeiras são liberadas de propósito: sentar de novo é o sinal
         // de que a pessoa quer jogar a próxima, em vez de ser arrastada
@@ -282,7 +297,7 @@ export function aplicar(
     case 'apostar': {
       if (!jogador || estado.fase !== 'apostas') break
       if (jogador.cadeira === null || jogador.maos.length > 0) break
-      if (acao.valor < REGRAS.apostaMin || acao.valor > REGRAS.apostaMax) break
+      if (acao.valor < REGRAS.apostaMin || acao.valor > estado.config.apostaMax) break
       if (acao.valor > jogador.fichas) break
       jogador.fichas -= acao.valor
       jogador.maos = [maoNova(estado, acao.valor)]
@@ -402,7 +417,7 @@ function passarVez(ctx: Contexto, agora: number, cadeiraAtual: number | null): v
   if (proximo) {
     estado.vezDe = proximo.peerId
     proximo.maoAtiva = 0
-    estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
+    estado.prazoTurno = agora + estado.config.segundosTurno * 1000
   } else {
     estado.vezDe = null
     estado.prazoTurno = null
@@ -431,7 +446,7 @@ function distribuir(ctx: Contexto, agora: number, rng: Rng): void {
   const mostraAs = estado.maoDealer[0]?.valor === 'A'
   estado.fase = mostraAs ? 'seguro' : 'turnos'
   estado.vezDe = jogando[0]?.peerId ?? null
-  estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
+  estado.prazoTurno = agora + estado.config.segundosTurno * 1000
 }
 
 /** Revela a carta oculta do dealer ao entrar na fase `dealer` e arma o
@@ -496,7 +511,7 @@ function limparRodada(ctx: Contexto, agora: number, rng: Rng): void {
   } else {
     estado.fase = sentados(estado).length >= 1 ? 'apostas' : 'aguardando'
     estado.prazoTurno = estado.fase === 'apostas'
-      ? agora + REGRAS.segundosTurno * 1000
+      ? agora + estado.config.segundosTurno * 1000
       : null
   }
 
@@ -520,7 +535,7 @@ function transicionar(ctx: Contexto, agora: number, rng: Rng): Contexto {
     const comMao = sentados(estado).filter((j) => j.maos.length > 0)
     if (comMao.length > 0 && comMao.every((j) => j.decidiuSeguro)) {
       estado.fase = 'turnos'
-      estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
+      estado.prazoTurno = agora + estado.config.segundosTurno * 1000
     }
   }
 
@@ -547,7 +562,7 @@ export function avancar(ctx: Contexto, agora: number, rng: Rng): Contexto {
       // Ninguém apostou: ou a mesa continua esperando, ou já não há mesa
       // nenhuma para esperar e a partida acaba.
       if (encerrarSemNinguemApto(estado)) return transicionar(novo, agora, rng)
-      estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
+      estado.prazoTurno = agora + estado.config.segundosTurno * 1000
     }
     for (const jogador of semAposta) {
       jogador.rodadasInativo += 1
@@ -564,7 +579,7 @@ export function avancar(ctx: Contexto, agora: number, rng: Rng): Contexto {
 
   if (estado.fase === 'seguro' && venceu) {
     estado.fase = 'turnos'
-    estado.prazoTurno = agora + REGRAS.segundosTurno * 1000
+    estado.prazoTurno = agora + estado.config.segundosTurno * 1000
     return transicionar(novo, agora, rng)
   }
 

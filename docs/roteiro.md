@@ -30,6 +30,11 @@ duas exceções marcadas 🕓, escritas em 2026-08-24 e ainda não vistas com ge
   identidade.
 - 🕓 **Grupos persistentes** — atalhos salvos no navegador, com cor derivada do
   próprio código. Aparecem no topo da tela inicial para quem já tem algum.
+- 🕓 **Configuração da partida** — fichas iniciais, alvo, aposta máxima e tempo
+  de jogada, escolhidos pelo anfitrião e só entre partidas. Viajam no
+  `EstadoJogo`, então todo mundo concorda sozinho. O padrão do alvo mudou de
+  1500 para **2500**: com 1000 iniciais e aposta de 500, o antigo fazia uma
+  única mão ganha encerrar a partida.
 - 🕓 **Galeria de jogos** — o que dá para jogar, e o que vem por aí como
   promessa declarada, nunca como cartão clicável que não faz nada.
 - 🕓 **Identidade estável** — par de chaves gerado no navegador, guardado como
@@ -214,7 +219,7 @@ Desenho completo em
 | 1 | Identidade estável | **feito** |
 | 2 | Barra lateral + grupos persistentes | **feito** |
 | 3 | Presença entre grupos + mensagem direta | a fazer |
-| 4 | Galeria de jogos + configuração da partida | a fazer |
+| 4 | Galeria de jogos + configuração da partida | **feito** |
 | 5 | Canais de voz | a fazer |
 | 6 | Amigos | a fazer |
 

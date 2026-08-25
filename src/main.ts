@@ -38,6 +38,7 @@ import { AparelhosEmUso } from './call/aparelhos-em-uso'
 import { renderizar } from './ui/render'
 import { rngSemente } from './game/shoe'
 import { mesaEsperaPor } from './game/rules'
+import type { ConfigPartida } from './game/types'
 
 /** Quem falou antes de a mesa saber o nome dele. */
 export const APELIDO_DESCONHECIDO = 'Alguém'
@@ -229,6 +230,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     },
     esquecerGrupo: () => {
       removerGrupo(codigo)
+      desenhar()
+    },
+    configurarPartida: (config: ConfigPartida) => {
+      sessao.despachar({ tipo: 'configurar', config })
       desenhar()
     },
     identidade: {
@@ -474,6 +479,11 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
         codigo,
         grupo: grupoSalvo(codigo),
         identidade,
+        partida: {
+          config: sessao.estado().config,
+          souHost: sessao.souHost(),
+          emAndamento: sessao.estado().fase !== 'aguardando',
+        },
       }, acoesConfiguracoes))
       return
     }

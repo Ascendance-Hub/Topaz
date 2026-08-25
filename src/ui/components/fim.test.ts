@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest'
 import { renderizarFim } from './fim'
-import { REGRAS } from '../../game/rules'
+import { CONFIG_PADRAO } from '../../game/rules'
 import type { EstadoJogo, Jogador } from '../../game/types'
 
 function jogador(peerId: string, apelido: string, fichas: number, eliminadoEm: number | null): Jogador {
@@ -20,6 +20,7 @@ function estadoFim(vencedor: string | null, hostAtual = 'p1'): EstadoJogo {
   return {
     fase: 'fim', jogadores, vezDe: null, prazoTurno: null, maoDealer: [],
     dealerTemOculta: false, cartasRestantes: 0, hostAtual, rodada: 20,
+    config: { ...CONFIG_PADRAO },
     proximoIdMao: 1, vencedor, naPartida: ['p1', 'p2', 'p3'],
   }
 }
@@ -56,11 +57,11 @@ describe('tela de fim', () => {
     // Spec §6: dois cruzando o alvo com fichas idênticas é empate de verdade,
     // `vencedor` fica `null` — o mesmo `null` de "ninguém sobrou". A tela
     // tratava só o segundo caso e dizia que a mesa quebrou junto logo acima
-    // de um placar com dois jogadores de 1600 fichas.
+    // de um placar com dois jogadores acima do alvo.
     const estado = estadoFim(null)
     estado.jogadores = [
-      jogador('p1', 'Alex', REGRAS.alvoVitoria + 100, null),
-      jogador('p2', 'Bruno', REGRAS.alvoVitoria + 100, null),
+      jogador('p1', 'Alex', (CONFIG_PADRAO.alvo ?? 0) + 100, null),
+      jogador('p2', 'Bruno', (CONFIG_PADRAO.alvo ?? 0) + 100, null),
       jogador('p3', 'Carla', 0, 12),
     ]
     const el = renderizarFim(estado, 'p1', vi.fn())
@@ -69,7 +70,10 @@ describe('tela de fim', () => {
     expect(sub.textContent).not.toContain('quebrou')
     expect(sub.textContent).toContain('Alex')
     expect(sub.textContent).toContain('Bruno')
-    expect(sub.textContent).toContain('1.600')
+    // Derivado do alvo, não escrito à mão: o alvo virou configuração, e um
+    // número fixo aqui quebraria a cada mudança de padrão sem dizer por quê.
+    expect(sub.textContent)
+      .toContain(((CONFIG_PADRAO.alvo ?? 0) + 100).toLocaleString('pt-BR'))
     expect(el.querySelector('[data-vencedor]')).toBeNull()
   })
 

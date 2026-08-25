@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   REGRAS, acoesDisponiveis, aindaEmJogo, mesaEsperaPor, pagamento, resultadoDe,
-  dealerDeveComprar,
+  dealerDeveComprar, CONFIG_PADRAO, LIMITES, normalizarConfig,
 } from './rules'
 import type { Carta, EstadoJogo, Jogador, Mao } from './types'
 
@@ -26,12 +26,12 @@ function jogador(extras: Partial<Jogador> = {}): Jogador {
 describe('REGRAS', () => {
   it('reflete os valores fixados no spec', () => {
     expect(REGRAS.numBaralhos).toBe(6)
-    expect(REGRAS.stackInicial).toBe(1000)
+    expect(CONFIG_PADRAO.fichasIniciais).toBe(1000)
     expect(REGRAS.apostaMin).toBe(25)
-    expect(REGRAS.apostaMax).toBe(500)
+    expect(CONFIG_PADRAO.apostaMax).toBe(500)
     expect(REGRAS.maxCadeiras).toBe(7)
     expect(REGRAS.maxMaos).toBe(3)
-    expect(REGRAS.segundosTurno).toBe(30)
+    expect(CONFIG_PADRAO.segundosTurno).toBe(30)
     expect(REGRAS.fichas).toEqual([25, 100, 500])
   })
 })
@@ -195,6 +195,7 @@ describe('pagamento', () => {
 describe('mesaEsperaPor', () => {
   function estado(extras: Partial<EstadoJogo> = {}): EstadoJogo {
     return {
+      config: { ...CONFIG_PADRAO },
       fase: 'apostas', jogadores: [], vezDe: null, prazoTurno: null,
       maoDealer: [], dealerTemOculta: false, cartasRestantes: 312,
       hostAtual: 'p1', rodada: 1, proximoIdMao: 1, vencedor: null,
@@ -262,5 +263,77 @@ describe('mesaEsperaPor', () => {
 
   it('não espera de quem nem está na mesa', () => {
     expect(mesaEsperaPor(estado({ jogadores: [] }), 'p1')).toBe(false)
+  })
+})
+
+describe('normalizarConfig', () => {
+  it('o padrão passa intacto', () => {
+    expect(normalizarConfig(CONFIG_PADRAO)).toEqual(CONFIG_PADRAO)
+  })
+
+  it('o alvo padrão exige mais de uma mão ganha', () => {
+    // O defeito que motivou tudo: com 1000 iniciais, alvo 1500 e aposta máxima
+    // 500, apostar o máximo e ganhar a primeira mão encerrava a partida.
+    const { fichasIniciais, alvo, apostaMax } = CONFIG_PADRAO
+    expect(fichasIniciais + apostaMax).toBeLessThan(alvo!)
+  })
+
+  it('lixo no lugar da configuração vira o padrão', () => {
+    // Ela chega pela rede, de um cliente modificado ou de uma versão que não
+    // conhecemos.
+    for (const ruim of [null, undefined, 42, 'texto', [], {}]) {
+      expect(normalizarConfig(ruim)).toEqual(CONFIG_PADRAO)
+    }
+  })
+
+  it('campo solto inválido não estraga os outros', () => {
+    const c = normalizarConfig({ ...CONFIG_PADRAO, apostaMax: 'muito' })
+
+    expect(c.apostaMax).toBe(CONFIG_PADRAO.apostaMax)
+    expect(c.fichasIniciais).toBe(CONFIG_PADRAO.fichasIniciais)
+  })
+
+  it('aposta máxima nunca passa das fichas iniciais', () => {
+    // Passar deixaria a mesa apostando o que ninguém tem, com os botões
+    // nascendo desabilitados.
+    const c = normalizarConfig({ ...CONFIG_PADRAO, fichasIniciais: 500, apostaMax: 5000 })
+
+    expect(c.apostaMax).toBeLessThanOrEqual(c.fichasIniciais)
+  })
+
+  it('alvo nunca fica abaixo das fichas iniciais', () => {
+    // Seria uma partida encerrada antes da primeira carta.
+    const c = normalizarConfig({ ...CONFIG_PADRAO, fichasIniciais: 5000, alvo: 100 })
+
+    expect(c.alvo!).toBeGreaterThan(c.fichasIniciais)
+  })
+
+  it('alvo nulo é aceito — é o "até sobrar um"', () => {
+    expect(normalizarConfig({ ...CONFIG_PADRAO, alvo: null }).alvo).toBeNull()
+  })
+
+  it('valores absurdos são encaixados nos limites', () => {
+    const alto = normalizarConfig({
+      fichasIniciais: 1e12, alvo: 1e12, apostaMax: 1e12, segundosTurno: 1e6,
+    })
+    expect(alto.fichasIniciais).toBeLessThanOrEqual(LIMITES.fichasIniciais.max)
+    expect(alto.segundosTurno).toBeLessThanOrEqual(LIMITES.segundosTurno.max)
+
+    const baixo = normalizarConfig({
+      fichasIniciais: -5, alvo: -5, apostaMax: -5, segundosTurno: 0,
+    })
+    expect(baixo.fichasIniciais).toBeGreaterThanOrEqual(LIMITES.fichasIniciais.min)
+    expect(baixo.segundosTurno).toBeGreaterThanOrEqual(LIMITES.segundosTurno.min)
+  })
+
+  it('aposta máxima nunca fica abaixo da mínima da mesa', () => {
+    // Abaixo dela não existiria aposta possível: todo botão nasceria morto.
+    expect(normalizarConfig({ ...CONFIG_PADRAO, apostaMax: 1 }).apostaMax)
+      .toBeGreaterThanOrEqual(REGRAS.apostaMin)
+  })
+
+  it('arredonda para inteiro — fichas quebradas não existem', () => {
+    expect(normalizarConfig({ ...CONFIG_PADRAO, fichasIniciais: 1000.7 }).fichasIniciais)
+      .toBe(1001)
   })
 })

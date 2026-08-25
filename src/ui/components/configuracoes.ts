@@ -6,6 +6,8 @@ import type { Identidade } from '../../identidade/atual'
 import { formatarCodigo } from '../codigo'
 import { MAX_NOME } from '../../grupos/grupos'
 import type { Grupo } from '../../grupos/grupos'
+import { renderizarConfigPartida } from './config-partida'
+import type { ConfigPartida } from '../../game/types'
 
 /**
  * Os ajustes da sala.
@@ -28,6 +30,8 @@ export interface DadosConfiguracoes {
   /** O grupo, se esta sala já estiver salva. */
   grupo: Grupo | null
   identidade: Identidade | null
+  /** O formato da partida, e se esta pessoa pode mexer nele. */
+  partida: { config: ConfigPartida; souHost: boolean; emAndamento: boolean }
 }
 
 export interface AcoesConfiguracoes {
@@ -36,6 +40,7 @@ export interface AcoesConfiguracoes {
   salvarGrupo(nome: string): void
   esquecerGrupo(): void
   identidade: AcoesIdentidade
+  configurarPartida(config: ConfigPartida): void
 }
 
 function secao(classe: string, titulo: string): HTMLElement {
@@ -55,6 +60,12 @@ export function renderizarConfiguracoes(
   area.className = 'config'
 
   area.append(secaoVoce(dados, acoes), secaoGrupo(dados, acoes))
+
+  // Antes da identidade e depois da sala: é ajuste de jogo, mexido de vez em
+  // quando — mais que o grupo, muito menos que o apelido.
+  const partida = secao('config-partida-secao', 'A partida')
+  partida.append(renderizarConfigPartida(dados.partida, acoes.configurarPartida))
+  area.append(partida)
 
   const identidade = secao('config-identidade', 'Sua identidade')
   identidade.append(renderizarIdentidade(dados.identidade, acoes.identidade))
