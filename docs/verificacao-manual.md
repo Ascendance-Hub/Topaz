@@ -208,6 +208,36 @@ A sonda fica desligada sem o parâmetro.
 - [ ] Sair e voltar da call faz o anel dela voltar a funcionar
 - [ ] A voz **não** sai dobrada (o analisador não pode estar ligado à saída)
 
+## Foto de perfil
+
+- [ ] "Escolher foto" abre o seletor de arquivos e a prévia mostra a foto
+- [ ] A prévia fica **redonda e sem achatar** — teste com uma foto bem larga
+      e com uma bem alta
+- [ ] "Tirar foto" volta para a inicial do apelido, e só aparece com foto
+- [ ] A foto sobrevive a recarregar a página
+- [ ] O amigo vê a sua foto no círculo dele, e você vê a dele
+- [ ] Quem entra **depois** também recebe a sua foto, sem você fazer nada
+- [ ] O anel de quem fala continua acendendo em volta da foto
+
+**Segurança** — o ponto que motivou o desenho:
+
+- [ ] Renomear um `.exe` para `.jpg` e escolher: aparece a mensagem de erro, e
+      **nada é enviado**
+- [ ] Escolher um PDF ou um `.txt`: mesma mensagem, sem quebrar a página
+- [ ] Na aba Network do navegador, **nenhuma requisição sai** por causa de
+      foto — ela viaja como `data:` pela conexão P2P
+
+## Assistir a própria tela
+
+- [ ] Ao compartilhar, aparece uma prévia pequena marcada "Sua tela"
+- [ ] A prévia é **muda** — não há eco nem microfonia, mesmo compartilhando
+      uma aba com som
+- [ ] Parar de compartilhar faz a prévia sumir
+- [ ] Com **ninguém assistindo**, o aviso "ninguém está assistindo" continua
+      aparecendo — ver a própria tela não pode contar como espectador
+- [ ] Compartilhar a janela do navegador mostra o efeito de espelho infinito;
+      isso é esperado
+
 ## Teste de rede
 
 Aparece para quem está sozinho na sala ou não conseguiu conectar — que é

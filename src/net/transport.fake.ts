@@ -8,6 +8,7 @@ interface No {
   aoEntrar: ((peerId: string) => void)[]
   aoSair: ((peerId: string) => void)[]
   aoMensagem: ((texto: string, peerId: string) => void)[]
+  aoFoto: ((foto: unknown, peerId: string) => void)[]
 }
 
 export interface OpcoesRedeFalsa {
@@ -60,7 +61,9 @@ export function criarRedeFalsa(opcoes: OpcoesRedeFalsa = {}) {
   }
 
   function conectar(id: string): Transporte {
-    const no: No = { id, aoAcao: [], aoEstado: [], aoEntrar: [], aoSair: [], aoMensagem: [] }
+    const no: No = {
+      id, aoAcao: [], aoEstado: [], aoEntrar: [], aoSair: [], aoMensagem: [], aoFoto: [],
+    }
 
     // Insere primeiro, depois avisa — assim `peers()` já enxerga o novo
     // peer de dentro do próprio callback `aoEntrarPeer`, igual ao Trystero
@@ -101,6 +104,14 @@ export function criarRedeFalsa(opcoes: OpcoesRedeFalsa = {}) {
       },
       aoReceberMensagem: (cb) => {
         no.aoMensagem.push(cb)
+      },
+      enviarFoto: (foto) => {
+        for (const outro of destinatarios()) {
+          for (const cb of outro.aoFoto) cb(foto, id)
+        }
+      },
+      aoReceberFoto: (cb) => {
+        no.aoFoto.push(cb)
       },
       aoEntrarPeer: (cb) => {
         no.aoEntrar.push(cb)

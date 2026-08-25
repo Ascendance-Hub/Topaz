@@ -204,6 +204,18 @@ export class Midia {
   }
 
   /**
+   * A minha tela, para eu mesmo poder assisti-la.
+   *
+   * Pedido de quem usa: conferir o que está mostrando sem perguntar aos
+   * outros. Não passa por WebRTC nenhum — é a captura crua ligada a um
+   * `<video>` local, e por isso não liga codificador nem conta como
+   * espectador. Ver a própria tela continua não acordando o encoder.
+   */
+  telaLocal(): MediaStream | null {
+    return this.tela
+  }
+
+  /**
    * `enabled = false` continua enviando a faixa, mas em silêncio — é o mudo
    * que todo app de call usa. Desligar a captura acenderia e apagaria o
    * indicador do navegador a cada clique, e obrigaria a renegociar.

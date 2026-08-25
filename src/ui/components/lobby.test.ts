@@ -29,7 +29,10 @@ describe('apelido em localStorage', () => {
     const lobby = renderizarLobby(() => {})
     const campo = lobby.querySelector<HTMLInputElement>('.campo')!
     campo.value = 'Ana'
-    const botao = lobby.querySelector<HTMLButtonElement>('.botao')!
+    // Pelo texto, não por posição: o lobby ganhou os botões do retrato de
+    // perfil, e "o primeiro botão" deixou de descrever o que este teste quer.
+    const botao = [...lobby.querySelectorAll('button')]
+      .find((b) => b.textContent === 'Entrar na sala')!
     botao.click()
     expect(apelidoSalvo()).toBe('Ana')
   })
@@ -47,7 +50,11 @@ describe('roteamento pela URL', () => {
   it('com código no hash, renderiza o caminho de entrar na sala existente', () => {
     location.hash = '#sala=K7X2QW9FM3PRTVN4'
     const lobby = renderizarLobby(() => {})
-    const botoes = [...lobby.querySelectorAll('button')].map((b) => b.textContent)
+    // Só os botões de navegação: os do retrato de perfil aparecem nos dois
+    // caminhos e não dizem nada sobre roteamento.
+    const botoes = [...lobby.querySelectorAll('button')]
+      .filter((b) => !b.dataset['perfil'])
+      .map((b) => b.textContent)
     expect(botoes).toEqual(['Entrar na sala'])
     expect(lobby.querySelector('.sub')?.textContent).toBe('Entrando na sala K7X2-QW9F-M3PR-TVN4')
   })
@@ -260,5 +267,66 @@ describe('link de convite com código inválido', () => {
   it('não avisa nada quando o código do link é válido', () => {
     location.hash = '#sala=K7X2QW9FM3PRTVN4'
     expect(renderizarLobby(() => {}).querySelector('.aviso')).toBeNull()
+  })
+})
+
+describe('foto de perfil no lobby', () => {
+  const foto = 'data:image/jpeg;base64,AAAA'
+
+  it('oferece escolher uma foto, junto do apelido', () => {
+    // Apelido e foto são a mesma coisa: quem você é. Separá-los em telas
+    // diferentes faria a foto virar um ajuste escondido que ninguém acha.
+    const lobby = renderizarLobby(vi.fn())
+
+    expect(lobby.querySelector('[data-perfil="escolher"]')).not.toBeNull()
+    expect(lobby.querySelector<HTMLInputElement>('input[type="file"]')).not.toBeNull()
+  })
+
+  it('só aceita imagem no seletor de arquivo', () => {
+    // Não é segurança — o `accept` é uma dica ao sistema, e o portão de
+    // verdade é o redesenho no canvas. Mas evita a pessoa escolher um PDF e
+    // levar um erro que ela não entende.
+    const lobby = renderizarLobby(vi.fn())
+    const campo = lobby.querySelector<HTMLInputElement>('input[type="file"]')!
+
+    expect(campo.accept).toContain('image/')
+  })
+
+  it('mostra a foto já guardada', () => {
+    localStorage.setItem('topaz:foto', foto)
+
+    const lobby = renderizarLobby(vi.fn())
+
+    expect(lobby.querySelector<HTMLImageElement>('.perfil-previa')!.src).toBe(foto)
+  })
+
+  it('sem foto guardada, mostra a inicial do apelido', () => {
+    localStorage.setItem('topaz:apelido', 'Alex')
+
+    const lobby = renderizarLobby(vi.fn())
+
+    expect(lobby.querySelector('.perfil-inicial')!.textContent).toBe('A')
+  })
+
+  it('dá como tirar a foto de novo, mas só quando existe uma', () => {
+    const semFoto = renderizarLobby(vi.fn())
+      .querySelector<HTMLElement>('[data-perfil="remover"]')!
+    // `hidden` e não ausente: escondido já sai da ordem de tabulação e da
+    // árvore de acessibilidade, então some de verdade para quem usa.
+    expect(semFoto.hidden).toBe(true)
+
+    localStorage.setItem('topaz:foto', foto)
+    const comFoto = renderizarLobby(vi.fn())
+      .querySelector<HTMLElement>('[data-perfil="remover"]')!
+    expect(comFoto.hidden).toBe(false)
+  })
+
+  it('foto adulterada no armazenamento não vira <img>', () => {
+    localStorage.setItem('topaz:foto', 'https://exemplo.com/rastreador.png')
+
+    const lobby = renderizarLobby(vi.fn())
+
+    expect(lobby.querySelector('.perfil-previa')).toBeNull()
+    expect(lobby.querySelector('img')).toBeNull()
   })
 })
