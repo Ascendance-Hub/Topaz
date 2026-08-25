@@ -51,6 +51,8 @@ export interface ExtrasHome {
   /** O painel da identidade. Vem pronto porque depende de leitura assíncrona
    *  do cofre, que esta camada não deve conhecer. */
   identidade?: HTMLElement
+  /** A faixa de grupos salvos. Vazia para quem chega pela primeira vez. */
+  grupos?: HTMLElement
 }
 
 export function renderizarHome(
@@ -64,6 +66,15 @@ export function renderizarHome(
   // "rolar até achar". Vale também para link truncado — aí é o aviso que
   // precisa aparecer sem rolagem.
   if (haCodigoNaUrl(location.hash)) home.dataset['convite'] = '1'
+
+  // Quem já tem grupos salvos vê os grupos PRIMEIRO, e a apresentação vira
+  // material de consulta. Quem chega pela primeira vez vê o contrário. Saber
+  // qual é o caso custa uma leitura do armazenamento, então não há razão para
+  // mostrar a mesma coisa às duas pessoas.
+  if (extras.grupos?.hasChildNodes()) {
+    home.dataset['comGrupos'] = '1'
+    home.append(extras.grupos)
+  }
 
   // ---- Herói -------------------------------------------------------------
   const heroi = document.createElement('header')

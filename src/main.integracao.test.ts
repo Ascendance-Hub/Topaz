@@ -78,7 +78,9 @@ describe('entrar numa sala com o Trystero de mentira, mas a fiação de verdade'
     entrarNaSala(app, 'Alex', 'CODIGO01')
 
     expect(app.querySelector('.barra-sala')).not.toBeNull()
-    expect(app.querySelector('.nav-sala')).not.toBeNull()
+    // O trilho substituiu a antiga barra de navegação: ele é a navegação da
+    // sala agora, e tem três destinos em vez de dois.
+    expect(app.querySelector('.trilho')).not.toBeNull()
     expect(app.querySelector('.call-controles')).not.toBeNull()
     expect(app.querySelector('.chat')).not.toBeNull()
   })

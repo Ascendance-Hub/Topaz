@@ -28,6 +28,18 @@ import { entrarNaSala, iniciarApp, MENSAGEM_ERRO_INICIAL } from './main'
 import { criarSalasFalsas } from './net/salas.fake'
 
 /**
+ * Abre a mesa como uma pessoa abre: pelo trilho, e depois pela galeria.
+ *
+ * O botão "Mesa" deixou de existir — ele pressupunha um jogo só. A mesa passou
+ * a ser um dos cartões de "Jogos", e este atalho mantém os testes falando de
+ * intenção ("abrir a mesa") em vez de sequência de cliques.
+ */
+function abrirMesa(app: HTMLElement): void {
+  app.querySelector<HTMLButtonElement>('[data-nav="jogos"]')!.click()
+  app.querySelector<HTMLButtonElement>('[data-abrir="blackjack"]')!.click()
+}
+
+/**
  * A fusão das três redes, de mentira. Existe porque `criarTransporte` é
  * mockado para a rede falsa do jogo, mas o canal da call e a mídia recebem a
  * fusão — e dar `undefined` a elas obrigaria o código de produção a carregar
@@ -115,7 +127,7 @@ describe('entrarNaSala — estado da conexão em vez de mesa travada', () => {
       expect(app.querySelector('.conexao')).toBeNull()
       expect(app.querySelector('.sala-parada')).not.toBeNull()
 
-      app.querySelector<HTMLButtonElement>('[data-nav="mesa"]')!.click()
+      abrirMesa(app)
       expect(app.querySelector('.mesa')).not.toBeNull()
     } finally {
       vi.useRealTimers()
@@ -284,7 +296,8 @@ describe('entrarNaSala — a sala é o espaço, a mesa é uma escolha', () => {
   }
 
   function clicar(app: HTMLElement, alvo: string): void {
-    app.querySelector<HTMLButtonElement>(`[data-nav="${alvo}"]`)!.click()
+    if (alvo === 'mesa') abrirMesa(app)
+    else app.querySelector<HTMLButtonElement>(`[data-nav="${alvo}"]`)!.click()
   }
 
   it('ao entrar, mostra a sala com quem está — não a mesa', () => {
@@ -372,8 +385,10 @@ describe('entrarNaSala — várias pessoas na mesma sala', () => {
     return { appA, appB }
   }
 
-  const nav = (app: HTMLElement, alvo: string) =>
-    app.querySelector<HTMLButtonElement>(`[data-nav="${alvo}"]`)!.click()
+  const nav = (app: HTMLElement, alvo: string) => {
+    if (alvo === 'mesa') abrirMesa(app)
+    else app.querySelector<HTMLButtonElement>(`[data-nav="${alvo}"]`)!.click()
+  }
   const agir = (app: HTMLElement, seletor: string) =>
     app.querySelector<HTMLButtonElement>(`[data-acao="${seletor}"]`)!.click()
 
@@ -463,8 +478,10 @@ describe('entrarNaSala — a sala avisa quando a mesa espera por você', () => {
     rede.bombear()
     vi.advanceTimersByTime(MS_DESCOBERTA + 600)
 
-    const nav = (app: HTMLElement, alvo: string) =>
-      app.querySelector<HTMLButtonElement>(`[data-nav="${alvo}"]`)!.click()
+    const nav = (app: HTMLElement, alvo: string) => {
+      if (alvo === 'mesa') abrirMesa(app)
+      else app.querySelector<HTMLButtonElement>(`[data-nav="${alvo}"]`)!.click()
+    }
     const agir = (app: HTMLElement, sel: string) =>
       app.querySelector<HTMLButtonElement>(`[data-acao="${sel}"]`)!.click()
 
@@ -477,7 +494,7 @@ describe('entrarNaSala — a sala avisa quando a mesa espera por você', () => {
   }
 
   const marcado = (app: HTMLElement) =>
-    app.querySelector<HTMLElement>('[data-nav="mesa"]')!.dataset['espera'] === '1'
+    app.querySelector<HTMLElement>('[data-nav="jogos"]')!.dataset['espera'] === '1'
 
   it('marca a mesa na fase de apostas para quem ainda não apostou', () => {
     vi.useFakeTimers()
@@ -574,7 +591,7 @@ describe('entrarNaSala — a call convive com o jogo', () => {
     try {
       const { app } = salaComCall()
 
-      app.querySelector<HTMLButtonElement>('[data-nav="mesa"]')!.click()
+      abrirMesa(app)
       app.querySelector<HTMLButtonElement>('[data-nav="sala"]')!.click()
 
       expect(app.querySelectorAll('.call-controles')).toHaveLength(1)
@@ -589,7 +606,7 @@ describe('entrarNaSala — a call convive com o jogo', () => {
     try {
       const { app } = salaComCall()
 
-      app.querySelector<HTMLButtonElement>('[data-nav="mesa"]')!.click()
+      abrirMesa(app)
       app.querySelector<HTMLButtonElement>('[data-acao="sentar"]')!.click()
 
       expect(app.querySelector('[data-sentado]')).not.toBeNull()

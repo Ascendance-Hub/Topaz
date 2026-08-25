@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi } from 'vitest'
-import { renderizarNavSala, renderizarSalaParada, AVISO_SOZINHO, ROTULO_ESPERANDO } from './sala'
+import { describe, it, expect } from 'vitest'
+import { renderizarSalaParada, AVISO_SOZINHO } from './sala'
 import type { EstadoJogo, Jogador } from '../../game/types'
 
 function jogador(peerId: string, apelido: string): Jogador {
@@ -18,39 +18,6 @@ function estadoCom(...jogadores: Jogador[]): EstadoJogo {
     hostAtual: 'eu', rodada: 0, proximoIdMao: 1, vencedor: null, naPartida: [],
   }
 }
-
-describe('renderizarNavSala', () => {
-  it('marca a sala como atual quando a mesa está fechada', () => {
-    const nav = renderizarNavSala(false, vi.fn())
-
-    expect(nav.querySelector('[data-nav="sala"]')!.getAttribute('aria-current')).toBe('page')
-    expect(nav.querySelector('[data-nav="mesa"]')!.getAttribute('aria-current')).toBeNull()
-  })
-
-  it('marca a mesa como atual quando ela está aberta', () => {
-    const nav = renderizarNavSala(true, vi.fn())
-
-    expect(nav.querySelector('[data-nav="mesa"]')!.getAttribute('aria-current')).toBe('page')
-  })
-
-  it('clicar em Mesa pede para abrir', () => {
-    const alternar = vi.fn()
-    const nav = renderizarNavSala(false, alternar)
-
-    nav.querySelector<HTMLButtonElement>('[data-nav="mesa"]')!.click()
-
-    expect(alternar).toHaveBeenCalledWith(true)
-  })
-
-  it('clicar em Sala pede para fechar a mesa', () => {
-    const alternar = vi.fn()
-    const nav = renderizarNavSala(true, alternar)
-
-    nav.querySelector<HTMLButtonElement>('[data-nav="sala"]')!.click()
-
-    expect(alternar).toHaveBeenCalledWith(false)
-  })
-})
 
 describe('renderizarSalaParada', () => {
   it('lista quem está na sala', () => {
@@ -89,43 +56,6 @@ describe('renderizarSalaParada', () => {
   })
 })
 
-describe('a marca de "a mesa espera por você"', () => {
-  it('não marca nada quando a mesa não precisa de você', () => {
-    const nav = renderizarNavSala(false, vi.fn(), false)
-
-    const mesa = nav.querySelector<HTMLElement>('[data-nav="mesa"]')!
-    expect(mesa.dataset['espera']).toBeUndefined()
-    expect(nav.querySelector('.nav-sala-marca')).toBeNull()
-  })
-
-  it('marca o botão da mesa quando ela está esperando você', () => {
-    const nav = renderizarNavSala(false, vi.fn(), true)
-
-    const mesa = nav.querySelector<HTMLElement>('[data-nav="mesa"]')!
-    expect(mesa.dataset['espera']).toBe('1')
-    expect(nav.querySelector('.nav-sala-marca')).not.toBeNull()
-  })
-
-  it('diz em texto o que a marca significa, para quem não vê a cor', () => {
-    const nav = renderizarNavSala(false, vi.fn(), true)
-
-    const mesa = nav.querySelector<HTMLElement>('[data-nav="mesa"]')!
-    expect(mesa.getAttribute('aria-label')).toContain(ROTULO_ESPERANDO)
-  })
-
-  it('nunca marca a sala — só a mesa espera por alguém', () => {
-    const nav = renderizarNavSala(false, vi.fn(), true)
-
-    expect(nav.querySelector<HTMLElement>('[data-nav="sala"]')!.dataset['espera'])
-      .toBeUndefined()
-  })
-
-  it('some assim que a mesa deixa de esperar', () => {
-    const semEspera = renderizarNavSala(true, vi.fn(), false)
-
-    expect(semEspera.querySelector('.nav-sala-marca')).toBeNull()
-  })
-})
 
 describe('quem está na sala mas sem conexão comigo', () => {
   const dois = () => estadoCom(jogador('eu', 'Alex'), jogador('p2', 'Bruno'))

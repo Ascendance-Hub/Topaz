@@ -46,9 +46,22 @@ const PARA_TEXTO: Record<string, string> = {
  * Este teste responde a segunda metade, e responde na máquina de quem está
  * com o problema.
  */
+/**
+ * Se o bloco de detalhes está aberto, e como avisar quando a pessoa mexe.
+ *
+ * Mora fora do componente porque o painel é reconstruído a cada desenho da
+ * sala: guardado aqui dentro, o estado morreria a cada clique em qualquer
+ * outro botão da tela.
+ */
+export interface EstadoDetalhes {
+  aberto?: boolean | undefined
+  aoAlternar?: ((aberto: boolean) => void) | undefined
+}
+
 export function renderizarTesteRede(
   analise: Analise | null, rodando: boolean, aoRodar: () => void,
   relays?: RelayDetalhe[],
+  detalhes: EstadoDetalhes = {},
 ): HTMLElement {
   const painel = document.createElement('div')
   painel.className = 'teste-rede'
@@ -66,28 +79,59 @@ export function renderizarTesteRede(
    * Os servidores de descoberta, para duas pessoas compararem.
    *
    * Duas redes podem alcançar conjuntos DIFERENTES de servidores. Se os
-   * conjuntos não se cruzam, as duas pessoas nunca se encontram — e nenhuma
-   * vê erro, porque ambas têm servidores conectados. Só olhando os nomes lado
-   * a lado dá para ver isso.
+   * conjuntos não se cruzam, as duas pessoas nunca se encontram — e nenhuma vê
+   * erro, porque ambas têm servidores conectados. Só olhando os nomes lado a
+   * lado dá para ver isso.
+   *
+   * Fica **dobrado** num `<details>`: são vinte nomes e dois parágrafos de
+   * explicação, e isso tomava a tela inteira de quem estava só esperando
+   * alguém entrar. `<details>` nativo em vez de um botão nosso — ele já vem
+   * com teclado, leitor de tela e o estado aberto/fechado de graça.
+   *
+   * O que NÃO se dobra é o sinal. Quando poucos servidores respondem, o aviso
+   * vai no próprio resumo do `<details>`: foi exatamente esse aviso que
+   * encontrou o antivírus bloqueando endereços, e enterrá-lo atrás de um
+   * clique desperdiçaria a única pista que aquele caso deixava.
    */
   function listarRelays(): void {
     if (!relays || relays.length === 0) return
 
-    const resumo = document.createElement('p')
-    resumo.className = 'teste-rede-relays-resumo'
     const vivos = relays.filter((r) => r.conectado).length
-    resumo.textContent =
+    const poucos = vivos > 0 && vivos < relays.length * FRACAO_SAUDAVEL
+
+    const bloco = document.createElement('details')
+    bloco.className = 'teste-rede-detalhes'
+    // A escolha da pessoa manda; `poucos` só decide na PRIMEIRA vez.
+    //
+    // Sem isto, o bloco reabria a cada `desenhar()` — e como a sala redesenha
+    // a cada clique nos controles da call, parecia que compartilhar tela ou
+    // silenciar alguém abria o diagnóstico. É o mesmo defeito do chat que
+    // perdia o texto: estado vivo num nó que é reconstruído.
+    bloco.open = detalhes.aberto ?? poucos
+    if (poucos) bloco.dataset['ruim'] = '1'
+    bloco.ontoggle = () => detalhes.aoAlternar?.(bloco.open)
+
+    const resumo = document.createElement('summary')
+    resumo.className = 'teste-rede-resumo'
+    resumo.textContent = poucos
+      ? `Ver detalhes de conexão — poucos servidores respondendo (${vivos} de ${relays.length})`
+      : 'Ver detalhes de conexão'
+    bloco.append(resumo)
+
+    const contagem = document.createElement('p')
+    contagem.className = 'teste-rede-relays-resumo'
+    contagem.textContent =
       `Servidores de descoberta: ${vivos} de ${relays.length}. `
       + 'Compare esta lista com a da outra pessoa — vocês precisam ter pelo '
       + 'menos um em comum.'
-    painel.append(resumo)
+    bloco.append(contagem)
 
-    if (vivos > 0 && vivos < relays.length * FRACAO_SAUDAVEL) {
+    if (poucos) {
       const alerta = document.createElement('p')
       alerta.className = 'teste-rede-veredito'
       alerta.dataset['ruim'] = '1'
       alerta.textContent = TEXTOS.poucosRelays
-      painel.append(alerta)
+      bloco.append(alerta)
     }
 
     const lista = document.createElement('div')
@@ -99,7 +143,8 @@ export function renderizarTesteRede(
       item.textContent = relay.nome
       lista.append(item)
     }
-    painel.append(lista)
+    bloco.append(lista)
+    painel.append(bloco)
   }
 
   if (rodando) {

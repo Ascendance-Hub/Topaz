@@ -118,3 +118,98 @@ describe('aviso de antivírus bloqueando servidores', () => {
     expect(painel.textContent).not.toContain(TEXTOS.poucosRelays)
   })
 })
+
+describe('os detalhes de conexão ficam dobrados', () => {
+  const relays = (vivos: number, total = 20) =>
+    Array.from({ length: total }, (_, i) => ({
+      url: `wss://r${i}`, nome: `r${i}.exemplo`, conectado: i < vivos,
+    }))
+
+  it('com a rede saudável, a lista nasce FECHADA', () => {
+    // São vinte nomes e dois parágrafos de explicação. Abertos, tomavam a tela
+    // inteira de quem estava só esperando alguém entrar.
+    const painel = renderizarTesteRede(null, false, vi.fn(), relays(18))
+
+    expect(painel.querySelector<HTMLDetailsElement>('details')!.open).toBe(false)
+  })
+
+  it('com poucos servidores, ela nasce ABERTA', () => {
+    // Quem está com problema não deveria precisar descobrir que existe um
+    // clique para ver o diagnóstico.
+    const painel = renderizarTesteRede(null, false, vi.fn(), relays(3))
+
+    expect(painel.querySelector<HTMLDetailsElement>('details')!.open).toBe(true)
+  })
+
+  it('o aviso aparece no resumo, mesmo dobrado', () => {
+    // Foi este aviso que encontrou o antivírus bloqueando endereços. Enterrá-lo
+    // atrás de um clique desperdiçaria a única pista que aquele caso deixava.
+    const painel = renderizarTesteRede(null, false, vi.fn(), relays(3))
+
+    const resumo = painel.querySelector('summary')!.textContent!
+    expect(resumo).toContain('poucos servidores')
+    expect(resumo).toContain('3 de 20')
+  })
+
+  it('com a rede saudável, o resumo é neutro', () => {
+    const painel = renderizarTesteRede(null, false, vi.fn(), relays(18))
+
+    expect(painel.querySelector('summary')!.textContent).toBe('Ver detalhes de conexão')
+  })
+
+  it('a lista inteira continua lá dentro, para comparar com a outra pessoa', () => {
+    const painel = renderizarTesteRede(null, false, vi.fn(), relays(18))
+
+    expect(painel.querySelectorAll('details .teste-rede-relay')).toHaveLength(20)
+  })
+
+  it('sem lista de servidores, não há bloco nenhum', () => {
+    // É o caso da home: fora de uma sala não há socket aberto, e a contagem
+    // sairia "0 de 20".
+    const painel = renderizarTesteRede(null, false, vi.fn())
+
+    expect(painel.querySelector('details')).toBeNull()
+  })
+})
+
+describe('a escolha de abrir os detalhes sobrevive ao redesenho', () => {
+  const relays = (vivos: number, total = 20) =>
+    Array.from({ length: total }, (_, i) => ({
+      url: `wss://r${i}`, nome: `r${i}.exemplo`, conectado: i < vivos,
+    }))
+
+  it('a escolha da pessoa manda sobre o padrão', () => {
+    // O defeito que isto conserta: a sala é redesenhada a cada clique nos
+    // controles da call, e o bloco reabria toda vez — parecia que compartilhar
+    // tela ou silenciar alguém abria o diagnóstico sozinho.
+    const painel = renderizarTesteRede(
+      null, false, vi.fn(), relays(3), { aberto: false })
+
+    expect(painel.querySelector<HTMLDetailsElement>('details')!.open).toBe(false)
+  })
+
+  it('quem quis abrir continua com ele aberto, mesmo com a rede saudável', () => {
+    const painel = renderizarTesteRede(
+      null, false, vi.fn(), relays(18), { aberto: true })
+
+    expect(painel.querySelector<HTMLDetailsElement>('details')!.open).toBe(true)
+  })
+
+  it('sem escolha registrada, o padrão continua valendo', () => {
+    const painel = renderizarTesteRede(null, false, vi.fn(), relays(3), {})
+
+    expect(painel.querySelector<HTMLDetailsElement>('details')!.open).toBe(true)
+  })
+
+  it('mexer no bloco avisa quem guarda a escolha', () => {
+    const aoAlternar = vi.fn()
+    const painel = renderizarTesteRede(
+      null, false, vi.fn(), relays(18), { aoAlternar })
+    const bloco = painel.querySelector<HTMLDetailsElement>('details')!
+
+    bloco.open = true
+    bloco.dispatchEvent(new Event('toggle'))
+
+    expect(aoAlternar).toHaveBeenCalledWith(true)
+  })
+})
