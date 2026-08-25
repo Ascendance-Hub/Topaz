@@ -1,10 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
-  ehCodigoValido, gerarCodigoSala, haCodigoNaUrl, lerCodigoDaUrl,
-  montarLinkSala, TAMANHO_CODIGO,
+  ehCodigoValido, formatarCodigo, gerarCodigoSala, haCodigoNaUrl, lerCodigoDaUrl,
+  montarHashSala, montarLinkSala, normalizarCodigo, TAMANHO_CODIGO, TAMANHO_FORMATADO,
 } from './codigo'
 import type { FonteBytes } from './codigo'
 import { rngSemente } from '../game/shoe'
+
+/** Um código canônico de exemplo, no tamanho corrente. */
+const EXEMPLO = 'K7X2QW9FM3PRTVN4'
 
 /**
  * Traduz um `Rng` semeado (mulberry32, já usado no jogo) numa `FonteBytes`
@@ -23,8 +26,18 @@ function fonteDeSemente(semente: number): FonteBytes {
 }
 
 describe('gerarCodigoSala', () => {
-  it('tem 8 caracteres', () => {
-    expect(gerarCodigoSala(fonteDeSemente(1))).toHaveLength(8)
+  it('tem TAMANHO_CODIGO caracteres', () => {
+    expect(gerarCodigoSala(fonteDeSemente(1))).toHaveLength(TAMANHO_CODIGO)
+  })
+
+  it('mantém o piso de entropia que torna a adivinhação inviável', () => {
+    // O código não é só um identificador: é a senha da sala. Quem descobre
+    // adivinha entra, ouve a call e vê as telas. Este teste existe para que
+    // encurtar o código volte a ser uma decisão consciente e não um ajuste
+    // de conveniência: com 8 caracteres eram ~40 bits, faixa que uma GPU
+    // varre em minutos.
+    const bits = TAMANHO_CODIGO * Math.log2(31)
+    expect(bits).toBeGreaterThanOrEqual(75)
   })
 
   it('evita caracteres ambíguos com uma fonte determinística', () => {
@@ -63,11 +76,48 @@ describe('gerarCodigoSala', () => {
   it('sem argumento, duas chamadas consecutivas produzem códigos diferentes', () => {
     expect(gerarCodigoSala()).not.toBe(gerarCodigoSala())
   })
+
+  it('não repete em muitos sorteios seguidos', () => {
+    const vistos = new Set<string>()
+    for (let i = 0; i < 500; i++) vistos.add(gerarCodigoSala())
+    expect(vistos.size).toBe(500)
+  })
+})
+
+describe('formatarCodigo', () => {
+  it('agrupa de quatro em quatro com hífen', () => {
+    // Dezesseis caracteres seguidos são ilegíveis para conferir a olho ou
+    // ditar por voz. O hífen é só apresentação — o código canônico, que vai
+    // para a rede, continua sem ele.
+    expect(formatarCodigo(EXEMPLO)).toBe('K7X2-QW9F-M3PR-TVN4')
+  })
+
+  it('o tamanho formatado bate com TAMANHO_FORMATADO', () => {
+    // O campo de digitação usa essa constante como maxLength; se ela
+    // divergir, colar um código com hífens trunca e nada entra.
+    expect(formatarCodigo(EXEMPLO)).toHaveLength(TAMANHO_FORMATADO)
+  })
+})
+
+describe('normalizarCodigo', () => {
+  it('tira hífens, espaços e passa para maiúsculas', () => {
+    expect(normalizarCodigo(' k7x2-qw9f m3pr-tvn4 ')).toBe(EXEMPLO)
+  })
+
+  it('desfaz exatamente o que formatarCodigo faz', () => {
+    const codigo = gerarCodigoSala(fonteDeSemente(7))
+    expect(normalizarCodigo(formatarCodigo(codigo))).toBe(codigo)
+  })
 })
 
 describe('lerCodigoDaUrl', () => {
   it('extrai o código do hash', () => {
-    expect(lerCodigoDaUrl('#sala=K7X2QW9F')).toBe('K7X2QW9F')
+    expect(lerCodigoDaUrl(`#sala=${EXEMPLO}`)).toBe(EXEMPLO)
+  })
+
+  it('aceita o código agrupado e devolve a forma canônica', () => {
+    // É essa a forma que aparece no link copiado, então é a que mais chega.
+    expect(lerCodigoDaUrl('#sala=K7X2-QW9F-M3PR-TVN4')).toBe(EXEMPLO)
   })
 
   it('devolve null sem hash', () => {
@@ -79,17 +129,15 @@ describe('lerCodigoDaUrl', () => {
   })
 
   it('normaliza para maiúsculas', () => {
-    expect(lerCodigoDaUrl('#sala=k7x2qw9f')).toBe('K7X2QW9F')
+    expect(lerCodigoDaUrl(`#sala=${EXEMPLO.toLowerCase()}`)).toBe(EXEMPLO)
   })
 
   it('devolve null para código mais curto que TAMANHO_CODIGO (link truncado)', () => {
-    const curto = 'K7X2QW9F'.slice(0, TAMANHO_CODIGO - 1)
-    expect(lerCodigoDaUrl(`#sala=${curto}`)).toBeNull()
+    expect(lerCodigoDaUrl(`#sala=${EXEMPLO.slice(0, TAMANHO_CODIGO - 1)}`)).toBeNull()
   })
 
   it('devolve null para código mais longo que TAMANHO_CODIGO', () => {
-    const longo = 'K7X2QW9F' + 'A'.repeat(TAMANHO_CODIGO)
-    expect(lerCodigoDaUrl(`#sala=${longo}`)).toBeNull()
+    expect(lerCodigoDaUrl(`#sala=${EXEMPLO}A`)).toBeNull()
   })
 })
 
@@ -99,43 +147,60 @@ describe('ehCodigoValido', () => {
   })
 
   it('rejeita comprimento errado', () => {
-    expect(ehCodigoValido('K7X2QW9')).toBe(false)
-    expect(ehCodigoValido('K7X2QW9FF')).toBe(false)
+    expect(ehCodigoValido(EXEMPLO.slice(0, -1))).toBe(false)
+    expect(ehCodigoValido(`${EXEMPLO}F`)).toBe(false)
     expect(ehCodigoValido('')).toBe(false)
   })
 
+  it('rejeita a forma agrupada — o portão só conhece a forma canônica', () => {
+    // Quem lê da URL ou do campo normaliza antes. Deixar o hífen passar aqui
+    // criaria duas formas válidas do mesmo código, e duas salas diferentes.
+    expect(ehCodigoValido(formatarCodigo(EXEMPLO))).toBe(false)
+  })
+
   it('rejeita caracteres fora do alfabeto, inclusive os ambíguos excluídos de propósito', () => {
-    // O, I, 1, L: comprimento certo (8), mas fora do alfabeto.
-    expect(ehCodigoValido('K7X2QW9O')).toBe(false)
-    expect(ehCodigoValido('K7X2QW91')).toBe(false)
-    expect(ehCodigoValido('K7X2QWIL')).toBe(false)
-    expect(ehCodigoValido('K7X2QW90')).toBe(false)
+    expect(ehCodigoValido('K7X2QW9OM3PRTVN4')).toBe(false)
+    expect(ehCodigoValido('K7X2QW91M3PRTVN4')).toBe(false)
+    expect(ehCodigoValido('K7X2QWILM3PRTVN4')).toBe(false)
+    expect(ehCodigoValido('K7X2QW90M3PRTVN4')).toBe(false)
   })
 
   it('rejeita marcação disfarçada de código (mesmo comprimento por acaso não muda o veredito)', () => {
-    expect(ehCodigoValido('<img/on>')).toBe(false)
+    expect(ehCodigoValido('<img/onerror=x>!')).toBe(false)
   })
 
   it('minúsculas não passam sem normalização prévia — só maiúsculas do alfabeto são válidas', () => {
-    expect(ehCodigoValido('k7x2qw9f')).toBe(false)
+    expect(ehCodigoValido(EXEMPLO.toLowerCase())).toBe(false)
+  })
+})
+
+describe('montarHashSala', () => {
+  it('escreve o código agrupado, para o que está na barra de endereços ser o mesmo que se copia', () => {
+    expect(montarHashSala(EXEMPLO)).toBe('#sala=K7X2-QW9F-M3PR-TVN4')
+  })
+
+  it('o que ele escreve, lerCodigoDaUrl lê de volta', () => {
+    expect(lerCodigoDaUrl(montarHashSala(EXEMPLO))).toBe(EXEMPLO)
   })
 })
 
 describe('montarLinkSala', () => {
   it('põe o código no hash, nunca no path', () => {
-    const link = montarLinkSala('https://ascendance-hub.github.io/Topaz/', 'K7X2QW9F')
-    expect(link).toBe('https://ascendance-hub.github.io/Topaz/#sala=K7X2QW9F')
+    // No fragmento o código não é enviado ao servidor: não entra em log de
+    // acesso nem vaza por cabeçalho Referer.
+    const link = montarLinkSala('https://ascendance-hub.github.io/Topaz/', EXEMPLO)
+    expect(link).toBe('https://ascendance-hub.github.io/Topaz/#sala=K7X2-QW9F-M3PR-TVN4')
   })
 
   it('não duplica o hash quando a base já tem um', () => {
-    const link = montarLinkSala('https://exemplo.com/Topaz/#sala=ANTIGO', 'NOVO1234')
-    expect(link).toBe('https://exemplo.com/Topaz/#sala=NOVO1234')
+    const link = montarLinkSala('https://exemplo.com/Topaz/#sala=ANTIGO', EXEMPLO)
+    expect(link).toBe('https://exemplo.com/Topaz/#sala=K7X2-QW9F-M3PR-TVN4')
   })
 })
 
 describe('haCodigoNaUrl', () => {
   it('reconhece um hash de sala mesmo com código inválido — é o que distingue link truncado de porta da frente', () => {
-    expect(haCodigoNaUrl('#sala=K7X2QW9F')).toBe(true)
+    expect(haCodigoNaUrl(`#sala=${EXEMPLO}`)).toBe(true)
     expect(haCodigoNaUrl('#sala=K7X2')).toBe(true)
     expect(haCodigoNaUrl('#sala=')).toBe(true)
   })

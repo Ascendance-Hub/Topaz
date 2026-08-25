@@ -5,12 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Topaz — sala de jogos</title>
     <meta name="theme-color" content="#061511" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=Archivo:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
+
+    <!--
+      Política de conteúdo: o que o navegador tem permissão de carregar e para
+      onde tem permissão de falar. Serve de rede de segurança — se algum dia
+      entrar código que monte HTML a partir de texto vindo da rede, o script
+      injetado não roda, porque não vem de `self`.
+
+      `connect-src wss:` é o que os relays nostr, os brokers MQTT e os
+      trackers usam. `ws:` (sem TLS) está na lista só para o servidor de
+      desenvolvimento; em produção o próprio navegador já bloqueia ws: numa
+      página https, então liberar aqui não afrouxa nada.
+
+      `worker-src blob:` existe porque o cliente MQTT monta um worker a partir
+      de um blob. `media-src blob:` cobre vídeo e áudio locais.
+
+      Duas ressalvas honestas:
+      - `style-src 'unsafe-inline'` fica porque o Vite injeta `<style>` via JS
+        durante o desenvolvimento. É o ponto fraco desta política.
+      - `frame-ancestors` (impedir que o site seja embutido num iframe alheio)
+        só funciona como cabeçalho HTTP, e o GitHub Pages não deixa definir
+        cabeçalhos. Fica registrado como limitação da hospedagem.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self';
+               style-src 'self' 'unsafe-inline';
+               font-src 'self';
+               img-src 'self' data:;
+               media-src 'self' blob:;
+               connect-src 'self' wss: ws:;
+               worker-src 'self' blob:;
+               object-src 'none';
+               base-uri 'self';
+               form-action 'none'"
     />
+
+    <!-- O código da sala viaja no fragmento (#sala=), que o navegador nunca
+         envia ao servidor. Isto fecha o resto: nenhuma URL nossa sai daqui
+         dentro de um cabeçalho Referer. -->
+    <meta name="referrer" content="no-referrer" />
+
     <link rel="stylesheet" href="/src/ui/theme.css" />
   </head>
   <body>

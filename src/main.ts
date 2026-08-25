@@ -15,6 +15,7 @@ import { renderizarControlesCall } from './ui/components/call'
 import type { AcoesCall } from './ui/components/call'
 import { criarVideoRemoto, mostrarVideo } from './ui/components/video-remoto'
 import { renderizarMixer, chaveVoz, chaveTela } from './ui/components/mixer'
+import { limparMidia, removerMidiaDe } from './ui/dom-midia'
 import { ehTela } from './call/classificar'
 import { criarCanalCall } from './call/canal'
 import { ProtocoloCall } from './call/protocolo'
@@ -156,8 +157,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       midia.pararTela()
       // Sair precisa calar tudo de verdade: um `<video>` escondido continua
       // tocando, e era isso que deixava o som da tela saindo depois de sair.
-      for (const caixa of videos.querySelectorAll<HTMLElement>('[data-de]')) caixa.remove()
-      audios.replaceChildren()
+      // `limparMidia` também larga os `srcObject` — tirar da árvore sem soltar
+      // deixava stream e decodificador vivos até a coleta de lixo passar.
+      limparMidia(videos)
+      limparMidia(audios)
     },
     compartilhar: () => {
       void midia.compartilharTela(() => {
@@ -209,7 +212,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   videos.className = 'call-videos'
 
   function removerVideoDe(peerId: string): void {
-    videos.querySelector(`[data-de="${peerId}"]`)?.remove()
+    removerMidiaDe(videos, peerId)
   }
 
   /**
@@ -261,7 +264,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     for (const caixa of videos.querySelectorAll<HTMLElement>('[data-de]')) {
       const de = caixa.dataset['de'] ?? ''
       if (!compartilhando.includes(de)) {
-        caixa.remove()
+        removerMidiaDe(videos, de)
         continue
       }
       mostrarVideo(caixa, assistindo.includes(de) && !todosSilenciados)
@@ -294,7 +297,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // Um elemento por peer. Cada republicação (sair e voltar da call) traz um
     // stream novo, e sem trocar o elemento os antigos se acumulavam segurando
     // streams mortos.
-    audios.querySelector(`[data-de="${de}"]`)?.remove()
+    removerMidiaDe(audios, de)
     const el = document.createElement('audio')
     el.autoplay = true
     el.dataset['de'] = de

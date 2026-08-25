@@ -159,3 +159,42 @@ describe('gaveta', () => {
     expect(chat.raiz.querySelector('.chat-nao-lidas')).toBeNull()
   })
 })
+
+describe('o que chega de outro navegador', () => {
+  it('corta um texto gigante em vez de despejá-lo na tela', () => {
+    // O corte em LIMITE_TEXTO existe no envio, e quem envia pode simplesmente
+    // não aplicá-lo. Uma linha de dez mil caracteres — ou dez milhões —
+    // trava o navegador de todo mundo na sala.
+    const chat = criarChat(vi.fn())
+
+    chat.receber('Alex', 'a'.repeat(10_000))
+
+    const texto = chat.raiz.querySelector('.chat-texto')!.textContent!
+    expect(texto).toHaveLength(LIMITE_TEXTO)
+  })
+
+  it('corta também o apelido', () => {
+    const chat = criarChat(vi.fn())
+
+    chat.receber('A'.repeat(10_000), 'oi')
+
+    expect(chat.raiz.querySelector('.chat-autor')!.textContent!.length)
+      .toBeLessThanOrEqual(LIMITE_TEXTO)
+  })
+
+  it('não deixa passar o que nem é texto', () => {
+    const chat = criarChat(vi.fn())
+
+    chat.receber(null as unknown as string, { toString: () => 'oi' } as unknown as string)
+
+    expect(chat.raiz.querySelector('.chat-linha')!.textContent).toBe('')
+  })
+
+  it('mensagem normal continua inteira', () => {
+    const chat = criarChat(vi.fn())
+
+    chat.receber('Alex', 'boa sorte')
+
+    expect(chat.raiz.querySelector('.chat-texto')!.textContent).toBe('boa sorte')
+  })
+})

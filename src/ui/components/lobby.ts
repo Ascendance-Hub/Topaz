@@ -1,5 +1,6 @@
 import {
-  ehCodigoValido, gerarCodigoSala, haCodigoNaUrl, lerCodigoDaUrl, TAMANHO_CODIGO,
+  ehCodigoValido, formatarCodigo, gerarCodigoSala, haCodigoNaUrl, lerCodigoDaUrl,
+  montarHashSala, normalizarCodigo, TAMANHO_FORMATADO,
 } from '../codigo'
 
 const CHAVE_APELIDO = 'topaz:apelido'
@@ -28,11 +29,6 @@ export function salvarApelido(apelido: string): void {
   }
 }
 
-/** Remove espaços e normaliza para maiúsculas um código digitado à mão. */
-function normalizarCodigoDigitado(bruto: string): string {
-  return bruto.replace(/\s+/g, '').toUpperCase()
-}
-
 export function renderizarLobby(
   aoEntrar: (apelido: string, codigo: string) => void,
 ): HTMLElement {
@@ -52,7 +48,7 @@ export function renderizarLobby(
   const sub = document.createElement('p')
   sub.className = 'sub'
   sub.textContent = codigoDaUrl
-    ? `Entrando na sala ${codigoDaUrl}`
+    ? `Entrando na sala ${formatarCodigo(codigoDaUrl)}`
     : 'Blackjack com os amigos'
 
   const aviso = document.createElement('p')
@@ -72,7 +68,9 @@ export function renderizarLobby(
   const campoCodigo = document.createElement('input')
   campoCodigo.className = 'campo'
   campoCodigo.placeholder = 'Código da sala'
-  campoCodigo.maxLength = TAMANHO_CODIGO
+  // O limite conta os hífens: colar `K7X2-QW9F-M3PR-TVN4` num campo limitado
+  // ao tamanho canônico cortaria o fim e nada entraria.
+  campoCodigo.maxLength = TAMANHO_FORMATADO
 
   /** Devolve o apelido digitado, ou `null` e foca o campo se estiver
    * vazio. Verificado antes de qualquer efeito colateral (gerar código,
@@ -107,7 +105,7 @@ export function renderizarLobby(
     criar.onclick = () => {
       if (!apelidoValido()) return
       const codigo = gerarCodigoSala()
-      location.hash = `sala=${codigo}`
+      location.hash = montarHashSala(codigo)
       entrar(codigo)
     }
 
@@ -119,7 +117,7 @@ export function renderizarLobby(
     entrarBotao.className = 'botao fantasma'
     entrarBotao.textContent = 'Entrar'
     entrarBotao.onclick = () => {
-      const codigo = normalizarCodigoDigitado(campoCodigo.value)
+      const codigo = normalizarCodigo(campoCodigo.value)
       // Mesmo portão que a URL usa (ehCodigoValido), não só o comprimento:
       // um código com caracteres fora do alfabeto nunca vai bater com uma
       // sala real, e deixá-lo passar é como esse texto acabava indo parar
@@ -130,7 +128,7 @@ export function renderizarLobby(
       // apelido em branco reescrevia o hash e só depois barrava por falta
       // de apelido — a URL mudava para nada.
       if (!apelidoValido()) return
-      location.hash = `sala=${codigo}`
+      location.hash = montarHashSala(codigo)
       entrar(codigo)
     }
 

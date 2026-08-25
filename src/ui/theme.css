@@ -12,6 +12,19 @@
    que brilha. A ousadia é gasta num lugar só: a luz.
    ========================================================================= */
 
+/* As fontes vêm do nosso próprio servidor, não do Google. Um `<link>` para
+   fonts.googleapis.com entrega a um terceiro o IP de quem abre o site e o
+   fato de que ele esteve aqui — a cada carregamento, antes mesmo de entrar
+   numa sala. Era o único terceiro do projeto que não precisava existir.
+
+   Os eixos variáveis bastam: `wght` cobre 400..700 do Archivo num arquivo só,
+   e `opsz` faz o Bodoni ajustar o contraste ao tamanho. Os subconjuntos que o
+   português não usa (vietnamita, latin-ext) têm `unicode-range` e por isso
+   nunca são baixados. */
+@import '@fontsource-variable/archivo/wght.css';
+@import '@fontsource-variable/archivo/wght-italic.css';
+@import '@fontsource-variable/bodoni-moda/opsz.css';
+
 :root {
   /* A sala, do canto mais escuro ao feltro que pega luz. */
   --noite: #061511;
@@ -36,8 +49,8 @@
 
   /* Bodoni só no nome da sala e nos títulos grandes: alto contraste cansa em
      texto corrido, e é justamente por ser raro que ele marca. */
-  --display: 'Bodoni Moda', Georgia, 'Times New Roman', serif;
-  --corpo: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --display: 'Bodoni Moda Variable', Georgia, 'Times New Roman', serif;
+  --corpo: 'Archivo Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   --dur-carta: 380ms;
   --dur-virada: 300ms;
@@ -187,6 +200,11 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   letter-spacing: 0.14em;
   font-weight: 600;
   color: var(--topazio);
+  /* O código tem hífens, e hífen é ponto de quebra natural: sem isto ele parte
+     no meio (`K7X2-QW9F-` numa linha, `M3PR-TVN4` na outra) justamente no
+     texto que alguém está lendo em voz alta para o amigo. A barra é
+     `flex-wrap`, então o que acontece é o código inteiro descer de linha. */
+  white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------------------

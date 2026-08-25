@@ -15,10 +15,16 @@ as coisas andam — não é plano de implementação (esses vivem em
 
 ## Onde ficam os aprendizados
 
-`docs/aprendizados-trystero-webrtc.md` guarda o que descobrimos sobre Trystero
-e WebRTC que **não está na documentação oficial** de nenhum dos dois, com o
-sintoma, a causa e o conserto de cada caso — mais o histórico dos problemas
-relatados em uso e o que cada um se revelou ser.
+Dois documentos, com propósitos diferentes:
+
+- [`aprendizados-trystero-webrtc.md`](aprendizados-trystero-webrtc.md) — o
+  conhecimento técnico já destilado sobre Trystero e WebRTC que **não está na
+  documentação oficial** de nenhum dos dois, com sintoma, causa e conserto de
+  cada caso.
+- [`diario-de-bordo.md`](diario-de-bordo.md) — o **processo**: em que ordem as
+  coisas aconteceram, o que foi tentado e descartado, e as medições que
+  apontaram para o lugar errado. Existe para que as tentativas mortas não
+  pareçam boas ideias para quem chegar depois.
 
 ## Investigado e encerrado
 
@@ -106,6 +112,32 @@ Trystero real:
 - **Em aberto:** a sonda devolveu `encoderImplementation` vazio, então não está
   provado que o Quick Sync entra por esse caminho. É inferência a partir da
   sonda anterior, não medição. Fica para a verificação manual.
+
+## Privacidade e desconfiança do que vem da rede
+
+Levantamento e correções em 2026-08-24. O relato completo, com o que **não**
+dá para fechar sem servidor, está no Capítulo 8 do
+[diário de bordo](diario-de-bordo.md).
+
+- **Fontes servidas pelo próprio site.** O `<link>` para o Google Fonts
+  entregava a um terceiro o IP e a visita a cada carregamento. Era o único
+  terceiro dispensável do projeto.
+- **CSP e `referrer: no-referrer`** no `index.html`. `frame-ancestors` fica de
+  fora: só funciona como cabeçalho HTTP, e o GitHub Pages não permite definir
+  cabeçalhos.
+- **Código de sala de 8 para 16 caracteres** (~40 → ~79 bits), mostrado
+  agrupado (`K7X2-QW9F-M3PR-TVN4`). O código é a senha da sala e é atacável
+  offline: o relay vê o tópico como um SHA-256 de passada única, então
+  adivinhar é varrer o espaço sem falar com ninguém.
+- **Guardas no que chega** — `ehEstadoPlausivel` antes de adotar estado, corte
+  de texto do chat por quem recebe, e busca de elementos por comparação de
+  string em vez de seletor CSS com `peerId` interpolado.
+- **Vazamento de mídia fechado** — tirar um `<video>`/`<audio>` da árvore sem
+  zerar o `srcObject` deixava stream e decodificador vivos.
+
+**Limite estrutural registrado:** qualquer peer pode publicar um estado se
+declarando anfitrião. Sem servidor não há árbitro; os guardas encarecem, não
+eliminam.
 
 ## Aguardando verificação de verdade
 

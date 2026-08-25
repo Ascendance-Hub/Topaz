@@ -25,7 +25,7 @@ describe('apelido em localStorage', () => {
   })
 
   it('ao entrar, o apelido digitado é gravado em localStorage', () => {
-    location.hash = '#sala=K7X2QW9F'
+    location.hash = '#sala=K7X2QW9FM3PRTVN4'
     const lobby = renderizarLobby(() => {})
     const campo = lobby.querySelector<HTMLInputElement>('.campo')!
     campo.value = 'Ana'
@@ -45,17 +45,17 @@ describe('roteamento pela URL', () => {
   })
 
   it('com código no hash, renderiza o caminho de entrar na sala existente', () => {
-    location.hash = '#sala=K7X2QW9F'
+    location.hash = '#sala=K7X2QW9FM3PRTVN4'
     const lobby = renderizarLobby(() => {})
     const botoes = [...lobby.querySelectorAll('button')].map((b) => b.textContent)
     expect(botoes).toEqual(['Entrar na sala'])
-    expect(lobby.querySelector('.sub')?.textContent).toBe('Entrando na sala K7X2QW9F')
+    expect(lobby.querySelector('.sub')?.textContent).toBe('Entrando na sala K7X2-QW9F-M3PR-TVN4')
   })
 })
 
 describe('apelido em branco', () => {
   it('não chama aoEntrar quando o apelido está vazio', () => {
-    location.hash = '#sala=K7X2QW9F'
+    location.hash = '#sala=K7X2QW9FM3PRTVN4'
     const aoEntrar = vi.fn()
     const lobby = renderizarLobby(aoEntrar)
     const campo = lobby.querySelector<HTMLInputElement>('.campo')!
@@ -85,7 +85,7 @@ describe('apelido em branco', () => {
     const campoCodigo = lobby.querySelector<HTMLInputElement>(
       'input[placeholder="Código da sala"]',
     )!
-    campoCodigo.value = 'K7X2QW9F'
+    campoCodigo.value = 'K7X2QW9FM3PRTVN4'
     const entrarBotao = [...lobby.querySelectorAll('button')].find(
       (b) => b.textContent === 'Entrar',
     )!
@@ -108,13 +108,13 @@ describe('normalização do código digitado à mão', () => {
     const campoCodigo = lobby.querySelector<HTMLInputElement>(
       'input[placeholder="Código da sala"]',
     )!
-    campoCodigo.value = ' k7x2qw9f '
+    campoCodigo.value = ' k7x2qw9fm3prtvn4 '
     const entrarBotao = [...lobby.querySelectorAll('button')].find(
       (b) => b.textContent === 'Entrar',
     )!
     entrarBotao.click()
-    expect(aoEntrar).toHaveBeenCalledWith('Ana', 'K7X2QW9F')
-    expect(location.hash).toBe('#sala=K7X2QW9F')
+    expect(aoEntrar).toHaveBeenCalledWith('Ana', 'K7X2QW9FM3PRTVN4')
+    expect(location.hash).toBe('#sala=K7X2-QW9F-M3PR-TVN4')
   })
 
   it('remove também espaço interno (código colado quebrado no meio)', () => {
@@ -126,16 +126,35 @@ describe('normalização do código digitado à mão', () => {
       'input[placeholder="Código da sala"]',
     )!
     // Espaço no meio, não só nas pontas — .trim() sozinho não resolveria isto.
-    campoCodigo.value = 'k7x2 qw9f'
+    campoCodigo.value = 'k7x2 qw9fm3pr tvn4'
     const entrarBotao = [...lobby.querySelectorAll('button')].find(
       (b) => b.textContent === 'Entrar',
     )!
     entrarBotao.click()
-    expect(aoEntrar).toHaveBeenCalledWith('Ana', 'K7X2QW9F')
-    expect(location.hash).toBe('#sala=K7X2QW9F')
+    expect(aoEntrar).toHaveBeenCalledWith('Ana', 'K7X2QW9FM3PRTVN4')
+    expect(location.hash).toBe('#sala=K7X2-QW9F-M3PR-TVN4')
   })
 
-  it('não entra quando o código tem 8 caracteres mas algum está fora do alfabeto', () => {
+  it('aceita o código colado com os hífens, que é a forma que o link mostra', () => {
+    // O link copiado traz `K7X2-QW9F-M3PR-TVN4`. Quem copia o código de uma
+    // conversa cola exatamente isso — se os hífens barrassem a entrada, o
+    // caminho mais provável seria o que não funciona.
+    const aoEntrar = vi.fn()
+    const lobby = renderizarLobby(aoEntrar)
+    lobby.querySelector<HTMLInputElement>('.campo')!.value = 'Ana'
+    const campoCodigo = lobby.querySelector<HTMLInputElement>(
+      'input[placeholder="Código da sala"]',
+    )!
+    campoCodigo.value = 'K7X2-QW9F-M3PR-TVN4'
+    // O campo precisa caber a forma agrupada inteira, senão o fim é cortado.
+    expect(campoCodigo.maxLength).toBeGreaterThanOrEqual('K7X2-QW9F-M3PR-TVN4'.length)
+
+    ;[...lobby.querySelectorAll('button')].find((b) => b.textContent === 'Entrar')!.click()
+
+    expect(aoEntrar).toHaveBeenCalledWith('Ana', 'K7X2QW9FM3PRTVN4')
+  })
+
+  it('não entra quando o código tem o comprimento certo mas algum está fora do alfabeto', () => {
     const aoEntrar = vi.fn()
     const lobby = renderizarLobby(aoEntrar)
     const hashAntes = location.hash
@@ -239,7 +258,7 @@ describe('link de convite com código inválido', () => {
   })
 
   it('não avisa nada quando o código do link é válido', () => {
-    location.hash = '#sala=K7X2QW9F'
+    location.hash = '#sala=K7X2QW9FM3PRTVN4'
     expect(renderizarLobby(() => {}).querySelector('.aviso')).toBeNull()
   })
 })
