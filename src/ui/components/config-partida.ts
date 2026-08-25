@@ -8,7 +8,8 @@ export const AVISO_SO_ANFITRIAO =
 
 export const AVISO_EM_ANDAMENTO =
   'A partida está em andamento. O formato só muda entre partidas: trocar o '
-  + 'alvo agora mudaria a regra com dinheiro na mesa.'
+  + 'alvo agora mudaria a regra com dinheiro na mesa. Quando ela acabar, dá '
+  + 'para ajustar antes de começar a próxima.'
 
 export const AVISO_SUGESTAO =
   'Campos preenchidos com o último formato que você salvou. Confira e clique '
@@ -18,8 +19,8 @@ export const ERRO_IMPORTAR =
   'Não deu para ler esse formato. Cole o texto inteiro, incluindo as chaves.'
 
 export const AVISO_FICHAS =
-  'As fichas novas valem para quem entrar depois e para a próxima partida. '
-  + 'Ninguém ganha nem perde fichas agora.'
+  'Com a mesa parada, mudar as fichas já vale para todo mundo. Com a partida '
+  + 'encerrada, vale na próxima — para não apagar o placar da que acabou.'
 
 export interface DadosConfigPartida {
   config: ConfigPartida
@@ -32,7 +33,8 @@ export interface DadosConfigPartida {
    */
   sugestao?: ConfigPartida | null
   souHost: boolean
-  /** `true` quando a fase não é `aguardando`. */
+  /** Partida em curso de verdade. `fim` NÃO conta: ali a partida acabou, e é
+   *  onde se ajusta o formato antes de recomeçar. */
   emAndamento: boolean
 }
 

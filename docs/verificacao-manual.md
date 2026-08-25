@@ -310,9 +310,16 @@ jogo — cada jogo terá o seu.
 - [ ] Marcar "Jogar até sobrar um" apaga o campo de alvo
 - [ ] Salvar com "até sobrar um" faz a partida seguir mesmo com alguém muito à
       frente; ela só acaba quando sobra um
-- [ ] Mudar as fichas iniciais **não** dá dinheiro a quem já está na sala
+- [ ] Com a **mesa parada**, mudar as fichas iniciais muda as fichas de todo
+      mundo na hora — e a partida começa com o valor novo
+- [ ] Com a partida **encerrada**, mudar as fichas **não** mexe no placar; o
+      valor novo entra em "Nova partida"
 - [ ] Quem entra depois recebe as fichas novas
-- [ ] "Nova partida" redistribui com o valor novo
+- [ ] Baixar a aposta máxima para 300 troca os botões para 25 / 100 / 300 —
+      nenhum botão de 500 sobra na tela
+- [ ] Subir a aposta máxima para 800 oferece um botão de 800
+- [ ] Todo botão de aposta que aparece **funciona** ao ser clicado
+- [ ] Ao terminar uma partida, dá para ajustar o formato **sem recarregar**
 - [ ] Mudar o tempo de jogada muda o ritmo da barra de prazo na mesa
 - [ ] O amigo vê a mudança sem recarregar
 
