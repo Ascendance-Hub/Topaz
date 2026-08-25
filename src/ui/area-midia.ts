@@ -4,6 +4,62 @@ import type { CanalAudio } from './components/mixer'
 import { aplicarSaida, limparMidia, removerMidiaDe, soltarMidia } from './dom-midia'
 import { ehTela } from '../call/classificar'
 
+/** Vídeos com PiP aberto ficam fora do fluxo da página; o tipo não é padrão. */
+type VideoComPiP = HTMLVideoElement & {
+  requestPictureInPicture?: () => Promise<unknown>
+}
+
+/**
+ * Os controles da prévia da própria tela.
+ *
+ * A tela dos OUTROS já tinha tela cheia e janela flutuante desde sempre; a
+ * prévia da própria nasceu sem nada, e conferir o que se está mostrando é
+ * justamente quando ampliar ajuda mais.
+ *
+ * Não tem "Silenciar": a prévia é muda por construção, e um botão que não faz
+ * nada é pior que botão nenhum.
+ */
+function barraDaPrevia(caixa: HTMLElement, video: HTMLVideoElement): HTMLElement {
+  const barra = document.createElement('div')
+  barra.className = 'video-barra'
+
+  const botao = (chave: string, rotulo: string): HTMLButtonElement => {
+    const el = document.createElement('button')
+    el.type = 'button'
+    el.className = 'video-botao'
+    el.dataset['video'] = chave
+    el.textContent = rotulo
+    return el
+  }
+
+  const telaCheia = botao('tela-cheia', 'Tela cheia')
+  telaCheia.onclick = () => {
+    // A CAIXA, não o `<video>`: em tela cheia os controles continuam
+    // acessíveis, e dá para sair sem sair da tela cheia antes.
+    const promessa = document.fullscreenElement === caixa
+      ? document.exitFullscreen()
+      : caixa.requestFullscreen?.()
+    void promessa?.catch((erro: unknown) => {
+      console.warn('tela cheia recusada:', erro)
+    })
+  }
+  barra.append(telaCheia)
+
+  // Só oferece o que o navegador tem: um botão que falha no clique é pior que
+  // um botão ausente.
+  if (document.pictureInPictureEnabled) {
+    const pip = botao('pip', 'Janela flutuante')
+    pip.onclick = () => {
+      void (video as VideoComPiP).requestPictureInPicture?.().catch((erro: unknown) => {
+        console.warn('não foi possível abrir a janela flutuante:', erro)
+      })
+    }
+    barra.append(pip)
+  }
+
+  return barra
+}
+
 /**
  * A área de mídia da sala: os `<video>` das telas e os `<audio>` das vozes.
  *
@@ -199,7 +255,7 @@ export class AreaDeMidia {
       console.warn('a prévia da própria tela não começou a tocar')
     })
 
-    caixa.append(video, rotulo)
+    caixa.append(video, rotulo, barraDaPrevia(caixa, video))
     this.videos.append(caixa)
   }
 

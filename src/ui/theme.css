@@ -127,37 +127,63 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
    Era o "tudo torto".
    ------------------------------------------------------------------------ */
 @media (min-width: 1080px) {
-  #app {
+  /* A HOME não é uma sala. Ela não tem trilho, e por isso continua sendo uma
+     coluna centrada que rola normalmente — foi exatamente isso que quebrou
+     quando o grid de três faixas passou a valer para as duas telas: a página
+     de apresentação foi parar dentro da coluna estreita do trilho. */
+  #app { max-width: 940px; margin: 0 auto; }
+
+  /* ---------------------------------------------------------------------
+     A SALA é uma casca de aplicativo.
+
+     Altura da janela, e SÓ o miolo rola. A barra fica em cima, as pessoas e
+     os controles da call ficam embaixo, sempre à vista — controle de call que
+     sai da tela quando a conversa cresce é o tipo de coisa que faz a pessoa
+     procurar o botão de sair com o mouse enquanto fala.
+
+     `100dvh` e não `100vh`: no celular a barra de endereços some e volta, e o
+     `vh` não acompanha — a última faixa ficaria escondida atrás dela.
+     --------------------------------------------------------------------- */
+  #app:has(.trilho) {
     display: grid;
-    grid-template-columns: minmax(0, 940px);
-    justify-content: center;
-    align-content: start;
+    grid-template-columns: 132px minmax(0, 1fr);
+    /* barra · miolo que rola · pessoas · controles */
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
     column-gap: 28px;
+    height: 100dvh;
+    max-width: 1440px;
     margin: 0 auto;
+    padding-bottom: 12px;
+    overflow: hidden;
   }
-  /* Tres faixas: trilho, conteudo e (quando houver) a conversa. O trilho
-     ganha coluna propria e atravessa todas as linhas — navegacao que rola
-     junto com o conteudo obriga a subir para trocar de secao. */
-  #app { grid-template-columns: 132px minmax(0, 880px); }
-  .trilho {
+
+  #app:has(.trilho) .trilho {
     grid-column: 1;
     grid-row: 1 / -1;
     flex-direction: column;
     align-items: stretch;
-    position: sticky;
-    top: 20px;
-    align-self: start;
+    align-self: stretch;
+    margin: 18px 0 0;
+    padding: 4px 12px 4px 0;
     border-bottom: none;
     border-right: 1px solid var(--latao-fraco);
-    padding: 4px 12px 4px 0;
-    margin: 18px 0 0;
   }
-  .barra-sala { grid-column: 2; grid-row: 1; }
-  .palco { grid-column: 2; grid-row: 2; min-width: 0; }
-  .participantes { grid-column: 2; grid-row: 3; }
-  .call-controles { grid-column: 2; grid-row: 4; }
-  .call-videos { grid-column: 2; grid-row: 5; }
-  .call-audios { grid-column: 2; }
+
+  #app:has(.trilho) .barra-sala { grid-column: 2; grid-row: 1; }
+  #app:has(.trilho) .conteudo { grid-column: 2; grid-row: 2; }
+  #app:has(.trilho) .participantes { grid-column: 2; grid-row: 3; }
+  #app:has(.trilho) .call-controles { grid-column: 2; grid-row: 4; }
+  /* Elementos de áudio não desenham nada; vão para a mesma célula da barra
+     para não abrirem uma linha só deles. */
+  #app:has(.trilho) .call-audios { grid-column: 2; grid-row: 1; }
+
+  /* `min-height: 0` é o que faz a rolagem acontecer AQUI dentro: sem isso um
+     item de grid nunca encolhe abaixo do conteúdo, e quem cresce é a página. */
+  .conteudo {
+    overflow-y: auto;
+    min-height: 0;
+    padding-right: 6px;
+  }
 
   /* A largura passa a ser a da coluna: um `max-width` menor aqui dentro
      recentralizaria cada peça por conta própria e desalinharia de novo. */
@@ -166,30 +192,29 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   .call-videos,
   .mixer { max-width: none; margin-left: 0; margin-right: 0; }
 
-  /* A segunda coluna só nasce quando a conversa está aberta ou há volumes
+  /* A terceira coluna só nasce quando a conversa está aberta ou há volumes
      para ajustar. Reservá-la vazia empurraria a mesa para fora do centro sem
      nada em troca — que era a queixa da tela da sala. */
-  #app:has(.chat[data-aberto='1']),
-  #app:has(.mixer-linha) {
-    grid-template-columns: 132px minmax(0, 880px) 320px;
+  #app:has(.trilho):has(.chat[data-aberto='1']),
+  #app:has(.trilho):has(.mixer-linha) {
+    grid-template-columns: 132px minmax(0, 1fr) 320px;
   }
-  #app:has(.chat[data-aberto='1']) .lateral,
-  #app:has(.mixer-linha) .lateral { grid-column: 3; grid-row: 1 / -1; }
-  #app:has(.chat[data-aberto='1']) .lateral,
-  #app:has(.mixer-linha) .lateral {
+  #app:has(.trilho):has(.chat[data-aberto='1']) .lateral,
+  #app:has(.trilho):has(.mixer-linha) .lateral {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    grid-column: 2;
-    grid-row: 3 / span 2;
-    align-self: start;
-    /* A linha que separa a lateral do resto: é ela que explica por que
-       aquele espaço existe. */
+    grid-column: 3;
+    grid-row: 1 / -1;
+    min-height: 0;
+    overflow-y: auto;
+    /* A linha que separa a lateral do resto: é ela que explica por que aquele
+       espaço existe. */
     border-left: 1px solid var(--latao-fraco);
     padding-left: 24px;
   }
-  #app:has(.chat[data-aberto='1']) .lateral .chat,
-  #app:has(.mixer-linha) .lateral .chat {
+  #app:has(.trilho):has(.chat[data-aberto='1']) .lateral .chat,
+  #app:has(.trilho):has(.mixer-linha) .lateral .chat {
     position: static;
     width: auto;
     align-items: stretch;
@@ -197,7 +222,11 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 }
 
 /* ---------------------------------------------------------------------------
-   O TRILHO — barra do topo, uma régua de latão.
+   A BARRA DA SALA — régua de latão no topo, com código e diagnóstico.
+
+   (Este bloco já se chamou "o trilho". O nome mudou quando a navegação virou
+   uma coluna de verdade com esse nome — duas coisas com o mesmo apelido no
+   mesmo arquivo é como se lê a regra errada.)
    ------------------------------------------------------------------------ */
 .barra-sala {
   max-width: 940px;
@@ -1246,10 +1275,16 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   width: 100%;
   max-width: 260px;
 }
+.video-local-caixa .video-barra {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(6, 21, 17, 0.72);
+}
 .video-local-caixa .video-nome {
   position: absolute;
   left: 8px;
-  bottom: 8px;
+  top: 8px;
   padding: 3px 9px;
   border-radius: 999px;
   font-size: 11px;
@@ -1589,3 +1624,104 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
    que veio buscar. */
 .home[data-com-grupos='1'] .home-heroi { padding-top: 4vh; }
 .home[data-com-grupos='1'] .home-chamada { font-size: clamp(28px, 4vw, 40px); }
+
+/* ---------------------------------------------------------------------------
+   BARRA DE ROLAGEM
+   ---------------------------------------------------------------------------
+   A do sistema é clara e larga, e num fundo de feltro ela grita — foi a
+   primeira coisa que saltou aos olhos quando a sala virou casca de altura
+   fixa. Aqui ela vira um fio de latão: presente quando precisa existir,
+   invisível quando não.
+
+   As duas sintaxes convivem de propósito: `scrollbar-color` é a padrão e vale
+   no Firefox e no Chrome novo; `::-webkit-scrollbar` cobre o que ainda não a
+   implementa e permite o fio fino que a padrão não deixa desenhar.
+   ------------------------------------------------------------------------ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--latao-fraco) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  /* A borda transparente com `background-clip` é o que afina o fio sem
+     encostar nas bordas — sem ela o latão fica colado no conteúdo. */
+  background: var(--latao-fraco);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--latao);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* A gaveta do chat é fixa no canto direito. Sem esta folga, a barra de
+   rolagem do miolo nasce embaixo dela — e a pessoa tenta arrastar uma coisa
+   clicando na outra. */
+@media (min-width: 1080px) {
+  #app:has(.trilho):not(:has(.chat[data-aberto='1'])):not(:has(.mixer-linha)) {
+    padding-right: 84px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   DETALHES DE CONEXÃO
+   ---------------------------------------------------------------------------
+   Vinte nomes de servidor e dois parágrafos de explicação tomavam a tela
+   inteira de quem estava só esperando alguém entrar. Aqui eles ficam dobrados.
+
+   `<details>` nativo em vez de um botão nosso: ele já vem com teclado, leitor
+   de tela e o estado aberto/fechado de graça — e nada do que a gente
+   escrevesse seria melhor nisso.
+   ------------------------------------------------------------------------ */
+.teste-rede-detalhes {
+  margin-top: 14px;
+  text-align: left;
+}
+
+.teste-rede-resumo {
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--latao-fraco);
+  color: var(--creme-fraco);
+  font-size: 12px;
+  list-style: none;
+  transition: color 160ms var(--easing), border-color 160ms var(--easing);
+}
+.teste-rede-resumo:hover { color: var(--creme); border-color: var(--latao); }
+/* O triângulo padrão do Safari aparece por fora do desenho. */
+.teste-rede-resumo::-webkit-details-marker { display: none; }
+
+.teste-rede-resumo::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--latao);
+  transition: transform 160ms var(--easing);
+}
+.teste-rede-detalhes[open] .teste-rede-resumo::before {
+  transform: rotate(90deg);
+}
+
+/* Quando há algo errado, o resumo carrega o aviso — é a única parte que NÃO
+   se dobra, porque foi ela que encontrou o antivírus bloqueando endereços. */
+.teste-rede-detalhes[data-ruim='1'] .teste-rede-resumo {
+  color: var(--alerta);
+  border-color: rgba(212, 117, 107, 0.45);
+}
+
+.teste-rede-detalhes > p,
+.teste-rede-detalhes > .teste-rede-relays {
+  margin-top: 12px;
+}

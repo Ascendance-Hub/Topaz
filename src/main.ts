@@ -388,9 +388,19 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   // qualquer aplicativo de call põe, e essa é a metade convencional do
   // desenho — a diferença fica no material, não na disposição.
   let participantes = renderizarParticipantes([])
-  app.replaceChildren(
-    barra, nav, palco, participantes, controles, lateral, area.videos, area.audios,
-  )
+  /**
+   * O que rola: o palco e as telas compartilhadas, juntos.
+   *
+   * Existe para a sala poder ser uma casca de altura fixa — barra em cima,
+   * pessoas e controles embaixo, e SÓ o miolo rolando. Sem este invólucro,
+   * palco e vídeos seriam duas áreas roláveis lado a lado, ou a página
+   * inteira cresceria e os controles da call sairiam da tela.
+   */
+  const conteudo = document.createElement('div')
+  conteudo.className = 'conteudo'
+  conteudo.append(palco, area.videos)
+
+  app.replaceChildren(barra, nav, conteudo, participantes, controles, lateral, area.audios)
 
   /** Só a fileira, sem redesenhar o resto. Chamada a cada mudança de quem
    *  está falando, que acontece muitas vezes por minuto. */

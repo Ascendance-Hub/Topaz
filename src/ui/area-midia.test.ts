@@ -293,3 +293,33 @@ describe('sair da call', () => {
     expect(area.audios.children).toHaveLength(0)
   })
 })
+
+describe('controles da própria tela', () => {
+  it('oferece tela cheia — conferir o que se mostra é quando ampliar ajuda mais', () => {
+    // A tela dos OUTROS já tinha isso desde sempre; a prévia da própria
+    // nasceu sem nada.
+    const { area } = montar()
+
+    area.previaDaMinhaTela(tela())
+
+    expect(area.videos.querySelector('[data-video="tela-cheia"]')).not.toBeNull()
+  })
+
+  it('NÃO oferece silenciar — a prévia é muda por construção', () => {
+    // Um botão que não faz nada é pior que botão nenhum.
+    const { area } = montar()
+
+    area.previaDaMinhaTela(tela())
+
+    expect(area.videos.querySelector('[data-video="som"]')).toBeNull()
+  })
+
+  it('os controles somem junto com a prévia', () => {
+    const { area } = montar()
+    area.previaDaMinhaTela(tela())
+
+    area.previaDaMinhaTela(null)
+
+    expect(area.videos.querySelector('[data-video="tela-cheia"]')).toBeNull()
+  })
+})
