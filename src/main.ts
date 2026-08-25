@@ -16,9 +16,12 @@ import type { AcoesCall } from './ui/components/call'
 import { criarVideoRemoto, mostrarVideo } from './ui/components/video-remoto'
 import { renderizarMixer, chaveVoz, chaveTela } from './ui/components/mixer'
 import { renderizarParticipantes } from './ui/components/participantes'
+import { fotoLembrada, fotoRecebida } from './perfil/foto-navegador'
 import type { Participante } from './ui/components/participantes'
 import { MonitorDeVoz, MS_AMOSTRAGEM } from './call/monitor-voz'
-import { aplicarSaida, limparMidia, removerMidiaDe, suportaTrocarSaida } from './ui/dom-midia'
+import {
+  aplicarSaida, limparMidia, removerMidiaDe, soltarMidia, suportaTrocarSaida,
+} from './ui/dom-midia'
 import { ehTela } from './call/classificar'
 import { criarCanalCall } from './call/canal'
 import { ProtocoloCall } from './call/protocolo'
@@ -85,6 +88,36 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   transporte.aoReceberMensagem((texto, peerId) => chat.receber(apelidoDe(peerId), texto))
 
   /**
+   * Anuncia a minha foto para a sala inteira.
+   *
+   * Chamada a cada pessoa que entra, e não uma vez só: quem chega depois não
+   * tem como pedir, e um anúncio completo repetido é o mesmo padrão que o
+   * resto do projeto usa para se consertar sozinho.
+   */
+  function anunciarFoto(): void {
+    const minha = fotoLembrada()
+    if (minha) transporte.enviarFoto(minha)
+  }
+
+  transporte.aoReceberFoto((foto, peerId) => {
+    // A conferência é assíncrona porque o tamanho decodificado só se sabe
+    // depois de o navegador decodificar — é o que barra a bomba de
+    // descompressão, que o teto de bytes sozinho não pega.
+    void fotoRecebida(foto).then((valida) => {
+      if (!valida) return
+      fotos.set(peerId, valida)
+      desenharParticipantes()
+    })
+  })
+
+  transporte.aoEntrarPeer(() => anunciarFoto())
+  transporte.aoSairPeer((peerId) => {
+    // Sem isto, a foto de quem saiu ficaria guardada até a aba fechar, e
+    // reapareceria se outra pessoa herdasse o mesmo id.
+    fotos.delete(peerId)
+  })
+
+  /**
    * Escolha local de visualização, de propósito FORA do `EstadoJogo`. Se
    * morasse no estado compartilhado, abrir a mesa arrastaria todo mundo
    * junto, e cada broadcast do host devolveria à mesa a tela de quem tivesse
@@ -131,6 +164,15 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    */
   const monitorVoz = new MonitorDeVoz()
   const falantes = new Set<string>()
+
+  /**
+   * A foto de cada pessoa, já conferida.
+   *
+   * Só entra aqui o que passou por `fotoRecebida` — formato, tamanho em bytes
+   * e tamanho depois de decodificar. O mapa é a fronteira: daqui para a tela,
+   * ninguém precisa desconfiar de novo.
+   */
+  const fotos = new Map<string, string>()
   /** O `selfId` não serve de chave para mim: o meu microfone é local e nunca
    *  chega por `aoReceberMidia`. Uma chave própria evita confundir os dois. */
   const EU = 'eu'
@@ -157,9 +199,15 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       // ouvindo em silêncio.
       mudo: midia.microfoneMudo(),
       semMicrofone: semMicrofone !== null,
+      // A minha sai do armazenamento, não do mapa: eu nunca recebo a minha
+      // própria foto pela rede.
+      foto: fotoLembrada() ?? undefined,
     }
     const outros = atual.naCall.map((peerId): Participante => ({
-      peerId, nome: apelidoDe(peerId), falando: falantes.has(peerId),
+      peerId,
+      nome: apelidoDe(peerId),
+      falando: falantes.has(peerId),
+      foto: fotos.get(peerId),
     }))
     return [eu, ...outros]
   }
@@ -480,6 +528,62 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
 
     ajustarVideos(atual.assistindo, atual.compartilhando)
     sincronizarMedidorDeVoz(atual.naCall, atual.euNaCall)
+    sincronizarPreviaDaMinhaTela(atual.euCompartilhando)
+  }
+
+  /**
+   * A prévia da minha própria tela, para eu conferir o que estou mostrando.
+   *
+   * Pedido de quem usa, e barato: é a captura crua num `<video>`, sem passar
+   * por WebRTC. Não liga codificador e não conta como espectador — assistir a
+   * própria tela continua não acordando o encoder de ninguém.
+   *
+   * Fica FORA do `[data-de]` de propósito: `ajustarVideos` e `aplicarVolumes`
+   * percorrem esse atributo pensando em telas de outras pessoas, e a minha
+   * apareceria como se alguém estivesse compartilhando duas vezes.
+   *
+   * Sempre MUDA. O áudio do sistema que vai junto com a tela voltaria pela
+   * minha própria caixa de som e realimentaria o microfone — microfonia, e das
+   * ruins, porque quem a causa é justamente quem não está ouvindo o resultado.
+   */
+  function sincronizarPreviaDaMinhaTela(euCompartilhando: boolean): void {
+    const atual = videos.querySelector<HTMLVideoElement>('.video-local')
+    const tela = euCompartilhando ? midia.telaLocal() : null
+
+    if (!tela) {
+      if (atual) {
+        soltarMidia(atual)
+        atual.parentElement?.remove()
+      }
+      return
+    }
+    // Idempotente: com a mesma captura já na tela, não há o que fazer.
+    if (atual?.srcObject === tela) return
+    if (atual) atual.parentElement?.remove()
+
+    const caixa = document.createElement('div')
+    caixa.className = 'video-local-caixa'
+
+    // Mesmo vocabulário do vídeo remoto: um rótulo com nome próprio faria a
+    // folha de estilo ter duas maneiras de dizer a mesma coisa.
+    const rotulo = document.createElement('span')
+    rotulo.className = 'video-nome'
+    rotulo.textContent = 'Sua tela'
+
+    const video = document.createElement('video')
+    video.className = 'video-local'
+    video.autoplay = true
+    video.playsInline = true
+    video.muted = true
+    video.srcObject = tela
+    void video.play().catch(() => {
+      // Sem áudio e com gesto do usuário logo antes, isto praticamente não
+      // acontece — mas engolir em silêncio deixaria um retângulo preto.
+      console.warn('a prévia da própria tela não começou a tocar')
+    })
+
+    caixa.append(video, rotulo)
+    videos.append(caixa)
   }
 
   /**

@@ -94,10 +94,12 @@ describe('entrar numa sala com o Trystero de mentira, mas a fiação de verdade'
   it('cria os canais do jogo E o da call em TODAS as redes', () => {
     entrarNaSala(document.createElement('div'), 'Alex', 'CODIGO01')
 
-    // Cada rede precisa dos quatro canais: a pessoa pode ser alcançável por
-    // qualquer uma delas, e é por ela que tudo vai trafegar.
+    // Cada rede precisa de TODOS os canais: a pessoa pode ser alcançável por
+    // qualquer uma delas, e é por ela que tudo vai trafegar. Um canal que só
+    // existisse numa rede sumiria para quem foi descoberto por outra.
     for (const sala of salas) {
-      expect([...sala.canais.keys()].sort()).toEqual(['acao', 'call', 'chat', 'estado'])
+      expect([...sala.canais.keys()].sort())
+        .toEqual(['acao', 'call', 'chat', 'estado', 'foto'])
     }
   })
 

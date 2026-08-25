@@ -92,3 +92,38 @@ describe('renderizarParticipantes', () => {
       .toContain('falando')
   })
 })
+
+describe('foto de perfil', () => {
+  const foto = 'data:image/jpeg;base64,AAAA'
+
+  it('mostra a foto no lugar da inicial', () => {
+    const area = renderizarParticipantes([alguem({ foto })])
+
+    expect(area.querySelector<HTMLImageElement>('.participante-foto')!.src).toBe(foto)
+    expect(area.querySelector('.participante-inicial')).toBeNull()
+  })
+
+  it('sem foto, continua a inicial — ninguém fica com um círculo vazio', () => {
+    const area = renderizarParticipantes([alguem()])
+
+    expect(area.querySelector('.participante-inicial')!.textContent).toBe('A')
+    expect(area.querySelector('.participante-foto')).toBeNull()
+  })
+
+  it('a foto tem texto alternativo com o nome', () => {
+    const area = renderizarParticipantes([alguem({ foto })])
+
+    expect(area.querySelector('.participante-foto')!.getAttribute('alt'))
+      .toContain('Alex')
+  })
+
+  it('recusa foto que não passou pelo portão', () => {
+    // Segunda linha de defesa. `main.ts` já valida o que chega da rede, mas
+    // este componente não deve confiar em quem o chama: basta um caminho novo
+    // esquecer a validação para virar `<img src>` com endereço de terceiro.
+    const area = renderizarParticipantes([alguem({ foto: 'https://exemplo.com/x.png' })])
+
+    expect(area.querySelector('.participante-foto')).toBeNull()
+    expect(area.querySelector('.participante-inicial')!.textContent).toBe('A')
+  })
+})

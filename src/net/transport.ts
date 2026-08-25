@@ -63,6 +63,20 @@ export interface Transporte {
    */
   enviarMensagem(texto: string): void
   aoReceberMensagem(cb: (texto: string, peerId: string) => void): void
+  /**
+   * A foto de perfil, como `data:` de imagem gerado no próprio navegador.
+   *
+   * Canal à parte pelo mesmo motivo do chat, e mais um: a foto é grande perto
+   * de tudo que trafega aqui (uns 4 a 8 KB). Se morasse no `EstadoJogo`, ela
+   * viajaria de novo a cada anúncio do anfitrião — que durante a compra do
+   * dealer acontece a cada 700 ms.
+   *
+   * Enviada quando alguém entra e quando muda, no mesmo espírito de anúncio
+   * completo que o resto do projeto usa: quem chega depois recebe sem precisar
+   * pedir, e uma perda no caminho se conserta no próximo anúncio.
+   */
+  enviarFoto(foto: string): void
+  aoReceberFoto(cb: (foto: unknown, peerId: string) => void): void
   aoEntrarPeer(cb: (peerId: string) => void): void
   aoSairPeer(cb: (peerId: string) => void): void
   sair(): void
@@ -155,7 +169,9 @@ export function criarTransporte(salas: Salas): Transporte {
   const acaoAction = salas.criarAcao<Acao>('acao')
   const estadoAction = salas.criarAcao<EstadoJogo>('estado')
   const chatAction = salas.criarAcao<string>('chat')
+  const fotoAction = salas.criarAcao<string>('foto')
 
+  const aoFoto: ((foto: unknown, peerId: string) => void)[] = []
   const aoAcao: ((acao: Acao, peerId: string) => void)[] = []
   const aoEstado: ((estado: EstadoJogo, peerId: string) => void)[] = []
   const aoEntrar: ((peerId: string) => void)[] = []
@@ -169,6 +185,12 @@ export function criarTransporte(salas: Salas): Transporte {
   estadoAction.onMessage((estado, de) => {
     for (const cb of aoEstado) cb(estado, de)
   })
+  fotoAction.onMessage((foto, de) => {
+    // Entregue como `unknown`: a validação é de quem consome, que é quem sabe
+    // o que serve como foto. Aqui só existe o transporte.
+    for (const cb of aoFoto) cb(foto, de)
+  })
+
   chatAction.onMessage((texto, de) => {
     for (const cb of aoMensagem) cb(texto, de)
   })
@@ -199,6 +221,12 @@ export function criarTransporte(salas: Salas): Transporte {
     },
     aoReceberMensagem: (cb) => {
       aoMensagem.push(cb)
+    },
+    enviarFoto: (foto) => {
+      fotoAction.send(foto)
+    },
+    aoReceberFoto: (cb) => {
+      aoFoto.push(cb)
     },
     aoEntrarPeer: (cb) => {
       aoEntrar.push(cb)

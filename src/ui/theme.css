@@ -1142,3 +1142,97 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 .home[data-convite='1'] .home-topologia {
   margin-top: 24px;
 }
+
+/* ---------------------------------------------------------------------------
+   RETRATO DE PERFIL
+   ---------------------------------------------------------------------------
+   Fica ao lado do apelido porque é a mesma coisa: quem você é. A foto nunca é
+   o arquivo escolhido — é o que o canvas redesenhou —, e por isso ela sempre
+   chega aqui como um quadrado de 96px que só precisa ser recortado em círculo.
+   ------------------------------------------------------------------------ */
+.perfil {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0 4px;
+}
+
+.perfil-circulo {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle at 34% 28%, var(--feltro-alto), var(--penumbra));
+  border: 1px solid var(--latao-fraco);
+}
+.perfil-previa {
+  width: 100%;
+  height: 100%;
+  /* `cover` e não `fill`: a imagem já vem quadrada do canvas, mas se algum dia
+     chegar diferente é melhor cortar que achatar o rosto. */
+  object-fit: cover;
+  display: block;
+}
+.perfil-inicial {
+  font-family: var(--display);
+  font-size: 23px;
+  color: var(--creme);
+  line-height: 1;
+}
+
+.perfil-botao { padding: 7px 14px; font-size: 12px; }
+
+.perfil-erro {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--alerta);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* A foto dentro do círculo da fileira de participantes. O anel de quem fala
+   continua sendo do círculo, não da imagem: por isso o `overflow: hidden` mora
+   no círculo e a sombra não é cortada. */
+.participante-foto {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.participante-circulo { overflow: hidden; }
+
+/* ---------------------------------------------------------------------------
+   A PRÓPRIA TELA
+   ---------------------------------------------------------------------------
+   Menor que a dos outros de propósito: serve para conferir o que se está
+   mostrando, não para assistir. Quem quiser ver grande já tem a tela de
+   verdade na frente.
+   ------------------------------------------------------------------------ */
+.video-local-caixa {
+  position: relative;
+  display: inline-block;
+  border-radius: var(--raio);
+  overflow: hidden;
+  border: 1px dashed var(--latao-fraco);
+  background: #000;
+}
+.video-local {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+}
+.video-local-caixa .video-nome {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--creme);
+  background: rgba(6, 21, 17, 0.72);
+}

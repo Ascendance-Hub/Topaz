@@ -24,6 +24,11 @@ duas exceções marcadas 🕓, escritas em 2026-08-24 e ainda não vistas com ge
   qualidade e `contentHint` no seletor, **áudio do sistema junto** com bitrate
   de música, tela cheia e Picture-in-Picture.
 - **Mixer de volume** — um canal por voz e um por tela, separados de propósito.
+- 🕓 **Assistir a própria tela** — prévia pequena da própria captura, para
+  conferir o que se está mostrando. Não passa por WebRTC e não liga
+  codificador: assistir a si mesmo continua não acordando o encoder.
+- 🕓 **Foto de perfil** — escolhida do computador, encolhida para 96×96 pelo
+  canvas e enviada P2P como `data:`. Nenhum servidor de terceiro é contatado.
 - 🕓 **Home de apresentação** — a primeira tela deixou de ser um cartão de
   entrar e virou uma página: o que o site faz, o que está protegido, e o teste
   de rede acessível antes mesmo de entrar numa sala. A ação vem antes da
@@ -201,6 +206,9 @@ eliminam.
 
 Nada aqui é defeito; são coisas que cabem depois.
 
+- **Foto na mesa e no chat** — hoje ela só aparece na fileira de participantes
+  da call. Levá-la para a lista da sala e para as linhas do chat é o passo
+  natural, mas cada lugar tem uma forma diferente e merece cuidado próprio.
 - **Compartilhar o estado do microfone** — hoje a fileira de participantes só
   sabe se **eu** estou mudo ou sem microfone; o dos outros não trafega. Mostrar
   o ícone deles exigiria mandar isso pelo protocolo da call.

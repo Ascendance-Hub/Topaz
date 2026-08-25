@@ -1,6 +1,10 @@
+import { ehFotoValida } from '../../perfil/foto'
+
 export interface Participante {
   peerId: string
   nome: string
+  /** `data:` de imagem gerado no próprio navegador de quem escolheu. */
+  foto?: string
   /** Você. Marcado para a pessoa se achar na fileira. */
   euMesmo?: boolean
   falando?: boolean
@@ -63,11 +67,24 @@ export function renderizarParticipantes(lista: Participante[]): HTMLElement {
     const circulo = document.createElement('div')
     circulo.className = 'participante-circulo'
 
-    const inicial = document.createElement('span')
-    inicial.className = 'participante-inicial'
-    // `textContent`: o apelido vem de outro navegador.
-    inicial.textContent = inicialDe(pessoa.nome)
-    circulo.append(inicial)
+    // Segunda linha de defesa. Quem monta a lista já validou o que veio da
+    // rede, mas este componente não confia em quem o chama: bastaria um
+    // caminho novo esquecer a validação para isto virar um `<img src>` com
+    // endereço de terceiro — exatamente o que o desenho evita.
+    if (ehFotoValida(pessoa.foto)) {
+      const foto = document.createElement('img')
+      foto.className = 'participante-foto'
+      foto.src = pessoa.foto
+      // Sem `alt`, um leitor de tela anuncia "imagem" e não diz de quem.
+      foto.alt = `Foto de ${pessoa.nome}`
+      circulo.append(foto)
+    } else {
+      const inicial = document.createElement('span')
+      inicial.className = 'participante-inicial'
+      // `textContent`: o apelido vem de outro navegador.
+      inicial.textContent = inicialDe(pessoa.nome)
+      circulo.append(inicial)
+    }
 
     const nome = document.createElement('span')
     nome.className = 'participante-nome'
