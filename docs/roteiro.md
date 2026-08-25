@@ -6,12 +6,28 @@ as coisas andam — não é plano de implementação (esses vivem em
 
 ## Pronto
 
+Tudo abaixo está na `main` e **verificado em uso real**, não só por teste.
+
 - **Blackjack multijogador** — regras completas, eleição e migração de
-  anfitrião, reconexão, partida com eliminação. Na `main`.
+  anfitrião, reconexão, partida com eliminação.
 - **Chat da sala** — texto livre, canal próprio fora do estado do jogo, painel
   que sobrevive aos re-renders da mesa.
-  ⚠️ Está na branch `chat-da-sala`, commitada e no remoto, **ainda não mergeada
-  na `main`** — ou seja, ainda não está no ar.
+- **Call de voz** — entrar e sair, mudo próprio, silenciar todo mundo, seletor
+  de microfone trocável no meio da call (via `replaceTrack`, sem renegociar).
+- **Compartilhamento de tela** — assinatura explícita (o codificador só liga
+  quando alguém pede para assistir), H.264 forçado por `setParameters`,
+  qualidade e `contentHint` no seletor, **áudio do sistema junto** com bitrate
+  de música, tela cheia e Picture-in-Picture.
+- **Mixer de volume** — um canal por voz e um por tela, separados de propósito.
+- **Descoberta por três redes** — nostr, MQTT e BitTorrent ao mesmo tempo,
+  deduplicando por pessoa. Foi o que destravou os amigos que não se achavam.
+- **Privacidade e guardas de rede** — fontes locais, CSP, código de sala de 16
+  caracteres, validação do que chega. Ver seção própria abaixo.
+
+O padrão de qualidade da tela é **1080p** desde 2026-08-24. É escolha contra a
+economia: custa ~3× de codificação e 6 Mbps por espectador (contra 2,5 em
+720p), e vale porque o uso real é ler texto na tela do outro. O seletor
+continua ali para quem tiver upload curto.
 
 ## Onde ficam os aprendizados
 
@@ -45,7 +61,10 @@ Dois documentos, com propósitos diferentes:
     `ms/quadro` mede coisas diferentes em hardware e software). A conclusão
     firme é só a existência do encoder de hardware.
 
-## Em desenho agora
+## Ciclo concluído — sala neutra + call
+
+Fechado. Fica registrado porque as decisões abaixo continuam valendo, e porque
+duas delas foram revistas depois (marcadas com ⚠️).
 
 **Sala neutra + call 1:1 (voz e tela).** Abordagem A: a sala passa a ser dona
 da conexão, com jogo e call como módulos opcionais e independentes por cima.
@@ -70,9 +89,8 @@ da conexão, com jogo e call como módulos opcionais e independentes por cima.
 O plano 1 entregou: transporte partido em `criarSalaTrystero` +
 `criarTransporte` (e testável pela primeira vez), `ui/sala.ts` renomeado para
 `ui/codigo.ts`, a tela da sala com quem está presente, e o `main.ts` montando
-uma sala em vez de uma partida. Nenhuma regra de jogo foi tocada.
-**Nada disso foi visto num navegador de verdade** — os itens estão na seção
-"Sala" de `docs/verificacao-manual.md`.
+uma sala em vez de uma partida. Nenhuma regra de jogo foi tocada. Tudo isso já
+foi visto em uso real, com amigos, em máquinas diferentes.
 
 O spec foi partido em dois planos porque a reestruturação da sala entrega
 software funcionando sozinha, sem nenhuma mídia. O passo de confirmar se dá
@@ -92,8 +110,11 @@ Decisões já tomadas neste ciclo:
   alguém pede para assistir.
 - Anti-ruído: começa com o do próprio navegador (`noiseSuppression` etc.).
 - Qualidade padrão 720p, com 1080p opcional. `contentHint` exposto.
+  ⚠️ Revisto em 2026-08-24: o padrão passou a ser **1080p**. Ver "Pronto".
 - **Seletor de microfone**, trocável no meio da call via `replaceTrack` (sem
   renegociar). Junto vai o seletor de saída de áudio, que é a mesma UI.
+  ⚠️ O de microfone foi feito; o de saída de áudio (`setSinkId`) **não**, e é a
+  única parte do acabamento da call que ficou faltando.
 - Coexistência de mesa e tela resolvida por **Picture-in-Picture nativo**, com
   vídeo flutuante em página como padrão.
 - **Celular: a call não funciona**, e a interface diz isso sem rodeios. O
@@ -139,31 +160,56 @@ dá para fechar sem servidor, está no Capítulo 8 do
 declarando anfitrião. Sem servidor não há árbitro; os guardas encarecem, não
 eliminam.
 
-## Aguardando verificação de verdade
+## O que falta
 
-A call 1:1 está escrita e a suíte cobre a lógica, mas **nada da experiência foi
-verificado** — voz, tela, qualidade e codec só se conferem com duas pessoas em
-máquinas diferentes. A lista está na seção "Call" de `docs/verificacao-manual.md`.
+### Defeitos conhecidos
 
-## Adiado de propósito
+- **Negar o microfone mata o botão em silêncio.** `main.ts` faz
+  `void midia.ligarMicrofone().then(...)` sem `catch`. Se a permissão é negada,
+  `getUserMedia` rejeita, `protocolo.entrar()` nunca roda, e clicar em "Entrar
+  na call" simplesmente não faz nada — sem aviso, sem erro visível. É o
+  "entrar só ouvindo" que estava adiado, mas o defeito é maior que a feature:
+  hoje a pessoa fica sem entender por que o botão não responde.
+  **Prioridade alta** — falha silenciosa é a classe de bug que mais custou
+  neste projeto.
+- **A conexão reserva não é adotada.** Quando a rede dona de um peer cai, a
+  duplicata das outras redes não é promovida — o `onPeerJoin` dela já tinha
+  sido ignorado. Ela custa memória e não serve para nada. Fechá-la não é a
+  saída: o Trystero reanuncia a cada ~5 s e viraria laço de reconexão.
+
+### Decisão em aberto
+
+- **Manter o MQTT?** Custa 368 kB de bundle e 20 conexões ociosas do pool
+  (o Trystero mantém um pool de 20 por estratégia). Em troca, é uma terceira
+  via de descoberta. Depende de mais rodadas de teste com o antivírus ligado.
+
+### Próximo ciclo grande
+
+- **Grupos persistentes** — salvos no navegador, tipo servidor do Discord.
+  Já tem base para isso; falta o ciclo de design.
+- **Iniciar o jogo direto do grupo**, sem passar pela sala de espera. Depende
+  dos grupos.
+
+### Adiado de propósito
 
 Nada aqui é defeito; são coisas que cabem depois.
 
-- **Áudio do sistema junto com a tela** — irregular entre plataformas e cria
-  eco com o microfone aberto. Custo: assistir vídeo junto não funciona direito
-  (imagem sim, som não).
-- **Acabamento da call** (plano 3): seletor de microfone e de saída de áudio,
-  Picture-in-Picture, "entrar só ouvindo" quando o microfone é negado, e o resto
-  dos casos de borda da §9 do spec.
+- **Seletor de saída de áudio** (`setSinkId`) — a única parte do acabamento da
+  call que não foi feita. Mesma UI do seletor de microfone.
+- **Degradar a tela conforme o número de espectadores** — a malha é N²: quem
+  compartilha sobe uma cópia por pessoa que assiste. Em 1080p são 6 Mbps cada,
+  então quatro espectadores são 24 Mbps de subida. A maior otimização já está
+  feita (assinatura explícita); o que falta é cair de resolução sozinho em vez
+  de travar.
 - **RNNoise em WASM** — anti-ruído bem melhor que o do navegador, mas é
   integração de AudioWorklet e merece ciclo próprio.
-- **Câmera** — fora da primeira versão; o código de mídia fica genérico o
+- **Câmera** — fora da primeira versão; o código de mídia é genérico o
   bastante para aceitar depois.
-- **Grupos persistentes** — salvos no navegador, tipo servidor do Discord.
-  Próximo ciclo de design, por cima desta base.
-- **Iniciar o jogo direto do grupo**, sem passar pela sala de espera. Depende
-  dos grupos.
 - **Camada espacial tipo Gather** — bonequinho andando, áudio por proximidade.
-  Depende da call e dos grupos existirem.
+  Depende dos grupos existirem.
 - **Mais de 5 pessoas com todos compartilhando tela** — exigiria SFU ou
   WebCodecs. Só se um dia fizer falta.
+- **Celular** — a call não funciona, e a interface diz isso sem rodeios. O
+  blackjack continua funcionando.
+- **Rede da faculdade** — decidido não consertar; exigiria TURN. Ver
+  "Investigado e encerrado".

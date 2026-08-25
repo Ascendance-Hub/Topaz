@@ -1,4 +1,5 @@
 import type { EstadoCall } from '../../call/protocolo'
+import { ALTURA_PADRAO } from '../../call/midia'
 import type { TipoConteudo } from '../../call/midia'
 import type { Dispositivo } from '../../call/dispositivos'
 
@@ -55,7 +56,10 @@ function botao(chave: string, rotulo: string, aoClicar: () => void): HTMLElement
  */
 export function renderizarControlesCall(
   estado: EstadoCall, acoes: AcoesCall,
-  alturaAtual = 720, conteudoAtual: TipoConteudo = 'motion',
+  // `main.ts` sempre passa `midia.qualidade()`; este padrão é para quem monta
+  // a barra sem contexto. Apontado para a constante para não virar uma segunda
+  // fonte de verdade que discorda da primeira em silêncio.
+  alturaAtual: number = ALTURA_PADRAO, conteudoAtual: TipoConteudo = 'motion',
   contexto: ContextoCall = { apelidoDe: (id) => id },
 ): HTMLElement {
   const barra = document.createElement('div')

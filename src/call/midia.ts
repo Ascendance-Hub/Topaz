@@ -11,11 +11,21 @@ export const RESTRICOES_MICROFONE: MediaStreamConstraints = {
 }
 
 /**
- * Teto padrão. O probe de 2026-08-20 mostrou o custo de codificação saltando
- * cerca de 3× ao passar de 720p para 1080p, enquanto o número de espectadores
- * quase não pesa. Resolução é o botão que importa.
+ * Teto padrão.
+ *
+ * O probe de 2026-08-20 mostrou o custo de codificação saltando cerca de 3× ao
+ * passar de 720p para 1080p, enquanto o número de espectadores quase não pesa:
+ * resolução é o botão que importa. Ainda assim o padrão é 1080p, e isso é uma
+ * escolha deliberada contra a economia — o uso real é ler texto e ver detalhe
+ * na tela do outro, e aí a resolução é o que decide se a coisa serve.
+ *
+ * O que ela custa, para quem for reavaliar depois: ~3× de CPU (com folga, já
+ * que o codificador é de hardware) e 6 Mbps de upload POR ESPECTADOR, contra
+ * 2,5 em 720p. Como a topologia é malha, quatro pessoas assistindo são 24 Mbps
+ * de subida. Quem tiver upload curto ou sentir a máquina pesar troca no
+ * seletor de qualidade, que continua ali.
  */
-export const ALTURA_PADRAO = 720
+export const ALTURA_PADRAO = 1080
 
 /**
  * Bitrate por altura. Um teto único servia mal aos dois casos: 3 Mbps aperta

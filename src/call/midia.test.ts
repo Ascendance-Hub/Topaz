@@ -216,10 +216,14 @@ describe('Midia — republicar depois de sair e voltar', () => {
 })
 
 describe('Midia — qualidade', () => {
-  it('começa em 720p, a altura que o probe mostrou barata', () => {
+  it('começa em 1080p, que é onde a tela fica boa de ler', () => {
+    // Escolha deliberada contra o que o probe recomendaria: 1080p custa ~3×
+    // mais codificação e 6 Mbps por espectador, contra 2,5 em 720p. O motivo
+    // de aceitar isso é que o uso real é ler texto e ver detalhe na tela do
+    // outro, e aí 720p é o que decide a experiência — não a economia.
     const { sala } = criarSalaFalsa()
 
-    expect(new Midia(sala).qualidade()).toBe(720)
+    expect(new Midia(sala).qualidade()).toBe(1080)
   })
 
   it('lembra a altura escolhida', () => {
