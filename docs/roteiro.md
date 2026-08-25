@@ -244,6 +244,13 @@ Decisões que já valem:
 
 Nada aqui é defeito; são coisas que cabem depois.
 
+- **Tela cheia na janela flutuante** — pedido de uso, e **fora do alcance da
+  plataforma**: a janela do Picture-in-Picture é desenhada pelo navegador, e a
+  API não permite acrescentar botão nenhum a ela. A alternativa real é o
+  *Document Picture-in-Picture* (Chrome/Edge 116+), que abre uma janelinha com
+  HTML nosso dentro — mas mesmo nela o navegador não deixa ir a tela cheia; o
+  que daria é um botão "abrir em tela cheia" que fecha a flutuante e amplia na
+  aba. Adiado por decisão do dono do projeto.
 - **Trocar identidade e sair** fora da home — os controles existem, mas o
   lugar natural deles é a aba Configurações da barra lateral (PR 2).
 - **Exportar identidade entre máquinas sem digitar** — hoje é copiar e colar o

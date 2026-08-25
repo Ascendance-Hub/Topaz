@@ -1686,7 +1686,9 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
    ------------------------------------------------------------------------ */
 .teste-rede-detalhes {
   margin-top: 14px;
-  text-align: left;
+  /* Sem `text-align` próprio: o painel inteiro é centrado, e uma regra aqui
+     puxava a pílula para a esquerda enquanto o botão logo acima ficava no
+     meio — duas peças da mesma coluna em eixos diferentes. */
 }
 
 .teste-rede-resumo {
