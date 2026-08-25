@@ -124,10 +124,13 @@ describe('jogar até sobrar um', () => {
 })
 
 describe('o que a tela avisa', () => {
-  it('diz que mudar fichas não dá dinheiro a ninguém agora', () => {
-    // Seria uma forma de o anfitrião premiar quem ele quisesse.
+  it('explica QUANDO as fichas novas passam a valer', () => {
+    // O comportamento depende da fase, e sem isso escrito a pessoa muda o
+    // valor, não vê nada mudar, e conclui que o botão não funciona — foi o
+    // relato de uso que fez esta parte ser reescrita.
     const area = renderizarConfigPartida(dados(), vi.fn())
 
-    expect(area.textContent).toContain('próxima partida')
+    expect(area.textContent).toContain('mesa parada')
+    expect(area.textContent).toContain('próxima')
   })
 })

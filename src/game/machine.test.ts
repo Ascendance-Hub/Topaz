@@ -1167,19 +1167,55 @@ describe('configurar a partida', () => {
     expect(ctx.estado.jogadores.find((j) => j.peerId === 'p3')!.fichas).toBe(3000)
   })
 
-  it('quem JÁ estava mantém as fichas até a próxima partida', () => {
-    // As fichas só são redistribuídas em `novaPartida`. Mudar o valor inicial
-    // no meio não dá dinheiro a ninguém — o que seria uma forma de o anfitrião
-    // premiar quem ele quisesse.
+  it('com a mesa parada, as fichas novas valem JÁ para quem está lá', () => {
+    // Relato de uso: o anfitrião trocava para 3000, começava a partida, e todo
+    // mundo jogava com 1000 — sem nada dizer por quê. Em `aguardando` ninguém
+    // tem ficha em jogo (todos estão no valor inicial), então mudar o valor
+    // inicial precisa valer agora.
     let ctx = aguardando()
-    const antes = ctx.estado.jogadores[0]!.fichas
 
     ctx = aplicar(ctx, ctx.estado.hostAtual, {
       tipo: 'configurar', config: config({ fichasIniciais: 3000 }),
     }, 0, RNG())
     ctx = aplicar(ctx, 'p1', { tipo: 'iniciar' }, 0, RNG())
 
-    expect(ctx.estado.jogadores[0]!.fichas).toBe(antes)
+    expect(ctx.estado.jogadores.every((j) => j.fichas === 3000)).toBe(true)
+  })
+
+  it('com a partida encerrada, o formato muda mas o PLACAR fica', () => {
+    // Em `fim` as fichas são o resultado da partida que acabou: reescrevê-las
+    // apagaria o placar antes de as pessoas verem. O valor novo entra na
+    // redistribuição de `novaPartida`.
+    const base = comDoisJogadores().estado
+    const emFim = {
+      sapata: [], ocultaDealer: null,
+      estado: {
+        ...base, fase: 'fim' as const,
+        jogadores: base.jogadores.map((j, i) => ({ ...j, fichas: 1700 + i })),
+      },
+    }
+
+    const ctx = aplicar(emFim, base.hostAtual, {
+      tipo: 'configurar', config: config({ fichasIniciais: 3000 }),
+    }, 0, RNG())
+
+    expect(ctx.estado.config.fichasIniciais).toBe(3000)
+    expect(ctx.estado.jogadores.map((j) => j.fichas)).toEqual([1700, 1701])
+  })
+
+  it('encerrada, dá para configurar sem recarregar a página', () => {
+    // Antes, `fim` contava como "em andamento" e o anfitrião ficava preso.
+    const base = comDoisJogadores().estado
+    const emFim = {
+      sapata: [], ocultaDealer: null,
+      estado: { ...base, fase: 'fim' as const },
+    }
+
+    const ctx = aplicar(emFim, base.hostAtual, {
+      tipo: 'configurar', config: config({ alvo: 9000 }),
+    }, 0, RNG())
+
+    expect(ctx.estado.config.alvo).toBe(9000)
   })
 
   it('a partida seguinte redistribui com o valor novo', () => {

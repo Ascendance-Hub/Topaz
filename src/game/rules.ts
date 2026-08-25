@@ -45,6 +45,23 @@ export const REGRAS = Object.freeze({
   msMostrarResultado: 2500,
 })
 
+/**
+ * As fichas que a mesa oferece, dado o teto de aposta.
+ *
+ * A lista de `REGRAS.fichas` é fixa (25, 100, 500) e era usada crua nos
+ * botões. Com o teto configurável isso ficou errado dos dois lados: baixar o
+ * teto para 300 deixava um botão de 500 na tela que o motor recusava — a
+ * pessoa clicava e nada acontecia —, e um teto de 800 não teria como ser
+ * apostado de uma vez.
+ *
+ * O próprio teto entra na lista quando não é um dos valores padrão, para que
+ * apostar tudo seja sempre um clique.
+ */
+export function fichasDisponiveis(apostaMax: number): number[] {
+  const cabem: number[] = REGRAS.fichas.filter((v) => v <= apostaMax)
+  return cabem.includes(apostaMax) ? cabem : [...cabem, apostaMax]
+}
+
 /** Encaixa um número entre um mínimo e um máximo. */
 function entre(valor: unknown, min: number, max: number, padrao: number): number {
   if (typeof valor !== 'number' || !Number.isFinite(valor)) return padrao

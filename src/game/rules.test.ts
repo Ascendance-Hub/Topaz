@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   REGRAS, acoesDisponiveis, aindaEmJogo, mesaEsperaPor, pagamento, resultadoDe,
-  dealerDeveComprar, CONFIG_PADRAO, LIMITES, normalizarConfig,
+  dealerDeveComprar, CONFIG_PADRAO, LIMITES, normalizarConfig, fichasDisponiveis,
 } from './rules'
 import type { Carta, EstadoJogo, Jogador, Mao } from './types'
 
@@ -335,5 +335,38 @@ describe('normalizarConfig', () => {
   it('arredonda para inteiro — fichas quebradas não existem', () => {
     expect(normalizarConfig({ ...CONFIG_PADRAO, fichasIniciais: 1000.7 }).fichasIniciais)
       .toBe(1001)
+  })
+})
+
+describe('fichasDisponiveis', () => {
+  it('com o teto padrão, são as fichas de sempre', () => {
+    expect(fichasDisponiveis(CONFIG_PADRAO.apostaMax)).toEqual([...REGRAS.fichas])
+  })
+
+  it('teto menor tira a ficha que não cabe, e oferece o teto', () => {
+    // O defeito: baixar o teto para 300 deixava um botão de 500 na tela que o
+    // motor recusava — a pessoa clicava e nada acontecia.
+    expect(fichasDisponiveis(300)).toEqual([25, 100, 300])
+  })
+
+  it('teto maior permite apostar tudo de uma vez', () => {
+    expect(fichasDisponiveis(800)).toEqual([25, 100, 500, 800])
+  })
+
+  it('nenhuma ficha oferecida passa do teto', () => {
+    for (const teto of [25, 26, 99, 100, 101, 499, 500, 501, 5000]) {
+      expect(fichasDisponiveis(teto).every((v) => v <= teto)).toBe(true)
+    }
+  })
+
+  it('sempre há pelo menos uma ficha para apostar', () => {
+    for (const teto of [25, 60, 300, 10_000]) {
+      expect(fichasDisponiveis(teto).length).toBeGreaterThan(0)
+    }
+  })
+
+  it('o teto nunca aparece duas vezes', () => {
+    const lista = fichasDisponiveis(500)
+    expect(new Set(lista).size).toBe(lista.length)
   })
 })

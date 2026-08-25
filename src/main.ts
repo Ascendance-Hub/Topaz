@@ -482,7 +482,11 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
         partida: {
           config: sessao.estado().config,
           souHost: sessao.souHost(),
-          emAndamento: sessao.estado().fase !== 'aguardando',
+          // `fim` NÃO conta como em andamento: a partida acabou, e é ali que
+          // se ajusta o formato antes de recomeçar. Sem isto o anfitrião
+          // ficava preso até recarregar a página.
+          emAndamento: sessao.estado().fase !== 'aguardando'
+            && sessao.estado().fase !== 'fim',
         },
       }, acoesConfiguracoes))
       return
