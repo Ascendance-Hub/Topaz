@@ -17,6 +17,10 @@ import { criarVideoRemoto, mostrarVideo } from './ui/components/video-remoto'
 import { renderizarMixer, chaveVoz, chaveTela } from './ui/components/mixer'
 import { renderizarParticipantes } from './ui/components/participantes'
 import { fotoLembrada, fotoRecebida } from './perfil/foto-navegador'
+import { renderizarIdentidade } from './ui/components/identidade'
+import { entrarComSegredo, identidadeAtual, sairDaIdentidade } from './identidade/atual'
+import type { Identidade } from './identidade/atual'
+import { Apresentacao } from './identidade/apresentacao'
 import type { Participante } from './ui/components/participantes'
 import { MonitorDeVoz, MS_AMOSTRAGEM } from './call/monitor-voz'
 import {
@@ -173,6 +177,26 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * ninguém precisa desconfiar de novo.
    */
   const fotos = new Map<string, string>()
+
+  /**
+   * O selo de quem já PROVOU quem é. Só entra aqui depois de a assinatura
+   * fechar — afirmar uma identidade é trivial, provar não.
+   */
+  const selos = new Map<string, string>()
+
+  identidadeAtual().then((eu) => {
+    const apresentacao = new Apresentacao(transporte, eu.par, codigo)
+    apresentacao.aoVerificar((peerId, selo) => {
+      selos.set(peerId, selo)
+      desenharParticipantes()
+    })
+    transporte.aoSairPeer((peerId) => selos.delete(peerId))
+  }).catch((erro: unknown) => {
+    // Sem identidade a sala continua funcionando: ninguém ganha selo, e é só
+    // isso. Derrubar a sala por causa de um cofre indisponível seria trocar um
+    // enfeite ausente por uma página em branco.
+    console.warn('não deu para carregar a identidade desta máquina', erro)
+  })
   /** O `selfId` não serve de chave para mim: o meu microfone é local e nunca
    *  chega por `aoReceberMidia`. Uma chave própria evita confundir os dois. */
   const EU = 'eu'
@@ -208,6 +232,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       nome: apelidoDe(peerId),
       falando: falantes.has(peerId),
       foto: fotos.get(peerId),
+      selo: selos.get(peerId),
     }))
     return [eu, ...outros]
   }
@@ -845,6 +870,39 @@ export function iniciarApp(app: HTMLElement): void {
     // recebeu um link e não consegue entrar nunca chega à sala para achá-lo.
     let analise: Analise | null = null
     let rodando = false
+    let identidade: Identidade | null = null
+
+    /** Recarrega o painel depois de qualquer mudança de identidade. */
+    const adotar = (nova: Identidade): void => {
+      identidade = nova
+      desenharHome()
+    }
+
+    const acoesIdentidade = {
+      // A pessoa afirmou ter guardado: paramos de mostrar o segredo. Ele não
+      // é apagado de lugar nenhum porque nunca foi guardado — só existia nesta
+      // variável.
+      guardei: () => {
+        if (identidade) adotar({ ...identidade, segredoNovo: undefined })
+      },
+      entrarComSegredo: (segredo: string) => {
+        entrarComSegredo(segredo).then(adotar).catch((erro: unknown) => {
+          console.warn('não deu para entrar com esse ID', erro)
+        })
+      },
+      sair: () => {
+        sairDaIdentidade()
+          .then(() => identidadeAtual())
+          .then(adotar)
+          .catch((erro: unknown) => console.warn('não deu para sair', erro))
+      },
+    }
+
+    identidadeAtual().then(adotar).catch((erro: unknown) => {
+      // Cofre indisponível (janela anônima, política do navegador): a home
+      // continua servindo para entrar em sala, só sem identidade.
+      console.warn('não deu para carregar a identidade', erro)
+    })
 
     const desenharHome = (): void => {
       app.replaceChildren(renderizarHome(
@@ -854,7 +912,10 @@ export function iniciarApp(app: HTMLElement): void {
         // — que lê como falha catastrófica para quem acabou de abrir a página.
         // A lista só quer dizer alguma coisa DENTRO da sala. O teste de NAT em
         // si funciona sozinho: ele fala com os servidores STUN direto.
-        { testeRede: renderizarTesteRede(analise, rodando, testar) },
+        {
+          testeRede: renderizarTesteRede(analise, rodando, testar),
+          identidade: renderizarIdentidade(identidade, acoesIdentidade),
+        },
       ))
     }
 

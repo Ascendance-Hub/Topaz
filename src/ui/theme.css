@@ -1236,3 +1236,100 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   color: var(--creme);
   background: rgba(6, 21, 17, 0.72);
 }
+
+/* ---------------------------------------------------------------------------
+   IDENTIDADE
+   ---------------------------------------------------------------------------
+   Dois estados com pesos opostos, de propósito.
+
+   Recém-criada: o segredo aparece grande e com aviso em cor de alerta. É a
+   ÚNICA vez que ele existe para ser visto — a chave guardada é não extraível,
+   então depois daqui não há como mostrá-lo de novo. Um painel discreto aqui
+   faria a pessoa fechar a página e perder a identidade sem saber.
+
+   Já existente: um selo pequeno. Identidade em uso não é assunto de todo dia.
+   ------------------------------------------------------------------------ */
+.identidade {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--latao-fraco);
+  text-align: left;
+}
+.identidade:empty {
+  /* Enquanto o cofre não responde não há linha divisória flutuando sozinha. */
+  border-top: none;
+  margin: 0;
+  padding: 0;
+}
+
+.identidade-titulo {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--topazio);
+  margin-bottom: 8px;
+}
+
+.identidade-aviso {
+  margin: 0 0 12px;
+  color: var(--alerta);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.identidade-segredo {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--latao-fraco);
+  background: var(--noite);
+  color: var(--creme);
+  /* Monoespaçada: o segredo é conferido caractere a caractere quando alguém
+     desconfia de que copiou pela metade. */
+  font-family: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  word-break: break-all;
+}
+
+.identidade-selo {
+  margin: 0 0 10px;
+  color: var(--creme-fraco);
+  font-size: 12.5px;
+}
+.identidade-selo-valor {
+  font-family: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+  letter-spacing: 0.1em;
+  color: var(--topazio);
+}
+
+.identidade-entrar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.identidade-entrar .campo { flex: 1 1 200px; margin: 0; }
+
+.identidade-erro {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--alerta);
+  font-size: 12px;
+}
+
+/* O selo embaixo do nome na fileira da call. Discreto: ele confirma, não
+   anuncia — e só existe para quem PROVOU, então sua mera presença já é a
+   informação. */
+.participante-selo {
+  font-family: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--latao);
+  max-width: 74px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

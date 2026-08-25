@@ -5,6 +5,8 @@ export interface Participante {
   nome: string
   /** `data:` de imagem gerado no próprio navegador de quem escolheu. */
   foto?: string
+  /** O selo da identidade, presente só depois de a pessoa PROVAR quem é. */
+  selo?: string
   /** Você. Marcado para a pessoa se achar na fileira. */
   euMesmo?: boolean
   falando?: boolean
@@ -91,6 +93,17 @@ export function renderizarParticipantes(lista: Participante[]): HTMLElement {
     nome.textContent = pessoa.nome
 
     peca.append(circulo, nome)
+
+    // O selo só aparece depois da prova. Sem prova não existe marca nenhuma —
+    // um selo "não verificado" seria pior que nada, porque a maior parte das
+    // pessoas leria a presença do selo, não o adjetivo.
+    if (pessoa.selo) {
+      const selo = document.createElement('span')
+      selo.className = 'participante-selo'
+      selo.textContent = pessoa.selo
+      selo.title = `Identidade verificada: ${pessoa.selo}`
+      peca.append(selo)
+    }
     area.append(peca)
   }
 

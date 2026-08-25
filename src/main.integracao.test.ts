@@ -99,7 +99,7 @@ describe('entrar numa sala com o Trystero de mentira, mas a fiação de verdade'
     // existisse numa rede sumiria para quem foi descoberto por outra.
     for (const sala of salas) {
       expect([...sala.canais.keys()].sort())
-        .toEqual(['acao', 'call', 'chat', 'estado', 'foto'])
+        .toEqual(['acao', 'call', 'chat', 'estado', 'foto', 'identidade'])
     }
   })
 

@@ -238,6 +238,27 @@ A sonda fica desligada sem o parâmetro.
 - [ ] Compartilhar a janela do navegador mostra o efeito de espelho infinito;
       isso é esperado
 
+## Identidade
+
+⚠️ **O segredo aparece uma vez só.** Copie antes de fechar a página — não há
+como mostrá-lo de novo, porque a chave guardada é não extraível de propósito.
+
+- [ ] Primeira visita (ou aba anônima): aparece "Guarde o seu ID" com o segredo
+- [ ] "Copiar" copia, e o texto também dá para selecionar à mão
+- [ ] "Já guardei" some com o painel e deixa só o selo curto
+- [ ] Recarregar a página mantém **o mesmo selo** e **não** mostra o segredo
+- [ ] Colar o segredo em "Entrar com este ID" noutro navegador dá **o mesmo
+      selo** — é o "logar noutro dispositivo"
+- [ ] Colar um ID pela metade mostra erro e **não** apaga a identidade atual
+- [ ] "Sair desta máquina" cria uma identidade nova; colar o segredo antigo
+      traz a anterior de volta
+
+**Na sala, com um amigo:**
+
+- [ ] O selo aparece embaixo do nome dele na fileira da call
+- [ ] O selo que você vê para ele é **o mesmo** que ele vê no próprio painel
+- [ ] Nenhum selo aparece antes de a prova fechar
+
 ## Teste de rede
 
 Aparece para quem está sozinho na sala ou não conseguiu conectar — que é
