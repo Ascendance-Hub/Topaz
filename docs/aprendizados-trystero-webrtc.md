@@ -198,13 +198,36 @@ real que apontou de volta para ela.
 
 O que aprendemos sobre *verificar* um relay continua valendo para diagnosticar
 um endereço específico. O que não vale é usar essa verificação como base para
-substituir a lista inteira.
+substituir a lista inteira. E o que se aprendeu foi isto:
+
+### Um relay pode aceitar a publicação e não entregar nada
+
+O Trystero sinaliza com eventos **efêmeros** — kind na faixa 21xxx, **derivado
+do tópico da sala**. E nenhum relay é obrigado a repassar evento efêmero:
+guardá-lo não faz parte do contrato.
+
+A consequência prática é que os testes óbvios mentem, em ordem crescente de
+sofisticação:
+
+| O que se mede | Por que não basta |
+|---|---|
+| O socket abre | `nostr.wine` e `basspistol.org` abriam e recusavam publicação |
+| O NIP-11 não declara restrição | descrever não é entregar |
+| O relay responde `OK true` | `nostr.tegila.com.br` responde `OK true` e **não entrega** a quem está inscrito |
+
+O único teste que prova: **publicar por uma conexão e receber por outra, no
+mesmo relay.** Menos que isso é fé.
+
+⚠️ Ao montar essa sonda, filtrar por um kind **fixo** faz todos os relays
+aparecerem como "não entrega" — inclusive os que sabidamente funcionam — porque
+o kind muda com o tópico. Quando um resultado condena a população inteira, o
+defeito é da medição.
 
 ### Padrões de conexão
 
 - **ICE padrão:** apenas STUN (`stun.l.google.com:19302` e
   `stun.cloudflare.com:3478`). **Nenhum TURN.** Existe a opção `turnConfig`.
-- **Sinalização nostr:** 48 relays na lista, e o Trystero sorteia 5
+- **Sinalização nostr:** 47 relays na lista, e o Trystero sorteia 5
   (`defaultRedundancy`). Se poucos estiverem acessíveis, dois jogadores podem
   cair em conjuntos diferentes e não se encontrar.
 
