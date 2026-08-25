@@ -669,3 +669,66 @@ describe('presença que se conserta sozinha', () => {
     expect(anfitriao.estado().jogadores.map((j) => j.apelido)).toEqual(['Alex'])
   })
 })
+
+describe('o que chega pela rede não é confiável', () => {
+  /** Um peer que publica o que quiser — é o que um cliente modificado faz. */
+  function peerQuePublica(rede: ReturnType<typeof redeDiferida>, id: string) {
+    const transporte = rede.conectar(id)
+    return (estado: unknown) => transporte.enviarEstado(estado as EstadoJogo)
+  }
+
+  it('descarta um estado malformado em vez de adotar e apagar a mesa', () => {
+    // `jogadores` que não é lista derruba o desenho no `.map(...)`: a página
+    // some para quem recebeu, e quem mandou continua jogando. Um peer não
+    // pode ter esse poder sobre os outros.
+    const rede = redeDiferida()
+    const publicar = peerQuePublica(rede, 'pa')
+    const cliente = new Sessao(rede.conectar('pb'), rng)
+    rede.bombear()
+    cliente.entrar('Bruno')
+
+    publicar({ ...estadoFalso({ hostAtual: 'pa' }), jogadores: 'ninguém' })
+
+    expect(Array.isArray(cliente.estado().jogadores)).toBe(true)
+  })
+
+  it('descarta fase inventada', () => {
+    const rede = redeDiferida()
+    const publicar = peerQuePublica(rede, 'pa')
+    const cliente = new Sessao(rede.conectar('pb'), rng)
+    rede.bombear()
+    cliente.entrar('Bruno')
+
+    publicar({ ...estadoFalso({ hostAtual: 'pa' }), fase: 'roubar' })
+
+    expect(cliente.estado().fase).not.toBe('roubar')
+  })
+
+  it('descarta rodada absurda, que venceria o desempate entre mesas', () => {
+    // `mesaPrevalece` desempata por rodada. Sem teto, quem publica o maior
+    // número adota a sala inteira à mesa dele.
+    const rede = redeDiferida()
+    const publicar = peerQuePublica(rede, 'pa')
+    const cliente = new Sessao(rede.conectar('pb'), rng)
+    rede.bombear()
+    cliente.entrar('Bruno')
+
+    publicar(estadoFalso({ hostAtual: 'pa', rodada: Number.MAX_SAFE_INTEGER }))
+
+    expect(cliente.estado().rodada).not.toBe(Number.MAX_SAFE_INTEGER)
+  })
+
+  it('continua adotando o estado legítimo de um anfitrião de verdade', () => {
+    // O contrapeso: um guarda rígido demais recusaria a mesa real, e a falha
+    // só apareceria com duas pessoas na sala.
+    const rede = redeDiferida()
+    const publicar = peerQuePublica(rede, 'pa')
+    const cliente = new Sessao(rede.conectar('pb'), rng)
+    rede.bombear()
+    cliente.entrar('Bruno')
+
+    publicar(estadoFalso({ hostAtual: 'pa', rodada: 3 }))
+
+    expect(cliente.estado().rodada).toBe(3)
+  })
+})

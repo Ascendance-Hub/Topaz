@@ -4,6 +4,7 @@ import { reconstruirSapata } from '../game/shoe'
 import { REGRAS } from '../game/rules'
 import type { Acao, EstadoJogo, Rng } from '../game/types'
 import type { Transporte } from './transport'
+import { ehEstadoPlausivel } from './validar'
 
 /**
  * Quanto tempo esperamos, depois de entrar na sala (ou de ver um peer novo),
@@ -103,6 +104,13 @@ export class Sessao {
     })
 
     this.transporte.aoReceberEstado((estado, peerId) => {
+      // Antes de qualquer regra sobre QUEM mandou, uma sobre O QUE chegou. O
+      // tipo aqui é uma promessa do TypeScript, não um fato: do outro lado
+      // pode estar um cliente modificado, ou uma versão antiga do site. Um
+      // campo com o tipo errado lança no meio do desenho e apaga a página de
+      // quem recebeu — um peer não pode ter esse poder sobre os outros.
+      if (!ehEstadoPlausivel(estado)) return
+
       // O remetente precisa se declarar host no próprio payload — não
       // decidimos por um id em cache, porque numa saída com 3+ peers um
       // sobrevivente pode publicar antes que eu tenha processado a saída

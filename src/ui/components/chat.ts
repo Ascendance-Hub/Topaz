@@ -1,3 +1,5 @@
+import { textoLimitado } from '../../net/validar'
+
 /** Teto de uma mensagem. Papo de mesa, não redação. */
 export const LIMITE_TEXTO = 200
 
@@ -98,13 +100,16 @@ export function criarChat(aoEnviar: (texto: string) => void): Chat {
     // outro navegador, e ninguém na sala escolheu executar o que o outro
     // digitou. Vale para o apelido também — ele vem do `EstadoJogo`, que é
     // preenchido por quem entrou, não por nós.
+    // E cortado no limite, que é a outra metade da mesma regra: `LIMITE_TEXTO`
+    // é aplicado no envio, e quem envia pode simplesmente não aplicá-lo. O
+    // limite que protege esta janela é o que ELA impõe ao que chega.
     const autor = document.createElement('span')
     autor.className = 'chat-autor'
-    autor.textContent = apelido
+    autor.textContent = textoLimitado(apelido, LIMITE_TEXTO)
 
     const corpo = document.createElement('span')
     corpo.className = 'chat-texto'
-    corpo.textContent = texto
+    corpo.textContent = textoLimitado(texto, LIMITE_TEXTO)
 
     linha.append(autor, corpo)
     log.append(linha)
