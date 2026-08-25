@@ -162,12 +162,20 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
     grid-row: 1 / -1;
     flex-direction: column;
     align-items: stretch;
+    /* `start` e não `stretch`: os itens ficam juntos no topo, do tamanho do
+       próprio texto. */
     align-self: stretch;
+    justify-content: flex-start;
     margin: 18px 0 0;
     padding: 4px 12px 4px 0;
     border-bottom: none;
     border-right: 1px solid var(--latao-fraco);
   }
+  /* O `flex: 1` serve à faixa HORIZONTAL do celular, onde os três dividem a
+     largura. Na coluna ele faz cada item ocupar um terço da ALTURA da janela —
+     numa tela grande, "Ajustes" ia parar no rodapé e o item aceso virava um
+     retângulo de trezentos pixels. */
+  #app:has(.trilho) .trilho-item { flex: none; }
 
   #app:has(.trilho) .barra-sala { grid-column: 2; grid-row: 1; }
   #app:has(.trilho) .conteudo { grid-column: 2; grid-row: 2; }
@@ -179,11 +187,25 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 
   /* `min-height: 0` é o que faz a rolagem acontecer AQUI dentro: sem isso um
      item de grid nunca encolhe abaixo do conteúdo, e quem cresce é a página. */
+  /* `min-height: 0` é o que faz a rolagem acontecer AQUI dentro: sem isso um
+     item de grid nunca encolhe abaixo do conteúdo, e quem cresce é a página.
+
+     `safe center` centra o miolo quando ele é curto — numa tela grande, a sala
+     vazia ficava colada no topo com centenas de pixels de feltro embaixo. O
+     `safe` é o que impede o efeito colateral clássico: com `center` puro,
+     conteúdo mais alto que a área tem o TOPO cortado e a rolagem não alcança.
+     Com `safe`, ele volta a se comportar como `start` nesse caso. */
   .conteudo {
+    display: flex;
+    flex-direction: column;
+    justify-content: safe center;
+    gap: 16px;
     overflow-y: auto;
     min-height: 0;
     padding-right: 6px;
   }
+  /* Sem isto os filhos encolheriam para caber, em vez de rolar. */
+  .conteudo > * { flex: 0 0 auto; }
 
   /* A largura passa a ser a da coluna: um `max-width` menor aqui dentro
      recentralizaria cada peça por conta própria e desalinharia de novo. */
