@@ -131,3 +131,92 @@ describe('o que a tela avisa', () => {
     expect(area.textContent).toContain('próxima partida')
   })
 })
+
+describe('o último formato usado', () => {
+  const sugestao = { ...CONFIG_PADRAO, fichasIniciais: 4000, alvo: 9000 }
+
+  it('preenche os campos e avisa que ainda não vale', () => {
+    // Sem o aviso, a tela mostraria números que a partida não está usando — e
+    // ninguém saberia disso.
+    const area = renderizarConfigPartida(dados({ sugestao }), vi.fn())
+
+    expect(campo(area, 'fichasIniciais').value).toBe('4000')
+    expect(campo(area, 'sugestao')).not.toBeNull()
+  })
+
+  it('salvar entrega o que está na tela, que é a sugestão', () => {
+    const salvar = vi.fn()
+    const area = renderizarConfigPartida(dados({ sugestao }), salvar)
+
+    enviar(area)
+
+    expect(salvar.mock.calls[0]![0].fichasIniciais).toBe(4000)
+  })
+
+  it('quem não pode mexer vê o que VALE, não a sugestão', () => {
+    // Preencher com a sugestão de quem não pode salvar mostraria uma regra que
+    // não é a da mesa.
+    const area = renderizarConfigPartida(dados({ sugestao, souHost: false }), vi.fn())
+
+    expect(campo(area, 'fichasIniciais').value).toBe(String(CONFIG_PADRAO.fichasIniciais))
+    expect(campo(area, 'sugestao')).toBeNull()
+  })
+
+  it('sem sugestão, os campos mostram o formato da sala', () => {
+    const area = renderizarConfigPartida(dados(), vi.fn())
+
+    expect(campo(area, 'fichasIniciais').value).toBe(String(CONFIG_PADRAO.fichasIniciais))
+  })
+})
+
+describe('levar o formato para outro lugar', () => {
+  it('mostra o formato da SALA como texto, não a sugestão', () => {
+    // O que se manda a um amigo é a regra que está valendo aqui.
+    const area = renderizarConfigPartida(
+      dados({ sugestao: { ...CONFIG_PADRAO, alvo: 9000 } }), vi.fn())
+
+    expect(campo(area, 'json').value).toContain(String(CONFIG_PADRAO.alvo))
+  })
+
+  it('importar PREENCHE os campos, não aplica direto', () => {
+    // Quem cola um formato de outra pessoa merece ver o que vai mudar antes de
+    // a mesa mudar.
+    const salvar = vi.fn()
+    const area = renderizarConfigPartida(dados(), salvar)
+    campo(area, 'json').value = '{"fichasIniciais":2000,"alvo":7000,"apostaMax":300}'
+
+    area.querySelector<HTMLButtonElement>('[data-partida="importar"]')!.click()
+
+    expect(salvar).not.toHaveBeenCalled()
+    expect(campo(area, 'fichasIniciais').value).toBe('2000')
+    expect(campo(area, 'alvo').value).toBe('7000')
+  })
+
+  it('importar "até sobrar um" marca a caixa', () => {
+    const area = renderizarConfigPartida(dados(), vi.fn())
+    campo(area, 'json').value = '{"alvo":null}'
+
+    area.querySelector<HTMLButtonElement>('[data-partida="importar"]')!.click()
+
+    expect(campo(area, 'sem-alvo').checked).toBe(true)
+    expect(campo(area, 'alvo').disabled).toBe(true)
+  })
+
+  it('texto ruim avisa e não mexe em nada', () => {
+    const area = renderizarConfigPartida(dados(), vi.fn())
+    const antes = campo(area, 'fichasIniciais').value
+    campo(area, 'json').value = 'isto não é um formato'
+
+    area.querySelector<HTMLButtonElement>('[data-partida="importar"]')!.click()
+
+    expect(campo(area, 'erro-json').hidden).toBe(false)
+    expect(campo(area, 'fichasIniciais').value).toBe(antes)
+  })
+
+  it('quem não é anfitrião copia, mas não importa', () => {
+    const area = renderizarConfigPartida(dados({ souHost: false }), vi.fn())
+
+    expect(area.querySelector('[data-partida="copiar"]')).not.toBeNull()
+    expect(area.querySelector('[data-partida="importar"]')).toBeNull()
+  })
+})

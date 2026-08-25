@@ -1,12 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderizarConfiguracoes } from './configuracoes'
-import { CONFIG_PADRAO } from '../../game/rules'
 
 const CODIGO = 'K7X2QW9FM3PRTVN4'
 
 const acoes = () => ({
-  configurarPartida: vi.fn(),
   renomear: vi.fn(),
   salvarGrupo: vi.fn(),
   esquecerGrupo: vi.fn(),
@@ -18,7 +16,6 @@ const dados = (extras = {}) => ({
   codigo: CODIGO,
   grupo: null,
   identidade: null,
-  partida: { config: { ...CONFIG_PADRAO }, souHost: true, emAndamento: false },
   ...extras,
 })
 
@@ -138,6 +135,8 @@ describe('ordem das seções', () => {
     const area = renderizarConfiguracoes(dados(), acoes())
 
     expect([...area.querySelectorAll('.config-titulo')].map((t) => t.textContent))
-      .toEqual(['Você', 'Esta sala', 'A partida', 'Sua identidade'])
+      // "A partida" saiu daqui: o formato agora mora na aba de Jogos, no
+      // cartão do jogo a que ele pertence.
+      .toEqual(['Você', 'Esta sala', 'Sua identidade'])
   })
 })

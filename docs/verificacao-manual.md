@@ -289,7 +289,13 @@ como mostrá-lo de novo, porque a chave guardada é não extraível de propósit
 
 ## Formato da partida
 
-- [ ] Em Ajustes → A partida, o anfitrião vê os quatro campos editáveis
+O formato saiu de Ajustes e mora na aba **Jogos**, na engrenagem do cartão do
+jogo — cada jogo terá o seu.
+
+- [ ] A engrenagem aparece no cartão do Blackjack **só para o anfitrião**
+- [ ] Clicar nela abre o formato, com "← Jogos" para voltar
+- [ ] Ajustes **não** tem mais a seção "A partida"
+- [ ] O anfitrião vê os quatro campos editáveis
 - [ ] Quem **não** é anfitrião vê os mesmos valores, **legíveis** e travados,
       com o motivo escrito
 - [ ] Com a partida em andamento, nem o anfitrião edita — e a tela diz por quê

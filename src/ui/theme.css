@@ -1805,3 +1805,71 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 }
 
 .config-partida [data-partida='salvar'] { align-self: flex-start; }
+
+/* ---------------------------------------------------------------------------
+   A ENGRENAGEM DO FORMATO
+   ---------------------------------------------------------------------------
+   Fica no rodapé do cartão, ao lado de "Abrir mesa", e não no topo: ali ela
+   brigaria com o título. E só existe para o anfitrião — mostrá-la a todos e
+   barrar no clique seria um botão que engana.
+   ------------------------------------------------------------------------ */
+.jogo-rodape {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.jogo-ajustar {
+  padding: 8px 12px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.jogos-voltar {
+  margin-bottom: 14px;
+  padding: 7px 14px;
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------------------------
+   LEVAR O FORMATO PARA OUTRO LUGAR
+   ---------------------------------------------------------------------------
+   Dobrado, pelo mesmo motivo do diagnóstico de conexão: é caminho de vez em
+   quando, e aberto tomaria a tela de quem só queria mexer num número.
+   ------------------------------------------------------------------------ */
+.config-partida-transporte {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--latao-fraco);
+}
+.config-partida-transporte .teste-rede-resumo { display: inline-block; }
+
+.config-partida-json {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 14px 0 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--latao-fraco);
+  background: var(--noite);
+  color: var(--creme);
+  /* Monoespaçada: é texto que alguém confere linha a linha antes de mandar. */
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.config-partida-erro {
+  margin: 10px 0 0;
+  color: var(--alerta);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* A nota de que os campos vieram do último formato usado. Em latão e não em
+   alerta: não é erro — é um oferecimento que ainda não foi aceito. */
+.config-partida [data-partida='sugestao'] {
+  color: var(--latao);
+}

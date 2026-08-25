@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest'
-import { JOGOS, POR_VIR, renderizarJogos } from './jogos'
+import { JOGOS, POR_VIR, renderizarAjustesDoJogo, renderizarJogos } from './jogos'
 
 describe('renderizarJogos', () => {
   it('mostra o que dá para jogar, com o que a pessoa precisa saber antes', () => {
-    const area = renderizarJogos(vi.fn())
+    const area = renderizarJogos({ abrir: vi.fn() })
     const cartao = area.querySelector('[data-jogo="blackjack"]')!
 
     expect(cartao.querySelector('.jogo-nome')!.textContent).toBe('Blackjack')
@@ -13,7 +13,7 @@ describe('renderizarJogos', () => {
 
   it('abrir a mesa avisa qual jogo', () => {
     const abrir = vi.fn()
-    const area = renderizarJogos(abrir)
+    const area = renderizarJogos({ abrir })
 
     area.querySelector<HTMLButtonElement>('[data-abrir="blackjack"]')!.click()
 
@@ -23,7 +23,7 @@ describe('renderizarJogos', () => {
   it('o que ainda não existe NÃO é clicável', () => {
     // A saída fácil seria cartões clicáveis de jogos que não existem. A pessoa
     // clica, nada acontece, e conclui que o site está quebrado.
-    const area = renderizarJogos(vi.fn())
+    const area = renderizarJogos({ abrir: vi.fn() })
     const porVir = area.querySelectorAll('.jogo-por-vir')
 
     expect(porVir).toHaveLength(POR_VIR.length)
@@ -36,14 +36,60 @@ describe('renderizarJogos', () => {
   it('o que ainda não existe não conta como jogo', () => {
     // Sem `data-jogo`, nenhum código futuro que percorra a galeria tropeça
     // num aviso achando que é jogo.
-    const area = renderizarJogos(vi.fn())
+    const area = renderizarJogos({ abrir: vi.fn() })
 
     expect(area.querySelectorAll('[data-jogo]')).toHaveLength(JOGOS.length)
   })
 
   it('cada promessa diz que é promessa', () => {
-    const area = renderizarJogos(vi.fn())
+    const area = renderizarJogos({ abrir: vi.fn() })
 
     expect(area.querySelector('.jogo-por-vir')!.textContent).toContain('em breve')
+  })
+})
+
+describe('a engrenagem do formato', () => {
+  it('não existe para quem não é anfitrião', () => {
+    // Mostrá-la a todos e barrar no clique seria um botão que engana.
+    const area = renderizarJogos({ abrir: vi.fn() })
+
+    expect(area.querySelector('[data-ajustar]')).toBeNull()
+  })
+
+  it('para o anfitrião, abre o formato daquele jogo', () => {
+    const ajustar = vi.fn()
+    const area = renderizarJogos({ abrir: vi.fn(), ajustar })
+
+    area.querySelector<HTMLButtonElement>('[data-ajustar="blackjack"]')!.click()
+
+    expect(ajustar).toHaveBeenCalledWith('blackjack')
+  })
+
+  it('a engrenagem tem nome para quem não vê o símbolo', () => {
+    const area = renderizarJogos({ abrir: vi.fn(), ajustar: vi.fn() })
+
+    expect(area.querySelector('[data-ajustar]')!.getAttribute('aria-label'))
+      .toContain('Blackjack')
+  })
+
+  it('os cartões "em breve" não ganham engrenagem', () => {
+    const area = renderizarJogos({ abrir: vi.fn(), ajustar: vi.fn() })
+
+    expect(area.querySelectorAll('[data-ajustar]')).toHaveLength(JOGOS.length)
+  })
+})
+
+describe('renderizarAjustesDoJogo', () => {
+  it('mostra o painel do jogo com um caminho de volta', () => {
+    const painel = document.createElement('div')
+    painel.id = 'painel'
+    const voltar = vi.fn()
+
+    const area = renderizarAjustesDoJogo('Blackjack', painel, voltar)
+
+    expect(area.querySelector('.jogos-titulo')!.textContent).toBe('Blackjack')
+    expect(area.querySelector('#painel')).toBe(painel)
+    area.querySelector<HTMLButtonElement>('[data-jogos="voltar"]')!.click()
+    expect(voltar).toHaveBeenCalled()
   })
 })
