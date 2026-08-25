@@ -109,3 +109,8 @@ Design e plano de implementação em `docs/superpowers/`. O que aprendemos sobre
 Trystero e WebRTC pelo caminho — quase tudo saído de bug em uso real, e nada
 disso na documentação oficial — está em
 [`docs/aprendizados-trystero-webrtc.md`](docs/aprendizados-trystero-webrtc.md).
+
+Como o projeto chegou até aqui — o que foi tentado, o que deu errado e o que
+cada erro ensinou — está no
+[diário de bordo](docs/diario-de-bordo.md). Inclui o levantamento de quem
+enxerga o quê numa sala, e o que **não** dá para fechar sem servidor.

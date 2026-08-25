@@ -103,6 +103,35 @@ raramente bloqueia as três.
 - [ ] Sentar e apostar não acontecem em dobro
 - [ ] A tela compartilhada aparece uma vez só para quem assiste
 
+## Código de sala novo (16 caracteres)
+
+O código passou de 8 para 16 caracteres, mostrado agrupado
+(`K7X2-QW9F-M3PR-TVN4`). **Links antigos param de funcionar** — eles têm 8
+caracteres e agora são recusados na entrada. É esperado, e falha de forma
+visível (o aviso de convite inválido), nunca em silêncio.
+
+⚠️ Todo mundo precisa estar na **mesma versão**. Quem estiver com a página
+antiga aberta não vai conseguir entrar numa sala criada na versão nova.
+Recarregar resolve.
+
+- [ ] Criar sala: a barra de endereços mostra `#sala=XXXX-XXXX-XXXX-XXXX`
+- [ ] O botão "Copiar link" entrega a mesma grafia que está na barra
+- [ ] Abrir o link copiado noutra aba entra na sala certa
+- [ ] Colar o código **com hífens** no campo "Código da sala" funciona
+- [ ] Colar **sem hífens** também funciona
+- [ ] Um link antigo, de 8 caracteres, mostra o aviso de convite inválido
+- [ ] A barra da sala mostra o código agrupado, igual ao link
+
+## Fontes e política de conteúdo
+
+- [ ] A página abre com a tipografia certa (Bodoni nos títulos, Archivo no
+      corpo) — sem cair para Georgia/system-ui
+- [ ] O console **não** tem erro de CSP ao entrar numa sala
+- [ ] O console **não** tem erro de CSP ao entrar na call nem ao compartilhar
+      tela (é onde o worker do MQTT e a mídia local aparecem)
+- [ ] Na aba Network do navegador, **nenhuma requisição sai para
+      `fonts.googleapis.com` ou `fonts.gstatic.com`**
+
 ## Teste de rede
 
 Aparece para quem está sozinho na sala ou não conseguiu conectar — que é
