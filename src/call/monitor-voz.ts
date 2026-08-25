@@ -104,6 +104,7 @@ export class MonitorDeVoz {
     observado.fonte.disconnect()
     observado.analisador.disconnect()
     this.observados.delete(id)
+    this.ultimoNivel.delete(id)
     // Quem sai da call no meio de uma frase deixaria o anel aceso para sempre.
     if (observado.estado.falando) this.avisar(id, false)
   }
@@ -115,12 +116,29 @@ export class MonitorDeVoz {
     return [...this.observados.keys()]
   }
 
+  /**
+   * O nível medido de cada um agora, para diagnóstico.
+   *
+   * Os limiares nasceram estimados e só se acertam com voz real. Sem enxergar
+   * o número, "o anel não acende" tem três causas indistinguíveis: o áudio não
+   * chega ao analisador, o limiar está alto demais, ou o desenho não atualiza.
+   */
+  niveis(): { id: string; nivel: number; falando: boolean }[] {
+    return [...this.observados].map(([id, o]) => ({
+      id, nivel: this.ultimoNivel.get(id) ?? 0, falando: o.estado.falando,
+    }))
+  }
+
+  private readonly ultimoNivel = new Map<string, number>()
+
   /** Uma passada de medição sobre todo mundo que está sendo observado. */
   tique(agora: number): void {
     for (const [id, observado] of this.observados) {
       observado.analisador.getFloatTimeDomainData(observado.buffer)
       const antes = observado.estado.falando
-      observado.estado = decidirFalando(observado.estado, rmsDe(observado.buffer), agora)
+      const nivel = rmsDe(observado.buffer)
+      this.ultimoNivel.set(id, nivel)
+      observado.estado = decidirFalando(observado.estado, nivel, agora)
       // Só a MUDANÇA avisa: avisar a cada tique redesenharia a lista de
       // participantes dez vezes por segundo, para sempre.
       if (observado.estado.falando !== antes) this.avisar(id, observado.estado.falando)

@@ -175,6 +175,26 @@ permissão do microfone (ou desligue o microfone no sistema antes).
 `LIMIAR_DESLIGA = 0.02`). Esta é a parte que precisa de ajuste com voz real,
 em microfones diferentes.
 
+**Como medir em vez de adivinhar.** Acrescente `?diag=voz` à URL, entre na
+call e abra o console:
+
+```
+https://ascendance-hub.github.io/Topaz/?diag=voz#sala=XXXX-XXXX-XXXX-XXXX
+```
+
+Sai uma linha por segundo com o nível instantâneo e o **pico** desde a linha
+anterior. O pico é o que importa: falar é intermitente, e uma amostra tirada no
+meio de uma sílaba fechada mede silêncio.
+
+| O que aparece | O que significa |
+|---|---|
+| `ninguém sendo medido` | o microfone não chegou ao analisador — defeito de encanamento |
+| `agora=0.0000 pico=0.0000` sempre | o contexto de áudio não está recebendo nada |
+| pico bem abaixo de 0,04 ao falar | **o limiar está alto demais** — é só trocar o número |
+| `FALANDO` aparece e o anel não muda | o desenho não atualiza |
+
+A sonda fica desligada sem o parâmetro.
+
 - [ ] Falar acende o anel em volta do **seu** círculo
 - [ ] O anel do amigo acende quando ele fala, e não quando você fala
 - [ ] O anel **não pisca** nas pausas entre palavras de uma frase normal
