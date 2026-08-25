@@ -2,7 +2,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   CHAVE_MICROFONE, escolherMicrofone, lembrarMicrofone,
-  microfoneLembrado, microfones,
+  microfoneLembrado, microfones, motivoSemMicrofone,
+  escolherSaida, lembrarSaida, saidaLembrada, saidasDeAudio,
 } from './dispositivos'
 
 const info = (kind: string, deviceId: string, label = ''): MediaDeviceInfo =>
@@ -70,5 +71,86 @@ describe('escolherMicrofone', () => {
 
   it('devolve nulo quando não há microfone nenhum', () => {
     expect(escolherMicrofone([], 'fone')).toBeNull()
+  })
+})
+
+describe('motivoSemMicrofone', () => {
+  const erro = (name: string) => Object.assign(new Error('x'), { name })
+
+  it('explica a permissão negada e diz onde liberar', () => {
+    // O caso que mais acontece, e o único em que a pessoa pode resolver
+    // sozinha — então a mensagem tem que dizer ONDE.
+    const texto = motivoSemMicrofone(erro('NotAllowedError'))
+    expect(texto).toContain('bloqueou')
+    expect(texto.toLowerCase()).toContain('endereços')
+  })
+
+  it('distingue não ter microfone de estar bloqueado', () => {
+    expect(motivoSemMicrofone(erro('NotFoundError')))
+      .not.toBe(motivoSemMicrofone(erro('NotAllowedError')))
+    expect(motivoSemMicrofone(erro('NotFoundError'))).toContain('Nenhum microfone')
+  })
+
+  it('aponta o programa que está segurando o aparelho', () => {
+    expect(motivoSemMicrofone(erro('NotReadableError'))).toContain('outro programa')
+  })
+
+  it('trata o aparelho lembrado que sumiu', () => {
+    expect(motivoSemMicrofone(erro('OverconstrainedError'))).toContain('não está mais')
+  })
+
+  it('nunca devolve vazio, seja qual for o erro', () => {
+    // Sem isto o aviso apareceria em branco, que é quase tão ruim quanto o
+    // botão morto que este trabalho veio consertar.
+    for (const valor of [erro('CoisaNova'), new Error('sem nome'), null, undefined, 'texto']) {
+      expect(motivoSemMicrofone(valor).length).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('saidasDeAudio', () => {
+  it('fica só com as saídas de áudio', () => {
+    const lista = saidasDeAudio([
+      info('audioinput', 'a', 'Fone'),
+      info('audiooutput', 'c', 'Alto-falante'),
+      info('videoinput', 'b', 'Webcam'),
+    ])
+
+    expect(lista).toEqual([{ id: 'c', nome: 'Alto-falante' }])
+  })
+
+  it('inventa um nome quando o navegador não deu', () => {
+    expect(saidasDeAudio([info('audiooutput', 'c')])[0]!.nome).toBe('Saída 1')
+  })
+
+  it('descarta id vazio, que não serve para setSinkId', () => {
+    expect(saidasDeAudio([info('audiooutput', '', 'Anônimo')])).toEqual([])
+  })
+})
+
+describe('memória da saída de áudio', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('lembra e devolve', () => {
+    lembrarSaida('fone-usb')
+    expect(saidaLembrada()).toBe('fone-usb')
+  })
+
+  it('sem nada lembrado, devolve null', () => {
+    expect(saidaLembrada()).toBeNull()
+  })
+
+  it('usa a lembrada quando ela ainda existe', () => {
+    const lista = [{ id: 'a', nome: 'A' }, { id: 'b', nome: 'B' }]
+    expect(escolherSaida(lista, 'b')).toBe('b')
+  })
+
+  it('cai na primeira quando a lembrada sumiu — um fone desplugado entre sessões', () => {
+    const lista = [{ id: 'a', nome: 'A' }]
+    expect(escolherSaida(lista, 'sumiu')).toBe('a')
+  })
+
+  it('devolve null quando não há saída nenhuma', () => {
+    expect(escolherSaida([], 'b')).toBeNull()
   })
 })

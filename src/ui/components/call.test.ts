@@ -15,7 +15,7 @@ const acoes = () => ({
   pararTela: vi.fn(), assistir: vi.fn(), pararDeAssistir: vi.fn(),
   definirQualidade: vi.fn(), definirTipoConteudo: vi.fn(),
   alternarMeuMicrofone: vi.fn(), alternarSilenciarTodos: vi.fn(),
-  trocarMicrofone: vi.fn(),
+  trocarMicrofone: vi.fn(), tentarMicrofone: vi.fn(), trocarSaida: vi.fn(),
 })
 
 describe('controles da call', () => {
@@ -312,5 +312,117 @@ describe('seletor de microfone', () => {
     select.dispatchEvent(new Event('change'))
 
     expect(a.trocarMicrofone).toHaveBeenCalledWith('fone')
+  })
+})
+
+describe('microfone que não abriu', () => {
+  const semMic = 'O navegador bloqueou o microfone.'
+  const naCall = () => estado({ euNaCall: true })
+  const ctx = (extras = {}) => ({ apelidoDe: (id: string) => id, ...extras })
+
+  it('diz o motivo em vez de deixar a pessoa no escuro', () => {
+    // O defeito que isto conserta: negar a permissão matava o botão em
+    // silêncio. Entrar sem microfone é aceitável; entrar sem saber, não.
+    const barra = renderizarControlesCall(
+      naCall(), acoes(), 1080, 'motion', ctx({ semMicrofone: semMic }))
+
+    expect(barra.querySelector('.call-sem-microfone')!.textContent).toContain(semMic)
+  })
+
+  it('oferece tentar de novo, que é a ação que resolve', () => {
+    const a = acoes()
+    const barra = renderizarControlesCall(
+      naCall(), a, 1080, 'motion', ctx({ semMicrofone: semMic }))
+
+    barra.querySelector<HTMLButtonElement>('[data-call="tentar-microfone"]')!.click()
+
+    expect(a.tentarMicrofone).toHaveBeenCalled()
+  })
+
+  it('esconde o botão de mutar, que não tem o que mutar', () => {
+    const barra = renderizarControlesCall(
+      naCall(), acoes(), 1080, 'motion', ctx({ semMicrofone: semMic }))
+
+    expect(barra.querySelector('[data-call="meu-microfone"]')).toBeNull()
+  })
+
+  it('com microfone funcionando, nada disso aparece', () => {
+    const barra = renderizarControlesCall(naCall(), acoes(), 1080, 'motion', ctx())
+
+    expect(barra.querySelector('.call-sem-microfone')).toBeNull()
+    expect(barra.querySelector('[data-call="meu-microfone"]')).not.toBeNull()
+  })
+
+  it('quem está sem microfone continua podendo sair e ouvir', () => {
+    // Entrar só ouvindo tem que ser uma call de verdade, não uma tela morta.
+    const barra = renderizarControlesCall(
+      naCall(), acoes(), 1080, 'motion', ctx({ semMicrofone: semMic }))
+
+    expect(barra.querySelector('[data-call="sair"]')).not.toBeNull()
+    expect(barra.querySelector('[data-call="silenciar-todos"]')).not.toBeNull()
+  })
+})
+
+describe('seletor de saída de áudio', () => {
+  const duas = [{ id: 'a', nome: 'Alto-falante' }, { id: 'b', nome: 'Fone' }]
+  const naCall = () => estado({ euNaCall: true })
+  const ctx = (extras = {}) => ({ apelidoDe: (id: string) => id, ...extras })
+
+  it('não aparece com uma saída só — não há o que escolher', () => {
+    const barra = renderizarControlesCall(
+      naCall(), acoes(), 1080, 'motion', ctx({ saidas: [duas[0]] }))
+
+    expect(barra.querySelector('[data-call="saida"]')).toBeNull()
+  })
+
+  it('não aparece quando o navegador não sabe trocar', () => {
+    // `main.ts` simplesmente não passa a lista nesse caso. Um seletor que a
+    // pessoa mexe e não muda nada faz ela achar que o site quebrou.
+    const barra = renderizarControlesCall(naCall(), acoes(), 1080, 'motion', ctx())
+
+    expect(barra.querySelector('[data-call="saida"]')).toBeNull()
+  })
+
+  it('lista as saídas e marca a atual', () => {
+    const barra = renderizarControlesCall(
+      naCall(), acoes(), 1080, 'motion', ctx({ saidas: duas, saidaAtual: 'b' }))
+    const seletor = barra.querySelector<HTMLSelectElement>('[data-call="saida"]')!
+
+    expect([...seletor.options].map((o) => o.textContent)).toEqual(['Alto-falante', 'Fone'])
+    expect(seletor.value).toBe('b')
+  })
+
+  it('escolher avisa quem monta', () => {
+    const a = acoes()
+    const barra = renderizarControlesCall(
+      naCall(), a, 1080, 'motion', ctx({ saidas: duas, saidaAtual: 'a' }))
+    const seletor = barra.querySelector<HTMLSelectElement>('[data-call="saida"]')!
+
+    seletor.value = 'b'
+    seletor.dispatchEvent(new Event('change'))
+
+    expect(a.trocarSaida).toHaveBeenCalledWith('b')
+  })
+
+  it('nunca interpreta o nome do aparelho como HTML', () => {
+    // O nome vem do sistema operacional, não de nós.
+    const malicioso = '<img src=x onerror="window.__xss = true">'
+    const barra = renderizarControlesCall(
+      naCall(), acoes(), 1080, 'motion',
+      ctx({ saidas: [{ id: 'a', nome: malicioso }, duas[1]] }))
+
+    expect(barra.querySelector('img')).toBeNull()
+    expect(barra.querySelector<HTMLSelectElement>('[data-call="saida"]')!
+      .options[0]!.textContent).toBe(malicioso)
+  })
+
+  it('aparece mesmo para quem está sem microfone', () => {
+    // É justamente quem entrou só ouvindo que mais precisa escolher para ONDE
+    // está ouvindo.
+    const barra = renderizarControlesCall(
+      naCall(), acoes(), 1080, 'motion',
+      ctx({ saidas: duas, semMicrofone: 'bloqueado' }))
+
+    expect(barra.querySelector('[data-call="saida"]')).not.toBeNull()
   })
 })
