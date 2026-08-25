@@ -2,7 +2,7 @@ import { elementoCarta } from './carta'
 import { botaoAjuda } from './ajuda'
 import { avaliar } from '../../game/hand'
 import { podeSentar } from '../../game/machine'
-import { REGRAS, acoesDisponiveis } from '../../game/rules'
+import { REGRAS, acoesDisponiveis, fichasDisponiveis } from '../../game/rules'
 import type { Acao, EstadoJogo, Jogador, Mao, ResultadoMao } from '../../game/types'
 
 /** As quatro ações de turno, as únicas cujo rótulo alguém lê daqui. */
@@ -301,7 +301,7 @@ function painelProprio(
   const acoes = div('acoes')
 
   if (estado.fase === 'apostas' && eu.maos.length === 0) {
-    for (const valor of REGRAS.fichas) {
+    for (const valor of fichasDisponiveis(estado.config.apostaMax)) {
       acoes.append(botao('botao', `Apostar ${valor}`, () => aoAgir({ tipo: 'apostar', valor }), {
         desabilitado: valor > eu.fichas,
         dataset: { acao: 'apostar', valor: String(valor) },

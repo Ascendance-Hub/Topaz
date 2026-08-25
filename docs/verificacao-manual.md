@@ -195,7 +195,9 @@ meio de uma sílaba fechada mede silêncio.
 
 A sonda fica desligada sem o parâmetro.
 
-- [ ] Falar acende o anel em volta do **seu** círculo
+- [ ] Falar acende o anel em volta do **seu** círculo, e ele **pulsa** —
+      é o pulso que o distingue das outras bordas douradas da tela
+      ("sou eu" na lista da sala, "é sua vez" na mesa, aba atual na navegação)
 - [ ] O anel do amigo acende quando ele fala, e não quando você fala
 - [ ] O anel **não pisca** nas pausas entre palavras de uma frase normal
 - [ ] Ficar calado apaga o anel em menos de um segundo
@@ -272,6 +274,12 @@ como mostrá-lo de novo, porque a chave guardada é não extraível de propósit
 - [ ] Em Ajustes, trocar a foto atualiza o círculo na fileira da call
 - [ ] Em tela larga o trilho é uma coluna à esquerda; em tela estreita vira
       faixa horizontal, sem estourar
+- [ ] Numa tela **grande** (1440px ou mais), os três itens do trilho ficam
+      juntos no topo, do tamanho do próprio texto — não espalhados pela altura
+- [ ] Numa tela grande com a sala vazia, o miolo fica **centrado**, não colado
+      no topo com um vão de feltro embaixo
+- [ ] Com a mesa aberta (conteúdo alto), o topo **não** fica cortado e a
+      rolagem alcança tudo
 
 ## Grupos
 
@@ -302,9 +310,16 @@ jogo — cada jogo terá o seu.
 - [ ] Marcar "Jogar até sobrar um" apaga o campo de alvo
 - [ ] Salvar com "até sobrar um" faz a partida seguir mesmo com alguém muito à
       frente; ela só acaba quando sobra um
-- [ ] Mudar as fichas iniciais **não** dá dinheiro a quem já está na sala
+- [ ] Com a **mesa parada**, mudar as fichas iniciais muda as fichas de todo
+      mundo na hora — e a partida começa com o valor novo
+- [ ] Com a partida **encerrada**, mudar as fichas **não** mexe no placar; o
+      valor novo entra em "Nova partida"
 - [ ] Quem entra depois recebe as fichas novas
-- [ ] "Nova partida" redistribui com o valor novo
+- [ ] Baixar a aposta máxima para 300 troca os botões para 25 / 100 / 300 —
+      nenhum botão de 500 sobra na tela
+- [ ] Subir a aposta máxima para 800 oferece um botão de 800
+- [ ] Todo botão de aposta que aparece **funciona** ao ser clicado
+- [ ] Ao terminar uma partida, dá para ajustar o formato **sem recarregar**
 - [ ] Mudar o tempo de jogada muda o ritmo da barra de prazo na mesa
 - [ ] O amigo vê a mudança sem recarregar
 

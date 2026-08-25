@@ -193,8 +193,28 @@ export function aplicar(
       // trocaria a regra com dinheiro na mesa — e quem estivesse na frente
       // pela regra antiga perderia sem ter feito nada errado.
       if (peerId !== estado.hostAtual) break
-      if (estado.fase !== 'aguardando') break
+      // `fim` conta como "entre partidas": a partida acabou, e é justamente
+      // ali que se ajusta o formato antes de recomeçar. Sem isto o anfitrião
+      // ficava preso até recarregar a página.
+      if (estado.fase !== 'aguardando' && estado.fase !== 'fim') break
+
+      const antes = estado.config
       estado.config = normalizarConfig(acao.config)
+
+      // Em `aguardando` ninguém tem ficha em jogo — todo mundo está com o
+      // valor inicial —, então mudar o valor inicial precisa valer AGORA.
+      // Sem isto, o anfitrião trocava para 3000, começava a partida e todos
+      // jogavam com 1000, sem nada dizer por quê.
+      //
+      // Em `fim` as fichas são o placar da partida que acabou: reescrevê-las
+      // apagaria o resultado antes de as pessoas verem. Lá o valor novo entra
+      // na redistribuição de `novaPartida`.
+      if (
+        estado.fase === 'aguardando'
+        && estado.config.fichasIniciais !== antes.fichasIniciais
+      ) {
+        for (const j of estado.jogadores) j.fichas = estado.config.fichasIniciais
+      }
       break
     }
 
