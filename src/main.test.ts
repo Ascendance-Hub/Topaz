@@ -11,7 +11,12 @@ vi.mock('./net/transport', () => ({
   // Sinalização saudável por padrão: estes testes são sobre a sala, não sobre
   // rede bloqueada, e zero relays mudaria a mensagem de falha.
   relaysConectados: vi.fn(() => 3),
-  relaysDetalhados: vi.fn(() => []),
+  // Como em produção: a lista existe sempre, e cada relay diz se o socket
+  // dele está aberto AGORA. Fora de uma sala não há socket nenhum — devolver
+  // `[]` aqui escondia justamente o caso que a home precisa tratar.
+  relaysDetalhados: vi.fn(() => Array.from({ length: 20 }, (_, i) => ({
+    url: `wss://relay-${i}.exemplo`, nome: `relay-${i}.exemplo`, conectado: i < 3,
+  }))),
 }))
 
 import { criarSalasTrystero, criarTransporte } from './net/transport'
@@ -723,5 +728,39 @@ describe('entrarNaSala — microfone negado não pode matar o botão', () => {
       desfazer()
       vi.useRealTimers()
     }
+  })
+})
+
+describe('iniciarApp — a home', () => {
+  it('mostra a apresentação e o caminho de entrar', () => {
+    const app = document.createElement('div')
+
+    iniciarApp(app)
+
+    expect(app.querySelector('.home')).not.toBeNull()
+    expect(app.querySelector('.lobby')).not.toBeNull()
+  })
+
+  it('oferece o teste de rede antes mesmo de entrar numa sala', () => {
+    // Quem recebeu um link e não consegue entrar nunca chega à sala para achar
+    // o teste lá dentro.
+    const app = document.createElement('div')
+
+    iniciarApp(app)
+
+    expect(app.querySelector('[data-teste="rodar"]')).not.toBeNull()
+  })
+
+  it('NÃO conta servidores de descoberta na home', () => {
+    // Na home ninguém entrou em sala, então nenhum socket está aberto e a
+    // contagem sairia "0 de 20" — que lê como falha catastrófica para quem
+    // acabou de abrir a página. A lista só significa alguma coisa dentro da
+    // sala, onde as conexões existem de verdade.
+    const app = document.createElement('div')
+
+    iniciarApp(app)
+
+    expect(app.querySelector('.teste-rede-relays-resumo')).toBeNull()
+    expect(app.textContent).not.toContain('Servidores de descoberta')
   })
 })
