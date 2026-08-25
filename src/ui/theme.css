@@ -1974,4 +1974,16 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   color: var(--creme-tenue);
   font-variant-numeric: tabular-nums;
 }
+
+/* Abrir um canal novo. Tracejado e sem contagem: ele não é um canal, é a ação
+   de criar um — e a borda tracejada é a mesma linguagem dos jogos "em breve",
+   que também são coisas que ainda não existem. */
+.canal-abrir {
+  border-style: dashed;
+  padding: 7px 13px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--creme-tenue);
+}
+.canal-abrir:hover { color: var(--topazio); border-color: var(--topazio); }
 .canal[data-aqui='1'] .canal-quantos { color: var(--topazio-claro); }

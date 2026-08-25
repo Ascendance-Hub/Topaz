@@ -5,9 +5,9 @@
  * a conexão. Por isso a troca é instantânea — e por isso dá para VER quem está
  * nos outros canais, que é metade do motivo de ser uma sala só.
  *
- * Todos os canais aparecem, inclusive os vazios: é o canal vazio que serve
- * para dois saírem de perto dos outros, e escondê-lo tiraria justamente o uso
- * principal da coisa.
+ * Só existem os canais que têm gente. Para sair de perto dos outros, o botão
+ * de abrir cria um: mostrar um "Canal 3 · vazio" descreveria uma coisa que
+ * existe e está sem ninguém, quando o que a pessoa quer é criar uma.
  */
 
 export interface CanalNaTela {
@@ -16,8 +16,14 @@ export interface CanalNaTela {
   pessoas: number
 }
 
+export interface AcoesDeCanal {
+  mudar: (id: string) => void
+  /** Só chega preenchida quando ainda há id livre. */
+  abrir?: (() => void) | undefined
+}
+
 export function renderizarCanais(
-  canais: CanalNaTela[], meuCanal: string, aoMudar: (id: string) => void,
+  canais: CanalNaTela[], meuCanal: string, acoes: AcoesDeCanal,
 ): HTMLElement {
   const area = document.createElement('nav')
   area.className = 'canais'
@@ -39,7 +45,7 @@ export function renderizarCanais(
     // Já estar aqui não desabilita: um botão apagado some da ordem de
     // tabulação, e a pessoa perde a referência de onde está ao navegar por
     // teclado. Clicar de novo simplesmente não faz nada.
-    item.onclick = () => aoMudar(canal.id)
+    item.onclick = () => acoes.mudar(canal.id)
 
     const nome = document.createElement('span')
     nome.className = 'canal-nome'
@@ -47,22 +53,34 @@ export function renderizarCanais(
 
     const quantos = document.createElement('span')
     quantos.className = 'canal-quantos'
-    // "vazio" em vez de "0": o zero convida a pessoa a ler um número, e o que
-    // ela precisa saber é se há alguém lá.
-    quantos.textContent = canal.pessoas === 0 ? 'vazio' : String(canal.pessoas)
+    // Sempre um número: um canal sem gente não existe, então zero nunca chega
+    // aqui.
+    quantos.textContent = String(canal.pessoas)
 
     item.append(nome, quantos)
     // O rótulo lido em voz alta precisa dizer as três coisas que a pílula diz
     // visualmente: qual canal, quantos, e se é onde eu estou.
-    const situacao = canal.pessoas === 0
-      ? 'ninguém'
-      : `${canal.pessoas} ${canal.pessoas === 1 ? 'pessoa' : 'pessoas'}`
+    const situacao = `${canal.pessoas} ${canal.pessoas === 1 ? 'pessoa' : 'pessoas'}`
     item.setAttribute(
       'aria-label',
       `${canal.nome} — ${situacao}${aqui ? ' — você está aqui' : ''}`,
     )
 
     area.append(item)
+  }
+
+  if (acoes.abrir) {
+    const abrir = document.createElement('button')
+    abrir.type = 'button'
+    abrir.className = 'canal canal-abrir'
+    abrir.dataset['canal'] = 'novo'
+    abrir.textContent = '+'
+    // O símbolo sozinho não diz o que acontece — e o que acontece é ir para
+    // lá, não só criar. Quem lê por leitor de tela precisa saber disso.
+    abrir.title = 'Abrir um canal novo e ir para ele'
+    abrir.setAttribute('aria-label', 'Abrir um canal novo e ir para ele')
+    abrir.onclick = () => acoes.abrir?.()
+    area.append(abrir)
   }
 
   return area

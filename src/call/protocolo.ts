@@ -20,10 +20,14 @@ export type MensagemCall =
  * para conversar sem atrapalhar". Canais com nome ficam registrados como
  * evolução possível.
  *
- * **Quantos aparecem não é um número fixo, é uma regra:** os que têm gente,
- * mais um vago. Um canal custa zero — é um campo de texto, não uma conexão —,
- * então o único limite real é espaço de tela: dez pílulas vazias numa call de
- * duas pessoas seriam ruído. Assim há sempre para onde ir e nunca sobra pílula.
+ * **Só existem os canais que têm gente.** Um canal custa zero — é um campo de
+ * texto, não uma conexão —, então nada impede sete deles; o que os cria é
+ * haver alguém em cada um. Quem quiser um novo abre; quando o último sai, ele
+ * deixa de existir.
+ *
+ * A alternativa que eu tinha feito era mostrar sempre um canal vazio de
+ * reserva. Ficava errado no nome: "Canal 3 · vazio" descreve uma coisa que
+ * existe e está sem ninguém, quando o que a pessoa quer é CRIAR uma.
  *
  * O teto de oito é backstop, não produto: uma sala com oito conversas
  * paralelas já não é uma sala.
@@ -70,8 +74,10 @@ export interface EstadoCall {
   naCall: string[]
   /** Quem está no MEU canal — é com essas pessoas que eu falo. */
   comigo: string[]
-  /** Quantas pessoas em cada canal, contando eu. */
+  /** Os canais que existem — os que têm gente. Contando eu no meu. */
   porCanal: { id: string; nome: string; pessoas: number }[]
+  /** Ainda há id livre para abrir mais um. */
+  podeAbrirCanal: boolean
   /** Quem compartilha tela NO MEU CANAL: de outro canal não se assiste. */
   compartilhando: string[]
   /** De quem eu pedi a tela. */
@@ -229,6 +235,21 @@ export class ProtocoloCall {
     this.notificar()
   }
 
+  /**
+   * Abre um canal novo e vai para ele.
+   *
+   * "Abrir" é ir para um id livre: o canal passa a existir porque alguém está
+   * nele. Quando o último sair, ele deixa de existir sozinho — não há o que
+   * apagar nem quem precise apagar.
+   */
+  abrirCanal(): void {
+    const comFiltro = (teste: (p: Peer) => boolean) =>
+      [...this.peers.entries()].filter(([, p]) => teste(p)).map(([id]) => id)
+    const livre = this.primeiroLivre(comFiltro)
+    if (livre === undefined) return
+    this.mudarCanal(livre)
+  }
+
   assistir(peerId: string): void {
     const peer = this.peers.get(peerId)
     if (!this.comigo(peer) || !peer?.compartilhando) return
@@ -255,6 +276,7 @@ export class ProtocoloCall {
       naCall: comFiltro((p) => p.naCall),
       comigo: comFiltro((p) => p.naCall && p.canal === this.meuCanal),
       porCanal: this.canaisVisiveis(comFiltro),
+      podeAbrirCanal: this.euNaCall && this.primeiroLivre(comFiltro) !== undefined,
       compartilhando: comFiltro(
         (p) => p.naCall && p.compartilhando && p.canal === this.meuCanal,
       ),
@@ -274,19 +296,38 @@ export class ProtocoloCall {
    * Todo mundo calcula isto a partir do MESMO estado, então a lista é a mesma
    * em todas as telas sem nada precisar ser combinado.
    */
-  private canaisVisiveis(
-    comFiltro: (teste: (p: Peer) => boolean) => string[],
-  ): { id: string; nome: string; pessoas: number }[] {
-    const quantos = (id: string): number =>
-      comFiltro((p) => p.naCall && p.canal === id).length
+  private quantosEm(
+    comFiltro: (teste: (p: Peer) => boolean) => string[], id: string,
+  ): number {
+    return comFiltro((p) => p.naCall && p.canal === id).length
       // Eu conto no meu: a lista descreve onde as pessoas estão, e eu sou uma
       // delas — ver "0" no canal em que se está seria absurdo.
       + (this.euNaCall && this.meuCanal === id ? 1 : 0)
+  }
 
-    const primeiroVago = CANAIS.find((c) => quantos(c.id) === 0)
+  private primeiroLivre(
+    comFiltro: (teste: (p: Peer) => boolean) => string[],
+  ): string | undefined {
+    return CANAIS.find((c) => this.quantosEm(comFiltro, c.id) === 0)?.id
+  }
+
+  /**
+   * Os canais que existem: os que têm gente.
+   *
+   * A ordem é sempre a de `CANAIS`, e não a de criação: um canal esvaziado no
+   * meio da fileira some, e se os outros escorregassem para preencher o buraco
+   * as pílulas trocariam de posição enquanto as pessoas andam — clicar num
+   * canal e acertar outro é o pior desfecho.
+   *
+   * Todo mundo calcula isto a partir do MESMO estado, então a lista é idêntica
+   * em todas as telas sem nada precisar ser combinado.
+   */
+  private canaisVisiveis(
+    comFiltro: (teste: (p: Peer) => boolean) => string[],
+  ): { id: string; nome: string; pessoas: number }[] {
     return CANAIS
-      .filter((c) => quantos(c.id) > 0 || c.id === primeiroVago?.id)
-      .map((c) => ({ id: c.id, nome: c.nome, pessoas: quantos(c.id) }))
+      .map((c) => ({ id: c.id, nome: c.nome, pessoas: this.quantosEm(comFiltro, c.id) }))
+      .filter((c) => c.pessoas > 0)
   }
 
   aoMudar(cb: () => void): void {

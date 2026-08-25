@@ -33,8 +33,8 @@ duas exceções marcadas 🕓, escritas em 2026-08-24 e ainda não vistas com ge
 - 🕓 **Canais de voz** — numa sala só. Cada pessoa anuncia em que
   canal está, e o microfone vai apenas para quem está no mesmo. Trocar é
   instantâneo, sem novo handshake, e dá para ver quem está nos outros. As telas
-  também são por canal: de outro canal não se assiste. Quantos aparecem não é
-  número fixo: os que têm gente, mais um vago.
+  também são por canal: de outro canal não se assiste. Só existem os canais que
+  têm gente — quem quiser um novo abre, e o último a sair o apaga sozinho.
 - 🕓 **Configuração da partida** — fichas iniciais, alvo, aposta máxima e tempo
   de jogada, escolhidos pelo anfitrião e só entre partidas. Moram na aba
   **Jogos**, na engrenagem do cartão do jogo: cada jogo terá o seu, e uma seção
@@ -240,8 +240,8 @@ Decisões que já valem:
   zero conexões. Grupos de fundo entram só no nostr, com menos relays.
 - **Canais de voz numa sala só**, com o canal indo no protocolo da call. Uma
   sala por canal exigiria novo handshake a cada troca.
-  ✅ Feito. A lista é fixa (oito ids), mas só aparecem os ocupados mais um
-  vago — um canal custa zero, e o único limite real é espaço de tela. Canais com nome escolhido exigiriam
+  ✅ Feito. Existem os canais que têm gente: um canal custa zero, então nada
+  limita o número além de haver alguém em cada um. Canais com nome escolhido exigiriam
   sincronizar nomes entre navegadores, resolver quem criou primeiro e limpar os
   vazios — fica como evolução possível.
 - **A barra lateral substitui o botão "Mesa"**, que pressupõe um jogo só.

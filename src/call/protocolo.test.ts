@@ -327,82 +327,109 @@ describe('telas e canais', () => {
   })
 })
 
-describe('quantos canais aparecem', () => {
+describe('abrir e fechar canais', () => {
   const OUTRO = CANAIS[1].id
   const ids = (p: ProtocoloCall) => p.estado().porCanal.map((c) => c.id)
 
-  it('sozinho na call: o meu e UM vago', () => {
-    // Um canal custa zero, mas dez pílulas vazias numa call de duas pessoas
-    // seriam ruído. A regra é "os que têm gente, mais um vago".
+  it('só existem os canais que têm gente', () => {
+    // "Canal 3 · vazio" descreveria uma coisa que existe e está sem ninguém,
+    // quando o que a pessoa quer é CRIAR uma.
     const { a } = doisPares()
     a.entrar()
-
-    expect(ids(a)).toEqual([CANAL_PADRAO, OUTRO])
-  })
-
-  it('a lista cresce conforme as pessoas se espalham', () => {
-    const rede = criarCanalFalso()
-    const a = new ProtocoloCall(rede.conectar('pa'))
-    const b = new ProtocoloCall(rede.conectar('pb'))
-    a.entrar()
-    b.entrar()
-
-    b.mudarCanal(OUTRO)
-
-    // Os dois ocupados, mais o terceiro vago.
-    expect(ids(a)).toHaveLength(3)
-    expect(ids(a)[2]).toBe(CANAIS[2].id)
-  })
-
-  it('e encolhe quando as pessoas voltam a se juntar', () => {
-    const rede = criarCanalFalso()
-    const a = new ProtocoloCall(rede.conectar('pa'))
-    const b = new ProtocoloCall(rede.conectar('pb'))
-    a.entrar()
-    b.entrar()
-    b.mudarCanal(OUTRO)
-
-    b.mudarCanal(CANAL_PADRAO)
-
-    expect(ids(a)).toEqual([CANAL_PADRAO, OUTRO])
-  })
-
-  it('o vago fica no LUGAR dele, não empurrado para o fim', () => {
-    // Saí do Principal, então ele é o vago — e continua sendo o primeiro da
-    // fileira. Se o vago fosse para o fim, as pílulas trocariam de posição
-    // conforme as pessoas andam, e clicar num canal acertaria outro.
-    const { a } = doisPares()
-    a.entrar()
-    a.mudarCanal(OUTRO)
-
-    expect(ids(a)).toEqual([CANAL_PADRAO, OUTRO])
-  })
-
-  it('um vago basta: o Principal vazio já serve de saída', () => {
-    // A regra é "os que têm gente, mais UM vago" — não "mais um sempre no
-    // fim". Com o Principal livre não há razão para abrir o terceiro.
-    const { a } = doisPares()
-    a.entrar()
-    a.mudarCanal(OUTRO)
-
-    expect(ids(a)).not.toContain(CANAIS[2].id)
-  })
-
-  it('fora da call, um canal só — não há para onde ir mesmo', () => {
-    const { a } = doisPares()
 
     expect(ids(a)).toEqual([CANAL_PADRAO])
   })
 
-  it('as duas pessoas veem exatamente a mesma lista', () => {
-    // Todo mundo calcula a partir do mesmo estado, então nada precisa ser
-    // combinado pela rede.
+  it('abrir um canal leva a pessoa para ele', () => {
     const rede = criarCanalFalso()
     const a = new ProtocoloCall(rede.conectar('pa'))
     const b = new ProtocoloCall(rede.conectar('pb'))
     a.entrar()
     b.entrar()
-    b.mudarCanal(CANAIS[2].id)
+
+    b.abrirCanal()
+
+    expect(b.estado().meuCanal).toBe(OUTRO)
+    expect(ids(a)).toEqual([CANAL_PADRAO, OUTRO])
+  })
+
+  it('o canal deixa de existir quando o último sai', () => {
+    const rede = criarCanalFalso()
+    const a = new ProtocoloCall(rede.conectar('pa'))
+    const b = new ProtocoloCall(rede.conectar('pb'))
+    a.entrar()
+    b.entrar()
+    b.abrirCanal()
+
+    b.mudarCanal(CANAL_PADRAO)
+
+    expect(ids(a)).toEqual([CANAL_PADRAO])
+  })
+
+  it('sair da call também esvazia o canal', () => {
+    const rede = criarCanalFalso()
+    const a = new ProtocoloCall(rede.conectar('pa'))
+    const b = new ProtocoloCall(rede.conectar('pb'))
+    a.entrar()
+    b.entrar()
+    b.abrirCanal()
+
+    b.sair()
+
+    expect(ids(a)).toEqual([CANAL_PADRAO])
+  })
+
+  it('dá para ter tantos canais quanta gente houver neles', () => {
+    // Nada limita o número: o que cria um canal é haver alguém nele.
+    const rede = criarCanalFalso()
+    const todos = ['pa', 'pb', 'pc', 'pd'].map((id) => new ProtocoloCall(rede.conectar(id)))
+    for (const p of todos) p.entrar()
+
+    for (const p of todos.slice(1)) p.abrirCanal()
+
+    expect(ids(todos[0]!)).toHaveLength(4)
+  })
+
+  it('a ordem não muda quando um canal do meio se esvazia', () => {
+    // Se os outros escorregassem para preencher o buraco, as pílulas
+    // trocariam de posição enquanto as pessoas andam.
+    const rede = criarCanalFalso()
+    const a = new ProtocoloCall(rede.conectar('pa'))
+    const b = new ProtocoloCall(rede.conectar('pb'))
+    const c = new ProtocoloCall(rede.conectar('pc'))
+    for (const p of [a, b, c]) p.entrar()
+    b.abrirCanal()
+    c.abrirCanal()
+    expect(ids(a)).toEqual([CANAL_PADRAO, CANAIS[1].id, CANAIS[2].id])
+
+    b.mudarCanal(CANAL_PADRAO)
+
+    expect(ids(a)).toEqual([CANAL_PADRAO, CANAIS[2].id])
+  })
+
+  it('fora da call não há canal nenhum nem como abrir', () => {
+    const { a } = doisPares()
+
+    expect(a.estado().porCanal).toEqual([])
+    expect(a.estado().podeAbrirCanal).toBe(false)
+  })
+
+  it('sem id livre, não dá para abrir mais', () => {
+    const rede = criarCanalFalso()
+    const todos = CANAIS.map((_, i) => new ProtocoloCall(rede.conectar(`p${i}`)))
+    for (const p of todos) p.entrar()
+    for (const p of todos.slice(1)) p.abrirCanal()
+
+    expect(todos[0]!.estado().podeAbrirCanal).toBe(false)
+  })
+
+  it('as duas pessoas veem exatamente a mesma lista', () => {
+    const rede = criarCanalFalso()
+    const a = new ProtocoloCall(rede.conectar('pa'))
+    const b = new ProtocoloCall(rede.conectar('pb'))
+    a.entrar()
+    b.entrar()
+    b.abrirCanal()
 
     expect(ids(a)).toEqual(ids(b))
   })

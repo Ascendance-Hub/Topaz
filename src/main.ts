@@ -426,7 +426,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   // desenho — a diferença fica no material, não na disposição.
   // Os canais ficam logo acima das pessoas: trocar de canal é trocar de quem
   // está ali, e as duas coisas precisam ser lidas juntas.
-  let canais = renderizarCanais([], CANAL_PADRAO, () => {})
+  let canais = renderizarCanais([], CANAL_PADRAO, { mudar: () => {} })
   let participantes = renderizarParticipantes([])
   /**
    * O que rola: o palco e as telas compartilhadas, juntos.
@@ -453,7 +453,12 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     const novosCanais = renderizarCanais(
       atual.euNaCall ? atual.porCanal : [],
       atual.meuCanal,
-      (id) => protocolo.mudarCanal(id),
+      {
+        mudar: (id: string) => protocolo.mudarCanal(id),
+        // O botão só existe quando há id livre: um "+" que não abre nada
+        // seria um botão que engana.
+        ...(atual.podeAbrirCanal ? { abrir: () => protocolo.abrirCanal() } : {}),
+      },
     )
     canais.replaceWith(novosCanais)
     canais = novosCanais

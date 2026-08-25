@@ -7,7 +7,7 @@ import { CANAL_PADRAO } from '../../call/protocolo'
 function estado(extras: Partial<EstadoCall> = {}): EstadoCall {
   return {
     euNaCall: false, euCompartilhando: false, naCall: [],
-    meuCanal: CANAL_PADRAO, comigo: [], porCanal: [],
+    meuCanal: CANAL_PADRAO, comigo: [], porCanal: [], podeAbrirCanal: false,
     compartilhando: [], assistindo: [], assistidoPor: [], ...extras,
   }
 }

@@ -833,7 +833,8 @@ describe('entrarNaSala — canais de voz', () => {
     }
   })
 
-  it('na call, os canais aparecem e dá para trocar', async () => {
+  it('na call aparece o meu canal, e mais nenhum vazio', async () => {
+    // Um canal sem gente não existe: para sair de perto dos outros, abre-se um.
     vi.useFakeTimers()
     const desfazer = semMicrofone()
     try {
@@ -841,15 +842,33 @@ describe('entrarNaSala — canais de voz', () => {
       app.querySelector<HTMLButtonElement>('[data-call="entrar"]')!.click()
       await escoar()
 
+      expect(app.querySelectorAll('[data-canal]:not([data-canal="novo"])'))
+        .toHaveLength(1)
       expect(app.querySelector('[data-canal="principal"]')!
         .getAttribute('aria-current')).toBe('true')
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
 
-      app.querySelector<HTMLButtonElement>('[data-canal="segundo"]')!.click()
+  it('abrir um canal novo leva a pessoa para ele', async () => {
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+      app.querySelector<HTMLButtonElement>('[data-call="entrar"]')!.click()
+      await escoar()
 
-      expect(app.querySelector('[data-canal="segundo"]')!
-        .getAttribute('aria-current')).toBe('true')
-      expect(app.querySelector('[data-canal="principal"]')!
-        .getAttribute('aria-current')).toBeNull()
+      app.querySelector<HTMLButtonElement>('[data-canal="novo"]')!.click()
+
+      // Sozinho na call, o canal antigo se esvazia e some — sobra o novo, com
+      // a pessoa dentro.
+      const pilulas = [...app.querySelectorAll('[data-canal]')]
+        .filter((b) => b.getAttribute('data-canal') !== 'novo')
+      expect(pilulas).toHaveLength(1)
+      expect(pilulas[0]!.getAttribute('data-canal')).not.toBe('principal')
+      expect(pilulas[0]!.getAttribute('aria-current')).toBe('true')
     } finally {
       desfazer()
       vi.useRealTimers()
