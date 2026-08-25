@@ -200,6 +200,11 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   letter-spacing: 0.14em;
   font-weight: 600;
   color: var(--topazio);
+  /* O código tem hífens, e hífen é ponto de quebra natural: sem isto ele parte
+     no meio (`K7X2-QW9F-` numa linha, `M3PR-TVN4` na outra) justamente no
+     texto que alguém está lendo em voz alta para o amigo. A barra é
+     `flex-wrap`, então o que acontece é o código inteiro descer de linha. */
+  white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------------------

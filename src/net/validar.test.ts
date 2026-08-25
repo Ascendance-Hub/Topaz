@@ -5,6 +5,17 @@ import { rngSemente } from '../game/shoe'
 
 const estadoReal = () => criarContexto('pa', rngSemente(1)).estado
 
+const maoReal = () => ({
+  id: 'm1', cartas: [{ naipe: 'copas', valor: 'A' }], aposta: 10,
+  dobrada: false, vindaDeSplit: false, encerrada: false,
+})
+
+const jogadorReal = () => ({
+  peerId: 'pa', apelido: 'Alex', cadeira: 0, fichas: 1000, maos: [],
+  maoAtiva: 0, seguro: 0, rodadasInativo: 0, desconectadoEm: null,
+  decidiuSeguro: false, eliminadoEm: null,
+})
+
 describe('ehEstadoPlausivel', () => {
   it('aceita um estado de verdade, saído da própria máquina do jogo', () => {
     // O teste que impede o guarda de virar rígido demais e recusar a mesa
@@ -66,5 +77,66 @@ describe('textoLimitado', () => {
     expect(textoLimitado(null, 200)).toBe('')
     expect(textoLimitado({ toString: () => 'oi' }, 200)).toBe('')
     expect(textoLimitado(123, 200)).toBe('')
+  })
+})
+
+describe('ehEstadoPlausivel — profundidade', () => {
+  /**
+   * `Array.isArray(jogadores)` não basta. `mesa.ts` faz `jogador.maos.forEach`
+   * e `mao.cartas` logo em seguida: um item vazio dentro de uma lista
+   * bem-formada lança no meio do desenho e apaga a página de quem recebeu —
+   * exatamente o que este guarda existe para impedir.
+   */
+  it('recusa jogador sem as listas que o desenho percorre', () => {
+    expect(ehEstadoPlausivel({ ...estadoReal(), jogadores: [{}] })).toBe(false)
+    expect(ehEstadoPlausivel({ ...estadoReal(), jogadores: [null] })).toBe(false)
+  })
+
+  it('recusa jogador com peerId que não é texto', () => {
+    const jogador = { ...jogadorReal(), peerId: 7 }
+    expect(ehEstadoPlausivel({ ...estadoReal(), jogadores: [jogador] })).toBe(false)
+  })
+
+  it('recusa mão sem cartas', () => {
+    const jogador = { ...jogadorReal(), maos: [{ id: 'm1', aposta: 10 }] }
+    expect(ehEstadoPlausivel({ ...estadoReal(), jogadores: [jogador] })).toBe(false)
+  })
+
+  it('recusa carta nula, que lança ao ler o naipe', () => {
+    const jogador = { ...jogadorReal(), maos: [{ ...maoReal(), cartas: [null] }] }
+    expect(ehEstadoPlausivel({ ...estadoReal(), jogadores: [jogador] })).toBe(false)
+    expect(ehEstadoPlausivel({ ...estadoReal(), maoDealer: [null] })).toBe(false)
+  })
+
+  it('aceita uma mesa de verdade, com jogador, mão e cartas', () => {
+    // O contrapeso: um guarda fundo demais recusa a mesa legítima, e a falha
+    // só aparece com duas pessoas jogando de verdade.
+    const jogador = { ...jogadorReal(), maos: [maoReal()] }
+    const estado = { ...estadoReal(), jogadores: [jogador], maoDealer: maoReal().cartas }
+    expect(ehEstadoPlausivel(estado)).toBe(true)
+  })
+})
+
+describe('ehEstadoPlausivel — tamanho das listas de dentro', () => {
+  // Limitar só a lista de jogadores não fecha o buraco: um milhão de cartas
+  // na mão do dealer trava o navegador de quem recebe do mesmo jeito.
+  const muitas = (n: number) => Array.from({ length: n }, () => ({ naipe: 'copas', valor: 'A' }))
+
+  it('recusa mão do dealer com mais cartas do que existe no sapato', () => {
+    expect(ehEstadoPlausivel({ ...estadoReal(), maoDealer: muitas(100_000) })).toBe(false)
+  })
+
+  it('recusa mão de jogador com cartas demais', () => {
+    const jogador = { ...jogadorReal(), maos: [{ ...maoReal(), cartas: muitas(100_000) }] }
+    expect(ehEstadoPlausivel({ ...estadoReal(), jogadores: [jogador] })).toBe(false)
+  })
+
+  it('recusa jogador com mãos demais', () => {
+    const jogador = { ...jogadorReal(), maos: Array.from({ length: 5000 }, maoReal) }
+    expect(ehEstadoPlausivel({ ...estadoReal(), jogadores: [jogador] })).toBe(false)
+  })
+
+  it('aceita o sapato inteiro na mesa, que é o pior caso legítimo', () => {
+    expect(ehEstadoPlausivel({ ...estadoReal(), maoDealer: muitas(21) })).toBe(true)
   })
 })

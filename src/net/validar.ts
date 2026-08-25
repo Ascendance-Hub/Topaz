@@ -30,10 +30,46 @@ const MAX_RODADA = 1_000_000
  *  ataque ou defeito, e desenhá-la trava o navegador. */
 const MAX_JOGADORES = 64
 
-const ehLista = (valor: unknown): boolean => Array.isArray(valor)
+/** Um sapato de 6 baralhos tem 312 cartas; nenhuma mão chega perto. O teto
+ *  existe porque desenhar cem mil cartas trava o navegador de quem recebe —
+ *  limitar só a lista de jogadores não fecha esse buraco. */
+const MAX_CARTAS = 512
+
+/** Splits sucessivos, com folga. */
+const MAX_MAOS = 16
 
 const ehInteiroEntre = (valor: unknown, minimo: number, maximo: number): boolean =>
   typeof valor === 'number' && Number.isInteger(valor) && valor >= minimo && valor <= maximo
+
+const ehObjeto = (valor: unknown): valor is Record<string, unknown> =>
+  typeof valor === 'object' && valor !== null
+
+/**
+ * `Array.isArray` na lista de fora não basta: o desenho percorre o que está
+ * DENTRO. `mesa.ts` faz `jogador.maos.forEach(...)` e lê `mao.cartas` logo
+ * depois, então um item vazio numa lista bem-formada lança no meio do
+ * desenho — que é exatamente o caso que este arquivo existe para impedir.
+ *
+ * A validação vai só até onde o desenho vai: as listas percorridas e as
+ * chaves lidas sem verificação. Ir mais fundo recusaria mesa legítima na
+ * primeira mudança do jogo, e essa falha só apareceria com gente jogando.
+ */
+const ehListaDe = (
+  valor: unknown, maximo: number, item: (x: unknown) => boolean,
+): boolean =>
+  // O teto vem ANTES do `every`: numa lista absurda, percorrer para validar já
+  // é o próprio travamento.
+  Array.isArray(valor) && valor.length <= maximo && valor.every(item)
+
+const ehCarta = (valor: unknown): boolean => ehObjeto(valor)
+
+const ehMao = (valor: unknown): boolean =>
+  ehObjeto(valor) && ehListaDe(valor['cartas'], MAX_CARTAS, ehCarta)
+
+const ehJogador = (valor: unknown): boolean =>
+  ehObjeto(valor) &&
+  typeof valor['peerId'] === 'string' &&
+  ehListaDe(valor['maos'], MAX_MAOS, ehMao)
 
 /**
  * Se o objeto tem a FORMA de um estado de jogo — não se ele é verdadeiro.
@@ -46,9 +82,8 @@ export function ehEstadoPlausivel(valor: unknown): valor is EstadoJogo {
   if (typeof e['hostAtual'] !== 'string') return false
   if (!FASES.includes(e['fase'] as Fase)) return false
   if (!ehInteiroEntre(e['rodada'], 0, MAX_RODADA)) return false
-  if (!ehLista(e['jogadores'])) return false
-  if ((e['jogadores'] as unknown[]).length > MAX_JOGADORES) return false
-  if (!ehLista(e['maoDealer'])) return false
+  if (!ehListaDe(e['jogadores'], MAX_JOGADORES, ehJogador)) return false
+  if (!ehListaDe(e['maoDealer'], MAX_CARTAS, ehCarta)) return false
   return true
 }
 
