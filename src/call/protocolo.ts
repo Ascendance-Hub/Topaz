@@ -4,8 +4,40 @@
  * conserta sozinha no próximo reenvio — não há sequência para dessincronizar.
  */
 export type MensagemCall =
-  | { tipo: 'estado'; naCall: boolean; compartilhando: boolean }
+  | { tipo: 'estado'; naCall: boolean; compartilhando: boolean; canal: string }
   | { tipo: 'quero-tela'; quero: boolean }
+
+/**
+ * Os canais de voz da sala.
+ *
+ * Uma sala só, e cada pessoa anuncia em que canal está — o microfone vai
+ * apenas para quem está no mesmo. Uma sala do Trystero por canal seria pior em
+ * tudo: novo handshake a cada troca, e ninguém enxergaria quem está nos outros.
+ *
+ * A lista é FIXA e não viaja pela rede. Deixar criar canais exigiria
+ * sincronizar nomes entre navegadores, resolver quem criou primeiro e limpar
+ * os vazios — muita máquina para um grupo de amigos que precisa de "um canto
+ * para conversar sem atrapalhar". Canais com nome ficam registrados como
+ * evolução possível.
+ */
+export const CANAIS = [
+  { id: 'principal', nome: 'Principal' },
+  { id: 'segundo', nome: 'Canal 2' },
+  { id: 'terceiro', nome: 'Canal 3' },
+] as const
+
+export const CANAL_PADRAO = CANAIS[0].id
+
+/**
+ * Um canal que não conhecemos vira o padrão.
+ *
+ * Vem da rede: uma versão futura com mais canais, ou um cliente modificado.
+ * Jogar a pessoa no principal a mantém visível e audível — descartá-la a
+ * deixaria num canal fantasma, presente para si mesma e invisível para todos.
+ */
+export function canalConhecido(bruto: unknown): string {
+  return CANAIS.some((c) => c.id === bruto) ? (bruto as string) : CANAL_PADRAO
+}
 
 export interface CanalCall {
   meuId(): string
@@ -19,7 +51,15 @@ export interface CanalCall {
 export interface EstadoCall {
   euNaCall: boolean
   euCompartilhando: boolean
+  /** Em que canal eu estou. */
+  meuCanal: string
+  /** Todo mundo na call, em qualquer canal. Serve à contagem por canal. */
   naCall: string[]
+  /** Quem está no MEU canal — é com essas pessoas que eu falo. */
+  comigo: string[]
+  /** Quantas pessoas em cada canal, contando eu. */
+  porCanal: { id: string; nome: string; pessoas: number }[]
+  /** Quem compartilha tela NO MEU CANAL: de outro canal não se assiste. */
   compartilhando: string[]
   /** De quem eu pedi a tela. */
   assistindo: string[]
@@ -30,6 +70,7 @@ export interface EstadoCall {
 interface Peer {
   naCall: boolean
   compartilhando: boolean
+  canal: string
 }
 
 /**
@@ -41,6 +82,7 @@ interface Peer {
 export class ProtocoloCall {
   private euNaCall = false
   private euCompartilhando = false
+  private meuCanal: string = CANAL_PADRAO
   private peers = new Map<string, Peer>()
   private assistindo = new Set<string>()
   private assistidoPor = new Set<string>()
@@ -75,23 +117,53 @@ export class ProtocoloCall {
     // Retrato idêntico ao que eu já tinha não é mudança. Sem este descarte, a
     // tela se redesenharia a cada peer que entra na sala, porque cada entrada
     // faz todo mundo reanunciar.
+    const canal = canalConhecido(msg.canal)
     const anterior = this.peers.get(de)
-    if (anterior?.naCall === msg.naCall && anterior?.compartilhando === msg.compartilhando) {
+    if (
+      anterior?.naCall === msg.naCall
+      && anterior.compartilhando === msg.compartilhando
+      && anterior.canal === canal
+    ) {
       return
     }
-    this.peers.set(de, { naCall: msg.naCall, compartilhando: msg.compartilhando })
+    this.peers.set(de, { naCall: msg.naCall, compartilhando: msg.compartilhando, canal })
 
-    // Quem parou de compartilhar (ou saiu da call) deixa de ser assistido sem
-    // que ninguém precise pedir: a tela dele não existe mais.
-    if (!msg.compartilhando || !msg.naCall) this.assistindo.delete(de)
+    // Quem parou de compartilhar, saiu da call OU foi para outro canal deixa
+    // de ser assistido sem ninguém precisar pedir: a tela dele não está mais
+    // ao alcance.
+    this.reconciliarTelas()
     this.notificar()
   }
 
   private anunciar(para?: string): void {
-    this.canal.enviar(
-      { tipo: 'estado', naCall: this.euNaCall, compartilhando: this.euCompartilhando },
-      para,
-    )
+    this.canal.enviar({
+      tipo: 'estado',
+      naCall: this.euNaCall,
+      compartilhando: this.euCompartilhando,
+      canal: this.meuCanal,
+    }, para)
+  }
+
+  /** Está ao alcance da minha voz e da minha tela? */
+  private comigo(peer: Peer | undefined): boolean {
+    return peer !== undefined && peer.naCall && peer.canal === this.meuCanal
+  }
+
+  /**
+   * Deixa de assistir — e de ser assistido por — quem saiu do meu alcance.
+   *
+   * Reconciliação e não detecção de borda, como no resto da mídia: quem trocou
+   * de canal, parou de compartilhar ou saiu da call some daqui pela MESMA
+   * regra, e rodar duas vezes tem o mesmo efeito de rodar uma.
+   */
+  private reconciliarTelas(): void {
+    for (const id of [...this.assistindo]) {
+      const peer = this.peers.get(id)
+      if (!this.comigo(peer) || !peer?.compartilhando) this.assistindo.delete(id)
+    }
+    for (const id of [...this.assistidoPor]) {
+      if (!this.comigo(this.peers.get(id))) this.assistidoPor.delete(id)
+    }
   }
 
   private notificar(): void {
@@ -125,9 +197,28 @@ export class ProtocoloCall {
     this.notificar()
   }
 
+  /**
+   * Muda de canal.
+   *
+   * Não há handshake novo: a conexão com todo mundo da sala continua de pé, e
+   * o que muda é para quem o microfone é publicado. Por isso trocar é
+   * instantâneo, e por isso dá para ver quem está nos outros canais.
+   */
+  mudarCanal(canal: string): void {
+    const destino = canalConhecido(canal)
+    if (destino === this.meuCanal) return
+    this.meuCanal = destino
+    // As telas do canal antigo ficam para trás — inclusive a minha, para quem
+    // ficou lá. Sem isto, alguém continuaria recebendo a minha tela de um
+    // canal em que não estou mais.
+    this.reconciliarTelas()
+    this.anunciar()
+    this.notificar()
+  }
+
   assistir(peerId: string): void {
     const peer = this.peers.get(peerId)
-    if (!peer?.compartilhando || !peer.naCall) return
+    if (!this.comigo(peer) || !peer?.compartilhando) return
     if (this.assistindo.has(peerId)) return
     this.assistindo.add(peerId)
     this.canal.enviar({ tipo: 'quero-tela', quero: true }, peerId)
@@ -147,8 +238,20 @@ export class ProtocoloCall {
     return {
       euNaCall: this.euNaCall,
       euCompartilhando: this.euCompartilhando,
+      meuCanal: this.meuCanal,
       naCall: comFiltro((p) => p.naCall),
-      compartilhando: comFiltro((p) => p.naCall && p.compartilhando),
+      comigo: comFiltro((p) => p.naCall && p.canal === this.meuCanal),
+      porCanal: CANAIS.map((c) => ({
+        id: c.id,
+        nome: c.nome,
+        // Eu conto no meu: a lista descreve onde as pessoas estão, e eu sou
+        // uma delas — ver "0" no canal em que se está seria absurdo.
+        pessoas: comFiltro((p) => p.naCall && p.canal === c.id).length
+          + (this.euNaCall && this.meuCanal === c.id ? 1 : 0),
+      })),
+      compartilhando: comFiltro(
+        (p) => p.naCall && p.compartilhando && p.canal === this.meuCanal,
+      ),
       assistindo: [...this.assistindo],
       assistidoPor: [...this.assistidoPor],
     }

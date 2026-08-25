@@ -26,6 +26,8 @@ import { renderizarMixer } from './ui/components/mixer'
 import { AreaDeMidia } from './ui/area-midia'
 import { criarAcoesCall } from './ui/acoes-da-call'
 import { EU, montarParticipantes, renderizarParticipantes } from './ui/components/participantes'
+import { renderizarCanais } from './ui/components/canais'
+import { CANAL_PADRAO } from './call/protocolo'
 import { fotoLembrada, fotoRecebida } from './perfil/foto-navegador'
 import { renderizarIdentidade } from './ui/components/identidade'
 import { entrarComSegredo, identidadeAtual, sairDaIdentidade } from './identidade/atual'
@@ -291,7 +293,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     const atual = protocolo.estado()
     return montarParticipantes({
       euNaCall: atual.euNaCall,
-      naCall: atual.naCall,
+      naCall: atual.comigo,
       meuApelido: apelido,
       minhaFoto: fotoLembrada() ?? undefined,
       meuMicrofoneMudo: midia.microfoneMudo(),
@@ -353,14 +355,17 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    */
   function sincronizarMidia(): void {
     const atual = protocolo.estado()
-    midia.sincronizarMicrofone(atual.naCall)
+    // `comigo` e não `naCall`: o microfone vai só para quem está no MEU
+    // canal. É esta linha que faz dois grupos conversarem na mesma sala sem se
+    // atrapalhar — e ela sozinha, porque a conexão com todos continua de pé.
+    midia.sincronizarMicrofone(atual.comigo)
     // A assinatura vira efeito: sem espectador nenhum, a `Midia` despublica do
     // último e o codificador desliga — que é o ponto de todo o desenho.
     midia.sincronizarTela(atual.assistidoPor)
 
     area.ajustar(atual.assistindo, atual.compartilhando)
     area.previaDaMinhaTela(atual.euCompartilhando ? midia.telaLocal() : null)
-    sincronizarMedidorDeVoz(atual.naCall, atual.euNaCall)
+    sincronizarMedidorDeVoz(atual.comigo, atual.euNaCall)
   }
 
   /**
@@ -419,6 +424,9 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   // A fileira de pessoas fica logo acima da barra de controles: é onde
   // qualquer aplicativo de call põe, e essa é a metade convencional do
   // desenho — a diferença fica no material, não na disposição.
+  // Os canais ficam logo acima das pessoas: trocar de canal é trocar de quem
+  // está ali, e as duas coisas precisam ser lidas juntas.
+  let canais = renderizarCanais([], CANAL_PADRAO, () => {})
   let participantes = renderizarParticipantes([])
   /**
    * O que rola: o palco e as telas compartilhadas, juntos.
@@ -432,11 +440,24 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   conteudo.className = 'conteudo'
   conteudo.append(palco, area.videos)
 
-  app.replaceChildren(barra, nav, conteudo, participantes, controles, lateral, area.audios)
+  app.replaceChildren(
+    barra, nav, conteudo, canais, participantes, controles, lateral, area.audios,
+  )
 
   /** Só a fileira, sem redesenhar o resto. Chamada a cada mudança de quem
    *  está falando, que acontece muitas vezes por minuto. */
   function desenharParticipantes(): void {
+    const atual = protocolo.estado()
+    // A lista de canais só existe dentro da call: fora dela não há para onde
+    // ir, e uma fileira de pílulas mortas seria só ruído.
+    const novosCanais = renderizarCanais(
+      atual.euNaCall ? atual.porCanal : [],
+      atual.meuCanal,
+      (id) => protocolo.mudarCanal(id),
+    )
+    canais.replaceWith(novosCanais)
+    canais = novosCanais
+
     const nova = renderizarParticipantes(participantesAgora())
     participantes.replaceWith(nova)
     participantes = nova

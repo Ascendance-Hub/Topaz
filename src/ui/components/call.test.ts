@@ -2,10 +2,12 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderizarControlesCall } from './call'
 import type { EstadoCall } from '../../call/protocolo'
+import { CANAL_PADRAO } from '../../call/protocolo'
 
 function estado(extras: Partial<EstadoCall> = {}): EstadoCall {
   return {
     euNaCall: false, euCompartilhando: false, naCall: [],
+    meuCanal: CANAL_PADRAO, comigo: [], porCanal: [],
     compartilhando: [], assistindo: [], assistidoPor: [], ...extras,
   }
 }
@@ -51,9 +53,12 @@ describe('controles da call', () => {
     expect(a.sair).toHaveBeenCalled()
   })
 
-  it('mostra quantas pessoas estão na call, contando você', () => {
+  it('conta quem está NO MEU CANAL, contando você', () => {
+    // O número descreve a conversa de que eu faço parte. Quem está noutro
+    // canal continua na sala, e aparece na lista de canais.
     const controles = renderizarControlesCall(
-      estado({ euNaCall: true, naCall: ['pa', 'pb'] }), acoes())
+      estado({ euNaCall: true, naCall: ['pa', 'pb', 'pc'], comigo: ['pa', 'pb'] }),
+      acoes())
 
     expect(controles.querySelector('.call-contagem')!.textContent).toContain('3')
   })

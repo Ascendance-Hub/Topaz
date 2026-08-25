@@ -781,3 +781,78 @@ describe('iniciarApp — a home', () => {
     expect(app.textContent).not.toContain('Servidores de descoberta')
   })
 })
+
+describe('entrarNaSala — canais de voz', () => {
+  function semMicrofone(): () => void {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices')
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: () =>
+          Promise.reject(Object.assign(new Error('x'), { name: 'NotAllowedError' })),
+        enumerateDevices: () => Promise.resolve([]),
+        addEventListener: () => {},
+      },
+    })
+    return () => {
+      if (original) Object.defineProperty(navigator, 'mediaDevices', original)
+      else Reflect.deleteProperty(navigator as unknown as object, 'mediaDevices')
+    }
+  }
+
+  async function escoar(): Promise<void> {
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+  }
+
+  function sala() {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
+    outraAba.entrar('Alex')
+    vi.mocked(criarSalasTrystero).mockImplementation(() => salaFalsa())
+    vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
+    const app = document.createElement('div')
+    entrarNaSala(app, 'Bruno', 'CODIGO01')
+    rede.bombear()
+    vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+    outraAba.tique(Date.now())
+    return app
+  }
+
+  it('fora da call não há lista de canais', async () => {
+    // Fora dela não há para onde ir, e uma fileira de pílulas mortas seria
+    // só ruído.
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+
+      expect(app.querySelector('[data-canal]')).toBeNull()
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+
+  it('na call, os canais aparecem e dá para trocar', async () => {
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+      app.querySelector<HTMLButtonElement>('[data-call="entrar"]')!.click()
+      await escoar()
+
+      expect(app.querySelector('[data-canal="principal"]')!
+        .getAttribute('aria-current')).toBe('true')
+
+      app.querySelector<HTMLButtonElement>('[data-canal="segundo"]')!.click()
+
+      expect(app.querySelector('[data-canal="segundo"]')!
+        .getAttribute('aria-current')).toBe('true')
+      expect(app.querySelector('[data-canal="principal"]')!
+        .getAttribute('aria-current')).toBeNull()
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+})

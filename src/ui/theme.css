@@ -147,8 +147,8 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   #app:has(.trilho) {
     display: grid;
     grid-template-columns: 132px minmax(0, 1fr);
-    /* barra · miolo que rola · pessoas · controles */
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    /* barra · miolo que rola · canais · pessoas · controles */
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
     column-gap: 28px;
     height: 100dvh;
     max-width: 1440px;
@@ -179,8 +179,9 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 
   #app:has(.trilho) .barra-sala { grid-column: 2; grid-row: 1; }
   #app:has(.trilho) .conteudo { grid-column: 2; grid-row: 2; }
-  #app:has(.trilho) .participantes { grid-column: 2; grid-row: 3; }
-  #app:has(.trilho) .call-controles { grid-column: 2; grid-row: 4; }
+  #app:has(.trilho) .canais { grid-column: 2; grid-row: 3; }
+  #app:has(.trilho) .participantes { grid-column: 2; grid-row: 4; }
+  #app:has(.trilho) .call-controles { grid-column: 2; grid-row: 5; }
   /* Elementos de áudio não desenham nada; vão para a mesma célula da barra
      para não abrirem uma linha só deles. */
   #app:has(.trilho) .call-audios { grid-column: 2; grid-row: 1; }
@@ -1921,3 +1922,56 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 .config-partida [data-partida='sugestao'] {
   color: var(--latao);
 }
+
+/* ---------------------------------------------------------------------------
+   CANAIS DE VOZ
+   ---------------------------------------------------------------------------
+   Uma fileira de pílulas logo acima das pessoas: trocar de canal é trocar de
+   quem está ali, e as duas coisas precisam ser lidas juntas.
+
+   Pílula e não lista vertical como no Discord: lá o trilho de canais é a
+   navegação principal do aplicativo. Aqui a navegação já é o trilho da sala, e
+   uma segunda coluna vertical brigaria com ela pela mesma leitura.
+   ------------------------------------------------------------------------ */
+.canais {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 16px auto 0;
+  max-width: 940px;
+}
+.canais:empty { margin: 0; }
+
+.canal {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--latao-fraco);
+  background: transparent;
+  color: var(--creme-fraco);
+  font-family: var(--corpo);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: color 160ms var(--easing), border-color 160ms var(--easing),
+    background 160ms var(--easing);
+}
+.canal:hover { color: var(--creme); border-color: var(--latao); }
+
+/* Onde eu estou. O preenchimento é discreto de propósito: o topázio cheio já é
+   do anel de quem fala, e duas coisas gritando em topázio na mesma tela fazem
+   as duas perderem o sentido. */
+.canal[data-aqui='1'] {
+  color: var(--topazio);
+  border-color: var(--topazio);
+  background: rgba(240, 179, 74, 0.08);
+}
+
+.canal-quantos {
+  font-size: 11px;
+  color: var(--creme-tenue);
+  font-variant-numeric: tabular-nums;
+}
+.canal[data-aqui='1'] .canal-quantos { color: var(--topazio-claro); }

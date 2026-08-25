@@ -328,6 +328,29 @@ jogo — cada jogo terá o seu.
 - [ ] Com o padrão novo (alvo 2500), apostar 500 e ganhar a primeira mão
       **não** encerra mais a partida
 
+## Canais de voz
+
+Precisa de duas pessoas (ou duas abas com fones, para não haver microfonia).
+
+- [ ] Fora da call **não** aparece lista de canais
+- [ ] Na call aparecem os três, com a contagem de cada um
+- [ ] O canal em que você está fica marcado
+- [ ] Canal vazio aparece como "vazio", e dá para entrar nele
+- [ ] Você e o amigo no mesmo canal: vocês se ouvem
+- [ ] Ele troca de canal: **vocês param de se ouvir na hora**
+- [ ] Ele continua visível na contagem do outro canal — não some da sala
+- [ ] Voltar ao mesmo canal devolve o áudio, **sem recarregar**
+- [ ] A contagem "N no canal" conta quem está com você, não a sala toda
+- [ ] O chat continua sendo da SALA — todo mundo lê, em qualquer canal
+
+**Telas por canal:**
+
+- [ ] Compartilhando no canal 1, quem está no canal 2 **não** vê botão de
+      assistir
+- [ ] Assistindo alguém e ele trocando de canal: a tela some
+- [ ] Você compartilhando e trocando de canal: quem assistia para de receber —
+      confira que o aviso "ninguém está assistindo" volta
+
 ## Teste de rede
 
 Aparece para quem está sozinho na sala ou não conseguiu conectar — que é
