@@ -9,6 +9,7 @@ interface No {
   aoSair: ((peerId: string) => void)[]
   aoMensagem: ((texto: string, peerId: string) => void)[]
   aoFoto: ((foto: unknown, peerId: string) => void)[]
+  aoIdentidade: ((mensagem: unknown, peerId: string) => void)[]
 }
 
 export interface OpcoesRedeFalsa {
@@ -62,7 +63,7 @@ export function criarRedeFalsa(opcoes: OpcoesRedeFalsa = {}) {
 
   function conectar(id: string): Transporte {
     const no: No = {
-      id, aoAcao: [], aoEstado: [], aoEntrar: [], aoSair: [], aoMensagem: [], aoFoto: [],
+      id, aoAcao: [], aoEstado: [], aoEntrar: [], aoSair: [], aoMensagem: [], aoFoto: [], aoIdentidade: [],
     }
 
     // Insere primeiro, depois avisa — assim `peers()` já enxerga o novo
@@ -112,6 +113,15 @@ export function criarRedeFalsa(opcoes: OpcoesRedeFalsa = {}) {
       },
       aoReceberFoto: (cb) => {
         no.aoFoto.push(cb)
+      },
+      enviarIdentidade: (mensagem, para) => {
+        for (const outro of destinatarios()) {
+          if (para !== undefined && outro.id !== para) continue
+          for (const cb of outro.aoIdentidade) cb(mensagem, id)
+        }
+      },
+      aoReceberIdentidade: (cb) => {
+        no.aoIdentidade.push(cb)
       },
       aoEntrarPeer: (cb) => {
         no.aoEntrar.push(cb)

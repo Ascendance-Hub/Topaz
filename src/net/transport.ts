@@ -77,6 +77,16 @@ export interface Transporte {
    */
   enviarFoto(foto: string): void
   aoReceberFoto(cb: (foto: unknown, peerId: string) => void): void
+  /**
+   * A troca de identidade: `{ tipo: 'ola' }` com a chave pública e um desafio
+   * sorteado, e `{ tipo: 'prova' }` com a assinatura daquele desafio.
+   *
+   * Canal próprio para que a prova não dependa do jogo nem da call — ela
+   * precisa acontecer com quem entrou na sala, jogando ou não. E entregue como
+   * `unknown`: quem valida é quem consome.
+   */
+  enviarIdentidade(mensagem: unknown, para?: string): void
+  aoReceberIdentidade(cb: (mensagem: unknown, peerId: string) => void): void
   aoEntrarPeer(cb: (peerId: string) => void): void
   aoSairPeer(cb: (peerId: string) => void): void
   sair(): void
@@ -170,8 +180,10 @@ export function criarTransporte(salas: Salas): Transporte {
   const estadoAction = salas.criarAcao<EstadoJogo>('estado')
   const chatAction = salas.criarAcao<string>('chat')
   const fotoAction = salas.criarAcao<string>('foto')
+  const identidadeAction = salas.criarAcao<unknown>('identidade')
 
   const aoFoto: ((foto: unknown, peerId: string) => void)[] = []
+  const aoIdentidade: ((mensagem: unknown, peerId: string) => void)[] = []
   const aoAcao: ((acao: Acao, peerId: string) => void)[] = []
   const aoEstado: ((estado: EstadoJogo, peerId: string) => void)[] = []
   const aoEntrar: ((peerId: string) => void)[] = []
@@ -185,6 +197,10 @@ export function criarTransporte(salas: Salas): Transporte {
   estadoAction.onMessage((estado, de) => {
     for (const cb of aoEstado) cb(estado, de)
   })
+  identidadeAction.onMessage((mensagem, de) => {
+    for (const cb of aoIdentidade) cb(mensagem, de)
+  })
+
   fotoAction.onMessage((foto, de) => {
     // Entregue como `unknown`: a validação é de quem consome, que é quem sabe
     // o que serve como foto. Aqui só existe o transporte.
@@ -227,6 +243,12 @@ export function criarTransporte(salas: Salas): Transporte {
     },
     aoReceberFoto: (cb) => {
       aoFoto.push(cb)
+    },
+    enviarIdentidade: (mensagem, para) => {
+      identidadeAction.send(mensagem, para)
+    },
+    aoReceberIdentidade: (cb) => {
+      aoIdentidade.push(cb)
     },
     aoEntrarPeer: (cb) => {
       aoEntrar.push(cb)

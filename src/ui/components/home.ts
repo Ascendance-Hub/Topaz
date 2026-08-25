@@ -48,6 +48,9 @@ function cartaoRecurso(titulo: string, texto: string): HTMLElement {
 export interface ExtrasHome {
   /** O painel de teste de rede, montado por quem tem o estado dele. */
   testeRede?: HTMLElement
+  /** O painel da identidade. Vem pronto porque depende de leitura assíncrona
+   *  do cofre, que esta camada não deve conhecer. */
+  identidade?: HTMLElement
 }
 
 export function renderizarHome(
@@ -100,6 +103,10 @@ export function renderizarHome(
   const acao = document.createElement('section')
   acao.className = 'home-acao'
   acao.append(renderizarLobby(aoEntrar))
+  // A identidade fica junto do cartão de entrar, não numa seção lá embaixo:
+  // quando ela é nova, o segredo precisa ser visto AGORA — é a única vez que
+  // ele existe para ser mostrado.
+  if (extras.identidade) acao.append(extras.identidade)
   home.append(acao)
 
   // ---- O que dá para fazer ------------------------------------------------

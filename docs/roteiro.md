@@ -24,6 +24,11 @@ duas exceções marcadas 🕓, escritas em 2026-08-24 e ainda não vistas com ge
   qualidade e `contentHint` no seletor, **áudio do sistema junto** com bitrate
   de música, tela cheia e Picture-in-Picture.
 - **Mixer de volume** — um canal por voz e um por tela, separados de propósito.
+- 🕓 **Identidade estável** — par de chaves gerado no navegador, guardado como
+  `CryptoKey` **não extraível** no IndexedDB. Quem entra na sala prova quem é
+  assinando um desafio sorteado na hora, e ganha um selo. O segredo de
+  recuperação é mostrado **uma vez** na criação; com ele dá para entrar noutro
+  computador.
 - 🕓 **Assistir a própria tela** — prévia pequena da própria captura, para
   conferir o que se está mostrando. Não passa por WebRTC e não liga
   codificador: assistir a si mesmo continua não acordando o encoder.
@@ -191,6 +196,31 @@ eliminam.
   (o Trystero mantém um pool de 20 por estratégia). Em troca, é uma terceira
   via de descoberta. Depende de mais rodadas de teste com o antivírus ligado.
 
+### Ciclo em andamento — identidade, grupos e a reforma da sala
+
+Desenho completo em
+`docs/superpowers/specs/2026-08-25-identidade-grupos-e-sala-design.md`.
+
+| PR | O quê | Estado |
+|---|---|---|
+| 1 | Identidade estável | **feito** |
+| 2 | Barra lateral + grupos persistentes | a fazer |
+| 3 | Presença entre grupos + mensagem direta | a fazer |
+| 4 | Galeria de jogos + configuração da partida | a fazer |
+| 5 | Canais de voz | a fazer |
+| 6 | Amigos | a fazer |
+
+Decisões que já valem:
+
+- **Um grupo é um marcador local** (nome, código, cor). Quem está no grupo é
+  quem está na sala agora.
+- **Presença por modo passivo**: ativo no grupo aberto, passivo nos outros.
+  Passivo não anuncia, e dois passivos nunca se conectam — grupo vazio custa
+  zero conexões. Grupos de fundo entram só no nostr, com menos relays.
+- **Canais de voz numa sala só**, com o canal indo no protocolo da call. Uma
+  sala por canal exigiria novo handshake a cada troca.
+- **A barra lateral substitui o botão "Mesa"**, que pressupõe um jogo só.
+
 ### Próximo ciclo grande
 
 - **Grupos persistentes** — salvos no navegador, tipo servidor do Discord.
@@ -206,6 +236,10 @@ eliminam.
 
 Nada aqui é defeito; são coisas que cabem depois.
 
+- **Trocar identidade e sair** fora da home — os controles existem, mas o
+  lugar natural deles é a aba Configurações da barra lateral (PR 2).
+- **Exportar identidade entre máquinas sem digitar** — hoje é copiar e colar o
+  segredo. Um QR code resolveria, e é ciclo próprio.
 - **Foto na mesa e no chat** — hoje ela só aparece na fileira de participantes
   da call. Levá-la para a lista da sala e para as linhas do chat é o passo
   natural, mas cada lugar tem uma forma diferente e merece cuidado próprio.
