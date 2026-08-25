@@ -175,7 +175,9 @@ permissão do microfone (ou desligue o microfone no sistema antes).
 `LIMIAR_DESLIGA = 0.02`). Esta é a parte que precisa de ajuste com voz real,
 em microfones diferentes.
 
-- [ ] Falar acende o anel em volta do **seu** círculo
+- [ ] Falar acende o anel em volta do **seu** círculo, e ele **pulsa** —
+      é o pulso que o distingue das outras bordas douradas da tela
+      ("sou eu" na lista da sala, "é sua vez" na mesa, aba atual na navegação)
 - [ ] O anel do amigo acende quando ele fala, e não quando você fala
 - [ ] O anel **não pisca** nas pausas entre palavras de uma frase normal
 - [ ] Ficar calado apaga o anel em menos de um segundo
