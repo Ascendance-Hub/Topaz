@@ -14,7 +14,10 @@ import { criarChat } from './ui/components/chat'
 import { renderizarSalaParada } from './ui/components/sala'
 import { renderizarTrilho } from './ui/components/trilho'
 import type { Tela } from './ui/components/trilho'
-import { renderizarJogos } from './ui/components/jogos'
+import { JOGOS, renderizarAjustesDoJogo, renderizarJogos } from './ui/components/jogos'
+import { renderizarConfigPartida } from './ui/components/config-partida'
+import { formatoLembrado, lembrarFormato } from './partida/formato'
+import { CONFIG_PADRAO } from './game/rules'
 import { renderizarConfiguracoes } from './ui/components/configuracoes'
 import { renderizarFaixaGrupos } from './ui/components/faixa-grupos'
 import { grupos, grupoSalvo, removerGrupo, salvarGrupo } from './grupos/grupos'
@@ -38,7 +41,6 @@ import { AparelhosEmUso } from './call/aparelhos-em-uso'
 import { renderizar } from './ui/render'
 import { rngSemente } from './game/shoe'
 import { mesaEsperaPor } from './game/rules'
-import type { ConfigPartida } from './game/types'
 
 /** Quem falou antes de a mesa saber o nome dele. */
 export const APELIDO_DESCONHECIDO = 'Alguém'
@@ -129,8 +131,37 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * voltado para a sala — há teste cobrindo esse segundo caso.
    */
   let tela: Tela = 'sala'
+  /** Qual jogo está com o formato aberto, dentro da aba de Jogos. */
+  let jogoEmAjuste: string | null = null
   /** A identidade, guardada aqui para os Ajustes poderem mostrá-la. */
   let identidade: Identidade | null = null
+
+  function abrirFormato(chave: string): void {
+    jogoEmAjuste = chave
+    desenhar()
+  }
+
+  /**
+   * O que o painel de formato precisa saber.
+   *
+   * A sugestão só é oferecida numa sala que ainda está no PADRÃO: numa sala já
+   * configurada de propósito, preencher por cima apagaria a escolha de alguém
+   * — possivelmente de outra pessoa, já que o formato viaja no estado.
+   */
+  function dadosDoFormato() {
+    const estado = sessao.estado()
+    const noPadrao = JSON.stringify(estado.config) === JSON.stringify(CONFIG_PADRAO)
+    const lembrado = formatoLembrado()
+    return {
+      config: estado.config,
+      souHost: sessao.souHost(),
+      emAndamento: estado.fase !== 'aguardando' && estado.fase !== 'fim',
+      sugestao: noPadrao && lembrado
+        && JSON.stringify(lembrado) !== JSON.stringify(estado.config)
+        ? lembrado
+        : null,
+    }
+  }
 
   function irPara(destino: Tela): void {
     tela = destino
@@ -230,10 +261,6 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     },
     esquecerGrupo: () => {
       removerGrupo(codigo)
-      desenhar()
-    },
-    configurarPartida: (config: ConfigPartida) => {
-      sessao.despachar({ tipo: 'configurar', config })
       desenhar()
     },
     identidade: {
@@ -466,9 +493,24 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     }
 
     if (tela === 'jogos') {
-      // Por ora só há um jogo, e abrir a mesa é o que a galeria faz. Quando
-      // houver mais, é aqui que a escolha vira qual mesa abrir.
-      palco.replaceChildren(renderizarJogos(() => irPara('mesa')))
+      palco.replaceChildren(jogoEmAjuste === null
+        ? renderizarJogos({
+          abrir: () => irPara('mesa'),
+          // A engrenagem só existe para o anfitrião: mostrá-la a todos e
+          // barrar no clique seria um botão que engana.
+          ...(sessao.souHost() ? { ajustar: abrirFormato } : {}),
+        })
+        : renderizarAjustesDoJogo(
+          JOGOS.find((j) => j.chave === jogoEmAjuste)?.nome ?? 'Formato',
+          renderizarConfigPartida(dadosDoFormato(), (config) => {
+            sessao.despachar({ tipo: 'configurar', config })
+            // Lembrar aqui e não no motor: é escolha DESTA pessoa nesta
+            // máquina, não estado da partida.
+            lembrarFormato(config)
+            desenhar()
+          }),
+          () => { jogoEmAjuste = null; desenhar() },
+        ))
       return
     }
 
@@ -479,11 +521,6 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
         codigo,
         grupo: grupoSalvo(codigo),
         identidade,
-        partida: {
-          config: sessao.estado().config,
-          souHost: sessao.souHost(),
-          emAndamento: sessao.estado().fase !== 'aguardando',
-        },
       }, acoesConfiguracoes))
       return
     }

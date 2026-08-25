@@ -32,7 +32,42 @@ export const JOGOS: JogoDisponivel[] = [
 /** O que está por vir. Declarado como promessa, nunca como cartão clicável. */
 export const POR_VIR = ['Truco', 'Dominó', 'Poker']
 
-export function renderizarJogos(aoAbrir: (chave: string) => void): HTMLElement {
+export interface AcoesDaGaleria {
+  abrir: (chave: string) => void
+  /** Só chega preenchida para o anfitrião. */
+  ajustar?: ((chave: string) => void) | undefined
+}
+
+/**
+ * A tela de ajustes de UM jogo, dentro da aba de Jogos.
+ *
+ * O formato da partida vivia numa seção solta em "Ajustes". Ficava errado por
+ * antecipação: com mais jogos vindo, cada um terá suas próprias escolhas, e
+ * uma seção única teria de virar várias — ou pior, misturar tudo. Aqui ele
+ * pertence ao cartão de onde saiu.
+ */
+export function renderizarAjustesDoJogo(
+  nome: string, painel: HTMLElement, aoVoltar: () => void,
+): HTMLElement {
+  const area = document.createElement('div')
+  area.className = 'jogos'
+
+  const voltar = document.createElement('button')
+  voltar.type = 'button'
+  voltar.className = 'botao fantasma jogos-voltar'
+  voltar.dataset['jogos'] = 'voltar'
+  voltar.textContent = '← Jogos'
+  voltar.onclick = aoVoltar
+
+  const titulo = document.createElement('h2')
+  titulo.className = 'jogos-titulo'
+  titulo.textContent = nome
+
+  area.append(voltar, titulo, painel)
+  return area
+}
+
+export function renderizarJogos(acoes: AcoesDaGaleria): HTMLElement {
   const area = document.createElement('div')
   area.className = 'jogos'
 
@@ -61,14 +96,35 @@ export function renderizarJogos(aoAbrir: (chave: string) => void): HTMLElement {
     descricao.className = 'jogo-descricao'
     descricao.textContent = jogo.descricao
 
+    const rodape = document.createElement('div')
+    rodape.className = 'jogo-rodape'
+
     const abrir = document.createElement('button')
     abrir.type = 'button'
     abrir.className = 'botao'
     abrir.dataset['abrir'] = jogo.chave
     abrir.textContent = 'Abrir mesa'
-    abrir.onclick = () => aoAbrir(jogo.chave)
+    abrir.onclick = () => acoes.abrir(jogo.chave)
+    rodape.append(abrir)
 
-    cartao.append(nome, detalhe, descricao, abrir)
+    // A engrenagem só existe para quem pode mexer. Mostrá-la a todos e barrar
+    // no clique seria um botão que engana — e o rodapé fica ao lado de "Abrir
+    // mesa" para não brigar com o título no topo do cartão.
+    if (acoes.ajustar) {
+      const ajustar = document.createElement('button')
+      ajustar.type = 'button'
+      ajustar.className = 'botao fantasma jogo-ajustar'
+      ajustar.dataset['ajustar'] = jogo.chave
+      ajustar.textContent = '⚙'
+      // O símbolo sozinho não é lido por leitor de tela nem entendido por
+      // quem nunca viu esta engrenagem específica.
+      ajustar.title = `Formato de ${jogo.nome}`
+      ajustar.setAttribute('aria-label', `Formato de ${jogo.nome}`)
+      ajustar.onclick = () => acoes.ajustar?.(jogo.chave)
+      rodape.append(ajustar)
+    }
+
+    cartao.append(nome, detalhe, descricao, rodape)
     grade.append(cartao)
   }
 

@@ -31,7 +31,10 @@ duas exceções marcadas 🕓, escritas em 2026-08-24 e ainda não vistas com ge
 - 🕓 **Grupos persistentes** — atalhos salvos no navegador, com cor derivada do
   próprio código. Aparecem no topo da tela inicial para quem já tem algum.
 - 🕓 **Configuração da partida** — fichas iniciais, alvo, aposta máxima e tempo
-  de jogada, escolhidos pelo anfitrião e só entre partidas. Viajam no
+  de jogada, escolhidos pelo anfitrião e só entre partidas. Moram na aba
+  **Jogos**, na engrenagem do cartão do jogo: cada jogo terá o seu, e uma seção
+  única em Ajustes já nasceria errada. O navegador lembra o último formato e
+  pré-preenche salas novas; o JSON serve para mandar o formato a outra pessoa. Viajam no
   `EstadoJogo`, então todo mundo concorda sozinho. O padrão do alvo mudou de
   1500 para **2500**: com 1000 iniciais e aposta de 500, o antigo fazia uma
   única mão ganha encerrar a partida.
