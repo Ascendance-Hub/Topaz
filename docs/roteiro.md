@@ -24,6 +24,14 @@ duas exceções marcadas 🕓, escritas em 2026-08-24 e ainda não vistas com ge
   qualidade e `contentHint` no seletor, **áudio do sistema junto** com bitrate
   de música, tela cheia e Picture-in-Picture.
 - **Mixer de volume** — um canal por voz e um por tela, separados de propósito.
+- 🕓 **Barra lateral** — o botão "Mesa" virou um trilho com Sala, Jogos e
+  Ajustes. Ajustes traz apelido e foto trocáveis a qualquer momento (antes só
+  na porta de entrada), salvar esta sala como grupo, e os controles da
+  identidade.
+- 🕓 **Grupos persistentes** — atalhos salvos no navegador, com cor derivada do
+  próprio código. Aparecem no topo da tela inicial para quem já tem algum.
+- 🕓 **Galeria de jogos** — o que dá para jogar, e o que vem por aí como
+  promessa declarada, nunca como cartão clicável que não faz nada.
 - 🕓 **Identidade estável** — par de chaves gerado no navegador, guardado como
   `CryptoKey` **não extraível** no IndexedDB. Quem entra na sala prova quem é
   assinando um desafio sorteado na hora, e ganha um selo. O segredo de
@@ -204,7 +212,7 @@ Desenho completo em
 | PR | O quê | Estado |
 |---|---|---|
 | 1 | Identidade estável | **feito** |
-| 2 | Barra lateral + grupos persistentes | a fazer |
+| 2 | Barra lateral + grupos persistentes | **feito** |
 | 3 | Presença entre grupos + mensagem direta | a fazer |
 | 4 | Galeria de jogos + configuração da partida | a fazer |
 | 5 | Canais de voz | a fazer |

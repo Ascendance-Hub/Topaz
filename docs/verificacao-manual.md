@@ -259,6 +259,34 @@ como mostrá-lo de novo, porque a chave guardada é não extraível de propósit
 - [ ] O selo que você vê para ele é **o mesmo** que ele vê no próprio painel
 - [ ] Nenhum selo aparece antes de a prova fechar
 
+## Barra lateral e Ajustes
+
+- [ ] O trilho mostra **Sala, Jogos e Ajustes**; o botão "Mesa" não existe mais
+- [ ] "Jogos" abre a galeria, e o cartão do Blackjack abre a mesa
+- [ ] Com a mesa aberta, "Jogos" continua aceso — é por onde se volta
+- [ ] Os cartões "em breve" **não** são clicáveis
+- [ ] A bolinha de "a mesa espera por você" aparece em Jogos, e some quando a
+      mesa está na tela
+- [ ] Em Ajustes, trocar o apelido muda o nome que os outros veem, **sem
+      recarregar** e sem perder cadeira nem fichas
+- [ ] Em Ajustes, trocar a foto atualiza o círculo na fileira da call
+- [ ] Em tela larga o trilho é uma coluna à esquerda; em tela estreita vira
+      faixa horizontal, sem estourar
+
+## Grupos
+
+- [ ] Em Ajustes, "Salvar grupo" com um nome faz a sala aparecer na tela inicial
+- [ ] Salvar sem nome usa o código como rótulo
+- [ ] Salvar a mesma sala de novo **renomeia**, não duplica
+- [ ] O cartão na tela inicial entra na sala num clique, sem pedir apelido de novo
+- [ ] O × tira o atalho e **não** derruba ninguém da sala
+- [ ] Os grupos sobrevivem a recarregar
+- [ ] Com grupos salvos, eles aparecem **acima** da apresentação
+- [ ] Sem grupos, a tela inicial é a apresentação de sempre
+
+⚠️ Grupo é um atalho **por navegador**. Noutro computador a lista começa vazia
+— é o mesmo preço da foto e da identidade, e a interface diz isso.
+
 ## Teste de rede
 
 Aparece para quem está sozinho na sala ou não conseguiu conectar — que é

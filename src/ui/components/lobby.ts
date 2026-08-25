@@ -2,7 +2,7 @@ import {
   ehCodigoValido, formatarCodigo, gerarCodigoSala, haCodigoNaUrl, lerCodigoDaUrl,
   montarHashSala, normalizarCodigo, TAMANHO_FORMATADO,
 } from '../codigo'
-import { encolherImagem, esquecerFoto, fotoLembrada, lembrarFoto } from '../../perfil/foto-navegador'
+import { renderizarRetrato } from './retrato'
 import { inicialDe } from './participantes'
 
 const CHAVE_APELIDO = 'topaz:apelido'
@@ -71,7 +71,11 @@ export function renderizarLobby(
   // O apelido vem ANTES do retrato no DOM. Não é só ordem visual: o campo de
   // arquivo escondido do retrato passaria a ser o primeiro `input` do lobby, e
   // qualquer código que procure "o campo" pegaria o errado.
-  lobby.append(campoApelido, montarPerfil(campoApelido))
+  const retrato = renderizarRetrato(() => inicialDe(campoApelido.value))
+  // A inicial acompanha o apelido enquanto a pessoa digita, para a prévia não
+  // ficar mostrando a letra de um nome que ela já trocou.
+  campoApelido.addEventListener('input', () => retrato.atualizar())
+  lobby.append(campoApelido, retrato.raiz)
 
   const campoCodigo = document.createElement('input')
   campoCodigo.className = 'campo'
@@ -144,103 +148,4 @@ export function renderizarLobby(
   }
 
   return lobby
-}
-
-/**
- * O retrato de perfil: prévia redonda, botão de escolher e botão de tirar.
- *
- * Fica ao lado do apelido de propósito — apelido e foto são a mesma coisa,
- * quem você é. Empurrar a foto para uma tela de ajustes a transformaria num
- * canto escondido que ninguém acha.
- *
- * A foto escolhida NÃO é o arquivo: `encolherImagem` decodifica e redesenha
- * num canvas, e o que fica guardado são os pixels que nós desenhamos. É por
- * isso que um executável renomeado não passa daqui — ele falha ao decodificar
- * e a função rejeita.
- */
-function montarPerfil(campoApelido: HTMLInputElement): HTMLElement {
-  const area = document.createElement('div')
-  area.className = 'perfil'
-
-  const previa = document.createElement('div')
-  previa.className = 'perfil-circulo'
-
-  const arquivo = document.createElement('input')
-  arquivo.type = 'file'
-  // Dica ao seletor do sistema, não segurança: o portão de verdade é o
-  // redesenho no canvas. Serve para a pessoa não escolher um PDF e levar um
-  // erro que não explica nada.
-  arquivo.accept = 'image/*'
-  arquivo.hidden = true
-
-  const escolher = document.createElement('button')
-  escolher.type = 'button'
-  escolher.className = 'botao fantasma perfil-botao'
-  escolher.dataset['perfil'] = 'escolher'
-  escolher.textContent = 'Escolher foto'
-  escolher.onclick = () => arquivo.click()
-
-  const remover = document.createElement('button')
-  remover.type = 'button'
-  remover.className = 'botao fantasma perfil-botao'
-  remover.dataset['perfil'] = 'remover'
-  remover.textContent = 'Tirar foto'
-  remover.onclick = () => {
-    esquecerFoto()
-    desenharPrevia()
-  }
-
-  const erro = document.createElement('p')
-  erro.className = 'perfil-erro'
-  erro.hidden = true
-
-  function desenharPrevia(): void {
-    const foto = fotoLembrada()
-    previa.replaceChildren()
-    if (foto) {
-      const img = document.createElement('img')
-      img.className = 'perfil-previa'
-      img.src = foto
-      img.alt = 'Sua foto de perfil'
-      previa.append(img)
-    } else {
-      const inicial = document.createElement('span')
-      inicial.className = 'perfil-inicial'
-      inicial.textContent = inicialDe(campoApelido.value)
-      previa.append(inicial)
-    }
-    // O botão de tirar só existe quando há o que tirar.
-    remover.hidden = !foto
-  }
-
-  arquivo.onchange = () => {
-    const escolhido = arquivo.files?.[0]
-    // Limpa o valor para escolher o MESMO arquivo de novo disparar `change`
-    // — sem isto, tentar de novo depois de um erro não faria nada.
-    arquivo.value = ''
-    if (!escolhido) return
-    erro.hidden = true
-    void encolherImagem(escolhido)
-      .then((foto) => {
-        lembrarFoto(foto)
-        desenharPrevia()
-      })
-      .catch(() => {
-        // Um arquivo que não decodifica como imagem chega aqui — inclusive um
-        // executável renomeado. Dizer o que houve importa: sem isto, escolher
-        // um arquivo e nada acontecer parece o site quebrado.
-        erro.hidden = false
-        erro.textContent = 'Não deu para ler essa imagem. Escolha um arquivo de foto.'
-      })
-  }
-
-  // A inicial acompanha o apelido enquanto a pessoa digita, para a prévia não
-  // ficar mostrando a letra de um nome que ela já trocou.
-  campoApelido.addEventListener('input', () => {
-    if (!fotoLembrada()) desenharPrevia()
-  })
-
-  desenharPrevia()
-  area.append(previa, escolher, remover, arquivo, erro)
-  return area
 }

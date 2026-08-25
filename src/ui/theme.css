@@ -135,15 +135,33 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
     column-gap: 28px;
     margin: 0 auto;
   }
-  .barra-sala { grid-column: 1; grid-row: 1; }
-  .nav-sala { grid-column: 1; grid-row: 2; }
-  .palco { grid-column: 1; grid-row: 3; min-width: 0; }
-  .call-videos { grid-column: 1; grid-row: 4; }
+  /* Tres faixas: trilho, conteudo e (quando houver) a conversa. O trilho
+     ganha coluna propria e atravessa todas as linhas — navegacao que rola
+     junto com o conteudo obriga a subir para trocar de secao. */
+  #app { grid-template-columns: 132px minmax(0, 880px); }
+  .trilho {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    flex-direction: column;
+    align-items: stretch;
+    position: sticky;
+    top: 20px;
+    align-self: start;
+    border-bottom: none;
+    border-right: 1px solid var(--latao-fraco);
+    padding: 4px 12px 4px 0;
+    margin: 18px 0 0;
+  }
+  .barra-sala { grid-column: 2; grid-row: 1; }
+  .palco { grid-column: 2; grid-row: 2; min-width: 0; }
+  .participantes { grid-column: 2; grid-row: 3; }
+  .call-controles { grid-column: 2; grid-row: 4; }
+  .call-videos { grid-column: 2; grid-row: 5; }
+  .call-audios { grid-column: 2; }
 
   /* A largura passa a ser a da coluna: um `max-width` menor aqui dentro
      recentralizaria cada peça por conta própria e desalinharia de novo. */
   .barra-sala,
-  .nav-sala,
   .mesa,
   .call-videos,
   .mixer { max-width: none; margin-left: 0; margin-right: 0; }
@@ -153,8 +171,10 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
      nada em troca — que era a queixa da tela da sala. */
   #app:has(.chat[data-aberto='1']),
   #app:has(.mixer-linha) {
-    grid-template-columns: minmax(0, 940px) 320px;
+    grid-template-columns: 132px minmax(0, 880px) 320px;
   }
+  #app:has(.chat[data-aberto='1']) .lateral,
+  #app:has(.mixer-linha) .lateral { grid-column: 3; grid-row: 1 / -1; }
   #app:has(.chat[data-aberto='1']) .lateral,
   #app:has(.mixer-linha) .lateral {
     display: flex;
@@ -1333,3 +1353,239 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ---------------------------------------------------------------------------
+   O TRILHO
+   ---------------------------------------------------------------------------
+   Navegação à esquerda: é onde todo aplicativo de conversa põe, e a pessoa
+   passa a maior parte do tempo em outros. Reconhecer sem aprender vale mais do
+   que ser original aqui — a diferença fica no material.
+
+   Rótulos de texto e não ícones, contra a convenção do Discord: ele apoia numa
+   iconografia que as pessoas já conhecem, e nós não temos uma. Ícone inventado
+   num menu é charada no pior lugar possível.
+
+   No celular é uma faixa horizontal; a coluna só nasce em tela larga.
+   ------------------------------------------------------------------------ */
+.trilho {
+  display: flex;
+  gap: 6px;
+  max-width: 940px;
+  margin: 18px auto 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--latao-fraco);
+}
+
+.trilho-item {
+  position: relative;
+  flex: 1;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--creme-fraco);
+  font-family: var(--corpo);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  transition: color 160ms var(--easing), background 160ms var(--easing);
+}
+.trilho-item:hover { color: var(--creme); background: rgba(255, 255, 255, 0.04); }
+
+/* Onde a pessoa está. A marcação sai do `aria-current`, não de uma classe,
+   para que a verdade visual e a que o leitor de tela anuncia sejam a MESMA —
+   duas fontes divergiriam na primeira mudança. */
+.trilho-item[aria-current='page'] {
+  color: var(--topazio);
+  background: rgba(240, 179, 74, 0.09);
+}
+.trilho-item[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--topazio);
+}
+
+/* A mesa esperando por você. Discreta: ela avisa, não interrompe. */
+.trilho-marca {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--topazio);
+  box-shadow: 0 0 8px rgba(240, 179, 74, 0.8);
+  vertical-align: middle;
+}
+
+/* ---------------------------------------------------------------------------
+   GALERIA DE JOGOS
+   ------------------------------------------------------------------------ */
+.jogos { max-width: 940px; margin: 0 auto; }
+.jogos-titulo {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--topazio);
+  margin-bottom: 16px;
+}
+.jogos-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 16px;
+}
+.jogo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--latao-fraco);
+  background: linear-gradient(180deg, rgba(20, 59, 44, 0.5), rgba(13, 42, 32, 0.25));
+}
+.jogo-nome {
+  font-family: var(--display);
+  font-size: 21px;
+  font-weight: 400;
+  color: var(--creme);
+}
+.jogo-detalhe {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--latao);
+}
+.jogo-descricao {
+  margin: 0;
+  flex: 1;
+  color: var(--creme-fraco);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.jogo .botao { align-self: flex-start; }
+
+/* O que ainda não existe: tracejado e apagado, para ler como promessa e não
+   como item quebrado. Sem botão nenhum — clicar e nada acontecer é o que faz a
+   pessoa concluir que o site está com defeito. */
+.jogo-por-vir {
+  border-style: dashed;
+  background: none;
+  opacity: 0.45;
+}
+
+/* ---------------------------------------------------------------------------
+   AJUSTES
+   ------------------------------------------------------------------------ */
+.config { max-width: 620px; margin: 0 auto; }
+.config-secao {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--latao-fraco);
+}
+.config-secao:last-child { border-bottom: none; }
+.config-titulo {
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--topazio);
+  margin-bottom: 12px;
+}
+.config-texto {
+  margin: 0 0 10px;
+  color: var(--creme-fraco);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.config-codigo {
+  margin: 0 0 12px;
+  font-family: ui-monospace, Consolas, monospace;
+  letter-spacing: 0.1em;
+  color: var(--creme);
+  font-size: 14px;
+}
+.config-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.config-linha .campo { flex: 1 1 180px; margin: 0; }
+.config .perfil { justify-content: flex-start; }
+.config .identidade { border-top: none; margin-top: 0; padding-top: 0; }
+
+/* ---------------------------------------------------------------------------
+   FAIXA DE GRUPOS
+   ---------------------------------------------------------------------------
+   A cor de cada cartão sai do próprio código da sala. É a única pista visual
+   que distingue os cartões de relance, então ela carrega mais peso do que
+   parece — e por sair do código, é a mesma em qualquer máquina, sem nada
+   precisar ser sincronizado.
+   ------------------------------------------------------------------------ */
+.faixa-grupos { margin-bottom: 8px; }
+.faixa-grupos-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+.grupo-cartao {
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid var(--latao-fraco);
+  /* A cor entra como fio à esquerda, não como fundo: fundo colorido brigaria
+     com o feltro e faria a home parecer outro produto a cada grupo salvo. */
+  border-left: 3px solid var(--cor-grupo, var(--latao));
+  background: linear-gradient(180deg, rgba(20, 59, 44, 0.45), rgba(13, 42, 32, 0.2));
+  overflow: hidden;
+}
+.grupo-entrar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 16px 40px 16px 16px;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.grupo-entrar:hover { background: rgba(255, 255, 255, 0.04); }
+.grupo-nome {
+  color: var(--creme);
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grupo-codigo {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--creme-tenue);
+}
+.grupo-remover {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--creme-tenue);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.grupo-remover:hover { color: var(--alerta); background: rgba(212, 117, 107, 0.12); }
+
+/* Com grupos salvos, a apresentação desce: quem já usa o site vê primeiro o
+   que veio buscar. */
+.home[data-com-grupos='1'] .home-heroi { padding-top: 4vh; }
+.home[data-com-grupos='1'] .home-chamada { font-size: clamp(28px, 4vw, 40px); }

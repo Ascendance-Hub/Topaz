@@ -7,10 +7,17 @@ import { analisarCandidatos } from './net/diagnostico-rede'
 import type { Analise } from './net/diagnostico-rede'
 import { renderizarTesteRede } from './ui/components/teste-rede'
 import { renderizarHome } from './ui/components/home'
+import { apelidoSalvo, salvarApelido } from './ui/components/lobby'
 import { renderizarBarraSala } from './ui/components/barra-sala'
 import { renderizarConexao } from './ui/components/conexao'
 import { criarChat } from './ui/components/chat'
-import { renderizarNavSala, renderizarSalaParada } from './ui/components/sala'
+import { renderizarSalaParada } from './ui/components/sala'
+import { renderizarTrilho } from './ui/components/trilho'
+import type { Tela } from './ui/components/trilho'
+import { renderizarJogos } from './ui/components/jogos'
+import { renderizarConfiguracoes } from './ui/components/configuracoes'
+import { renderizarFaixaGrupos } from './ui/components/faixa-grupos'
+import { grupos, grupoSalvo, removerGrupo, salvarGrupo } from './grupos/grupos'
 import { renderizarControlesCall } from './ui/components/call'
 import { renderizarMixer } from './ui/components/mixer'
 import { AreaDeMidia } from './ui/area-midia'
@@ -120,10 +127,12 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * junto, e cada broadcast do host devolveria à mesa a tela de quem tivesse
    * voltado para a sala — há teste cobrindo esse segundo caso.
    */
-  let mesaAberta = false
+  let tela: Tela = 'sala'
+  /** A identidade, guardada aqui para os Ajustes poderem mostrá-la. */
+  let identidade: Identidade | null = null
 
-  function alternarMesa(aberta: boolean): void {
-    mesaAberta = aberta
+  function irPara(destino: Tela): void {
+    tela = destino
     desenhar()
   }
 
@@ -133,7 +142,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * ruído em cima de algo que a pessoa já está olhando.
    */
   function mesaEspera(): boolean {
-    return !mesaAberta
+    return tela !== 'mesa'
       && sessao.statusConexao() === 'conectado'
       && mesaEsperaPor(sessao.estado(), sessao.meuId())
   }
@@ -183,6 +192,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   const selos = new Map<string, string>()
 
   identidadeAtual().then((eu) => {
+    identidade = eu
+    desenhar()
     const apresentacao = new Apresentacao(transporte, eu.par, codigo)
     apresentacao.aoVerificar((peerId, selo) => {
       selos.set(peerId, selo)
@@ -202,6 +213,46 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // causa de um anel seria caro e faria a mesa piscar.
     desenharParticipantes()
   })
+
+  const acoesConfiguracoes = {
+    renomear: (novo: string) => {
+      salvarApelido(novo)
+      // `entrar` é idempotente por construção: sobre um jogador que já existe
+      // ela só atualiza o apelido. Reusá-la evita uma ação nova nas regras do
+      // jogo só para renomear.
+      sessao.entrar(novo)
+      desenhar()
+    },
+    salvarGrupo: (nome: string) => {
+      salvarGrupo(codigo, nome)
+      desenhar()
+    },
+    esquecerGrupo: () => {
+      removerGrupo(codigo)
+      desenhar()
+    },
+    identidade: {
+      guardei: () => {
+        if (identidade) identidade = { ...identidade, segredoNovo: undefined }
+        desenhar()
+      },
+      entrarComSegredo: (segredo: string) => {
+        entrarComSegredo(segredo).then((nova) => {
+          identidade = nova
+          desenhar()
+        }).catch((erro: unknown) => console.warn('não deu para entrar com esse ID', erro))
+      },
+      sair: () => {
+        sairDaIdentidade()
+          .then(() => identidadeAtual())
+          .then((nova) => {
+            identidade = nova
+            desenhar()
+          })
+          .catch((erro: unknown) => console.warn('não deu para sair', erro))
+      },
+    },
+  }
 
   /** Junta o que a sala sabe e deixa a decisão com `montarParticipantes`. */
   function participantesAgora(): Participante[] {
@@ -312,7 +363,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     naSala: sessao.estado().jogadores.length,
     conectados: conectadosComigo().length,
   })
-  let nav = renderizarNavSala(mesaAberta, alternarMesa, mesaEspera())
+  let nav = renderizarTrilho(tela, irPara, { mesaEspera: mesaEspera() })
   let mixer = montarMixer()
 
   /**
@@ -358,7 +409,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     barra.replaceWith(novaBarra)
     barra = novaBarra
 
-    const novaNav = renderizarNavSala(mesaAberta, alternarMesa, mesaEspera())
+    const novaNav = renderizarTrilho(tela, irPara, { mesaEspera: mesaEspera() })
     nav.replaceWith(novaNav)
     nav = novaNav
 
@@ -393,8 +444,26 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       }
       return
     }
-    if (mesaAberta) {
+    if (tela === 'mesa') {
       renderizar(palco, sessao.estado(), sessao.meuId(), (acao) => sessao.despachar(acao))
+      return
+    }
+
+    if (tela === 'jogos') {
+      // Por ora só há um jogo, e abrir a mesa é o que a galeria faz. Quando
+      // houver mais, é aqui que a escolha vira qual mesa abrir.
+      palco.replaceChildren(renderizarJogos(() => irPara('mesa')))
+      return
+    }
+
+    if (tela === 'config') {
+      palco.replaceChildren(renderizarConfiguracoes({
+        apelido: sessao.estado().jogadores.find((j) => j.peerId === sessao.meuId())
+          ?.apelido ?? apelido,
+        codigo,
+        grupo: grupoSalvo(codigo),
+        identidade,
+      }, acoesConfiguracoes))
       return
     }
 
@@ -572,6 +641,23 @@ export function iniciarApp(app: HTMLElement): void {
       console.warn('não deu para carregar a identidade', erro)
     })
 
+    /**
+     * Entrar direto por um cartão de grupo.
+     *
+     * O apelido guardado é usado sem perguntar — quem tem grupos salvos já
+     * passou pela porta da frente pelo menos uma vez. Se ele não existir (o
+     * armazenamento pode ter sido limpo pela metade), o cartão não faz nada em
+     * silêncio: leva o foco para o campo, que é o que resolve.
+     */
+    const entrarNoGrupo = (cod: string): void => {
+      const apelido = apelidoSalvo()
+      if (!apelido) {
+        app.querySelector<HTMLInputElement>('input[placeholder="Seu apelido"]')?.focus()
+        return
+      }
+      entrarNaSala(app, apelido, cod)
+    }
+
     const desenharHome = (): void => {
       app.replaceChildren(renderizarHome(
         (apelido, codigo) => entrarNaSala(app, apelido, codigo),
@@ -583,6 +669,10 @@ export function iniciarApp(app: HTMLElement): void {
         {
           testeRede: renderizarTesteRede(analise, rodando, testar),
           identidade: renderizarIdentidade(identidade, acoesIdentidade),
+          grupos: renderizarFaixaGrupos(grupos(), entrarNoGrupo, (cod) => {
+            removerGrupo(cod)
+            desenharHome()
+          }),
         },
       ))
     }
