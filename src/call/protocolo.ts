@@ -19,11 +19,24 @@ export type MensagemCall =
  * os vazios — muita máquina para um grupo de amigos que precisa de "um canto
  * para conversar sem atrapalhar". Canais com nome ficam registrados como
  * evolução possível.
+ *
+ * **Quantos aparecem não é um número fixo, é uma regra:** os que têm gente,
+ * mais um vago. Um canal custa zero — é um campo de texto, não uma conexão —,
+ * então o único limite real é espaço de tela: dez pílulas vazias numa call de
+ * duas pessoas seriam ruído. Assim há sempre para onde ir e nunca sobra pílula.
+ *
+ * O teto de oito é backstop, não produto: uma sala com oito conversas
+ * paralelas já não é uma sala.
  */
 export const CANAIS = [
   { id: 'principal', nome: 'Principal' },
   { id: 'segundo', nome: 'Canal 2' },
   { id: 'terceiro', nome: 'Canal 3' },
+  { id: 'quarto', nome: 'Canal 4' },
+  { id: 'quinto', nome: 'Canal 5' },
+  { id: 'sexto', nome: 'Canal 6' },
+  { id: 'setimo', nome: 'Canal 7' },
+  { id: 'oitavo', nome: 'Canal 8' },
 ] as const
 
 export const CANAL_PADRAO = CANAIS[0].id
@@ -241,20 +254,39 @@ export class ProtocoloCall {
       meuCanal: this.meuCanal,
       naCall: comFiltro((p) => p.naCall),
       comigo: comFiltro((p) => p.naCall && p.canal === this.meuCanal),
-      porCanal: CANAIS.map((c) => ({
-        id: c.id,
-        nome: c.nome,
-        // Eu conto no meu: a lista descreve onde as pessoas estão, e eu sou
-        // uma delas — ver "0" no canal em que se está seria absurdo.
-        pessoas: comFiltro((p) => p.naCall && p.canal === c.id).length
-          + (this.euNaCall && this.meuCanal === c.id ? 1 : 0),
-      })),
+      porCanal: this.canaisVisiveis(comFiltro),
       compartilhando: comFiltro(
         (p) => p.naCall && p.compartilhando && p.canal === this.meuCanal,
       ),
       assistindo: [...this.assistindo],
       assistidoPor: [...this.assistidoPor],
     }
+  }
+
+  /**
+   * Os canais que valem aparecer: os que têm gente, mais o primeiro vago.
+   *
+   * A ordem é sempre a de `CANAIS`, e não "usados primeiro, vago no fim": o
+   * vago pode ser o Principal, quando todo mundo migrou para outro lugar, e
+   * jogá-lo para o fim faria as pílulas trocarem de posição conforme as
+   * pessoas andam — clicar num canal e acertar outro é o pior desfecho.
+   *
+   * Todo mundo calcula isto a partir do MESMO estado, então a lista é a mesma
+   * em todas as telas sem nada precisar ser combinado.
+   */
+  private canaisVisiveis(
+    comFiltro: (teste: (p: Peer) => boolean) => string[],
+  ): { id: string; nome: string; pessoas: number }[] {
+    const quantos = (id: string): number =>
+      comFiltro((p) => p.naCall && p.canal === id).length
+      // Eu conto no meu: a lista descreve onde as pessoas estão, e eu sou uma
+      // delas — ver "0" no canal em que se está seria absurdo.
+      + (this.euNaCall && this.meuCanal === id ? 1 : 0)
+
+    const primeiroVago = CANAIS.find((c) => quantos(c.id) === 0)
+    return CANAIS
+      .filter((c) => quantos(c.id) > 0 || c.id === primeiroVago?.id)
+      .map((c) => ({ id: c.id, nome: c.nome, pessoas: quantos(c.id) }))
   }
 
   aoMudar(cb: () => void): void {

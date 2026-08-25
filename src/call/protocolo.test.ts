@@ -326,3 +326,84 @@ describe('telas e canais', () => {
     expect(a.estado().compartilhando).toEqual(['pb'])
   })
 })
+
+describe('quantos canais aparecem', () => {
+  const OUTRO = CANAIS[1].id
+  const ids = (p: ProtocoloCall) => p.estado().porCanal.map((c) => c.id)
+
+  it('sozinho na call: o meu e UM vago', () => {
+    // Um canal custa zero, mas dez pílulas vazias numa call de duas pessoas
+    // seriam ruído. A regra é "os que têm gente, mais um vago".
+    const { a } = doisPares()
+    a.entrar()
+
+    expect(ids(a)).toEqual([CANAL_PADRAO, OUTRO])
+  })
+
+  it('a lista cresce conforme as pessoas se espalham', () => {
+    const rede = criarCanalFalso()
+    const a = new ProtocoloCall(rede.conectar('pa'))
+    const b = new ProtocoloCall(rede.conectar('pb'))
+    a.entrar()
+    b.entrar()
+
+    b.mudarCanal(OUTRO)
+
+    // Os dois ocupados, mais o terceiro vago.
+    expect(ids(a)).toHaveLength(3)
+    expect(ids(a)[2]).toBe(CANAIS[2].id)
+  })
+
+  it('e encolhe quando as pessoas voltam a se juntar', () => {
+    const rede = criarCanalFalso()
+    const a = new ProtocoloCall(rede.conectar('pa'))
+    const b = new ProtocoloCall(rede.conectar('pb'))
+    a.entrar()
+    b.entrar()
+    b.mudarCanal(OUTRO)
+
+    b.mudarCanal(CANAL_PADRAO)
+
+    expect(ids(a)).toEqual([CANAL_PADRAO, OUTRO])
+  })
+
+  it('o vago fica no LUGAR dele, não empurrado para o fim', () => {
+    // Saí do Principal, então ele é o vago — e continua sendo o primeiro da
+    // fileira. Se o vago fosse para o fim, as pílulas trocariam de posição
+    // conforme as pessoas andam, e clicar num canal acertaria outro.
+    const { a } = doisPares()
+    a.entrar()
+    a.mudarCanal(OUTRO)
+
+    expect(ids(a)).toEqual([CANAL_PADRAO, OUTRO])
+  })
+
+  it('um vago basta: o Principal vazio já serve de saída', () => {
+    // A regra é "os que têm gente, mais UM vago" — não "mais um sempre no
+    // fim". Com o Principal livre não há razão para abrir o terceiro.
+    const { a } = doisPares()
+    a.entrar()
+    a.mudarCanal(OUTRO)
+
+    expect(ids(a)).not.toContain(CANAIS[2].id)
+  })
+
+  it('fora da call, um canal só — não há para onde ir mesmo', () => {
+    const { a } = doisPares()
+
+    expect(ids(a)).toEqual([CANAL_PADRAO])
+  })
+
+  it('as duas pessoas veem exatamente a mesma lista', () => {
+    // Todo mundo calcula a partir do mesmo estado, então nada precisa ser
+    // combinado pela rede.
+    const rede = criarCanalFalso()
+    const a = new ProtocoloCall(rede.conectar('pa'))
+    const b = new ProtocoloCall(rede.conectar('pb'))
+    a.entrar()
+    b.entrar()
+    b.mudarCanal(CANAIS[2].id)
+
+    expect(ids(a)).toEqual(ids(b))
+  })
+})

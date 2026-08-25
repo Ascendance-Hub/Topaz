@@ -333,9 +333,15 @@ jogo — cada jogo terá o seu.
 Precisa de duas pessoas (ou duas abas com fones, para não haver microfonia).
 
 - [ ] Fora da call **não** aparece lista de canais
-- [ ] Na call aparecem os três, com a contagem de cada um
+- [ ] Na call aparecem só os canais **em uso, mais um vago** — sozinho, são
+      dois; não uma fileira de pílulas vazias
+- [ ] Alguém indo para o Canal 2 faz o Canal 3 aparecer
+- [ ] Todo mundo voltando ao Principal faz a lista encolher de novo
+- [ ] Com o Principal vazio, ele continua sendo o **primeiro** da fileira — as
+      pílulas nunca trocam de posição
+- [ ] Você e o amigo veem exatamente a mesma lista
 - [ ] O canal em que você está fica marcado
-- [ ] Canal vazio aparece como "vazio", e dá para entrar nele
+- [ ] O canal vago aparece como "vazio", e dá para entrar nele
 - [ ] Você e o amigo no mesmo canal: vocês se ouvem
 - [ ] Ele troca de canal: **vocês param de se ouvir na hora**
 - [ ] Ele continua visível na contagem do outro canal — não some da sala

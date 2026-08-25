@@ -30,10 +30,11 @@ duas exceções marcadas 🕓, escritas em 2026-08-24 e ainda não vistas com ge
   identidade.
 - 🕓 **Grupos persistentes** — atalhos salvos no navegador, com cor derivada do
   próprio código. Aparecem no topo da tela inicial para quem já tem algum.
-- 🕓 **Canais de voz** — três canais numa sala só. Cada pessoa anuncia em que
+- 🕓 **Canais de voz** — numa sala só. Cada pessoa anuncia em que
   canal está, e o microfone vai apenas para quem está no mesmo. Trocar é
   instantâneo, sem novo handshake, e dá para ver quem está nos outros. As telas
-  também são por canal: de outro canal não se assiste.
+  também são por canal: de outro canal não se assiste. Quantos aparecem não é
+  número fixo: os que têm gente, mais um vago.
 - 🕓 **Configuração da partida** — fichas iniciais, alvo, aposta máxima e tempo
   de jogada, escolhidos pelo anfitrião e só entre partidas. Moram na aba
   **Jogos**, na engrenagem do cartão do jogo: cada jogo terá o seu, e uma seção
@@ -239,7 +240,8 @@ Decisões que já valem:
   zero conexões. Grupos de fundo entram só no nostr, com menos relays.
 - **Canais de voz numa sala só**, com o canal indo no protocolo da call. Uma
   sala por canal exigiria novo handshake a cada troca.
-  ✅ Feito, com lista FIXA de três canais. Canais com nome escolhido exigiriam
+  ✅ Feito. A lista é fixa (oito ids), mas só aparecem os ocupados mais um
+  vago — um canal custa zero, e o único limite real é espaço de tela. Canais com nome escolhido exigiriam
   sincronizar nomes entre navegadores, resolver quem criou primeiro e limpar os
   vazios — fica como evolução possível.
 - **A barra lateral substitui o botão "Mesa"**, que pressupõe um jogo só.
