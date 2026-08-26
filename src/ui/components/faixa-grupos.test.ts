@@ -64,28 +64,3 @@ describe('renderizarFaixaGrupos', () => {
       .toContain('Os manos')
   })
 })
-
-describe('quem está online', () => {
-  const lista = [{ codigo: 'AAAABBBBCCCCDDDD', nome: 'Os manos' }]
-
-  it('mostra a contagem quando há gente', () => {
-    const faixa = renderizarFaixaGrupos(lista, vi.fn(), vi.fn(), () => 3)
-
-    expect(faixa.querySelector('[data-online]')!.textContent).toContain('3')
-  })
-
-  it('sem ninguém, não mostra nada', () => {
-    // "0 online" é ruído: a ausência do selo já diz isso, e diz mais baixo.
-    const faixa = renderizarFaixaGrupos(lista, vi.fn(), vi.fn(), () => 0)
-
-    expect(faixa.querySelector('[data-online]')).toBeNull()
-  })
-
-  it('sem saber de presença, os cartões continuam iguais', () => {
-    // A home existia antes da presença, e precisa continuar existindo sem ela.
-    const faixa = renderizarFaixaGrupos(lista, vi.fn(), vi.fn())
-
-    expect(faixa.querySelector('[data-entrar]')).not.toBeNull()
-    expect(faixa.querySelector('[data-online]')).toBeNull()
-  })
-})

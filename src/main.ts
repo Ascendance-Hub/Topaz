@@ -47,9 +47,6 @@ import { faltaCripto, renderizarSemCripto } from './ui/components/sem-cripto'
 import { renderizarSalasSalvas, type AcoesDeSalas } from './ui/components/salas-salvas'
 import { montarDoCanal, type FonteDeParticipantes } from './ui/components/participantes'
 import { renderizarRoda } from './ui/components/roda'
-import { observarGrupos, PAUSA_ENTRE_SALAS_MS } from './presenca/presenca'
-import { abrirSalaDeFundo } from './presenca/sala-de-fundo'
-
 
 /** Quem falou antes de a mesa saber o nome dele. */
 export const APELIDO_DESCONHECIDO = 'Alguém'
@@ -73,33 +70,7 @@ function rngDaSessao() {
  * de fato na página, nunca um órfão de uma rodada anterior.
  */
 export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string): void {
-  // Diagnóstico da caçada da presença. Um observador externo entrou nesta
-  // mesma sala e não viu ninguém — nem em modo passivo, nem ativo. Ou o id não
-  // é o que a gente supõe, ou o nostr não está anunciando. Esta linha responde
-  // a primeira metade sem depender de eu transcrever o código certo.
-  console.info(`sala: entrando em "${codigo}" (${codigo.length} caracteres)`)
   const salas = criarSalasTrystero(codigo)
-  // E esta responde a segunda: quantos relays nostr estão de fato abertos
-  // DAQUI. A presença é só nostr; se o app estiver conectado por mqtt ou
-  // torrent e o nostr estiver morto nesta máquina, ninguém observando por
-  // nostr encontraria esta sala — e tudo o mais que investiguei seria ruído.
-  // Repetido, e não uma vez só: na primeira versão saía uma linha aos 8s, e
-  // ela simplesmente não apareceu — sem eu poder distinguir "o temporizador
-  // não disparou" de "ninguém estava olhando naquele segundo". Um retrato que
-  // aparece uma vez só não é retrato.
-  for (const segundos of [2, 6, 15, 40]) {
-    setTimeout(() => {
-      try {
-        const porRede = Object.entries(salas.quemPorRede())
-          .map(([nome, n]) => `${nome}=${n}`).join(' ')
-        console.info(
-          `sala (${segundos}s): relays nostr abertos ${relaysConectados()}`
-          + ` · peers ${transporte.peers().length} · por rede: ${porRede}`)
-      } catch (erro) {
-        console.error('sala: o próprio diagnóstico estourou', erro)
-      }
-    }, segundos * 1000)
-  }
   const transporte = criarTransporte(salas)
   const sessao = new Sessao(transporte, rngDaSessao)
 
@@ -381,20 +352,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    */
   const acoesDeSalas: AcoesDeSalas = {
     ir: (destino: string) => {
-      // Espera SÓ a observação do destino fechar — nunca o resto.
-      //
-      // O Trystero devolve a mesma sala quando se entra num id já aberto, e a
-      // saída dele só desregistra depois de um envio e mais 99ms. Sem isto, a
-      // sala "nova" seria a passiva, que não anuncia.
-      //
-      // E só ela: enquanto ESTA sala continua registrada, a piscina de relays
-      // sobrevive. Esperar tudo fazia `hasActiveRooms()` virar falso, e o
-      // Trystero destruía as vinte conexões de relay e as vinte ofertas
-      // pré-fabricadas — foi o que deixou a troca de sala lenta e falhando.
-      void presenca.fecharUm(destino).then(() => {
-        encerrar()
-        entrarNaSala(app, apelido, destino)
-      })
+      encerrar()
+      entrarNaSala(app, apelido, destino)
     },
     outra: () => {
       encerrar()
@@ -564,61 +523,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    */
   const coluna = document.createElement('div')
   coluna.className = 'coluna'
-  /**
-   * Os OUTROS grupos salvos, em modo passivo.
-   *
-   * Este aqui é ativo — é onde você está de verdade. Observar a si mesmo
-   * abriria uma segunda sala para a mesma conversa; pior, o Trystero devolve a
-   * MESMA sala nesse caso, e o `onPeerJoin` é uma propriedade única: uma das
-   * duas perderia o seu ouvinte.
-   */
-  //
-  // Nasce SEM observar nada, e só começa segundos depois de a sala estar de
-  // pé. Duas razões, e as duas custaram teste do Alexandre:
-  //
-  // 1. Abrir salas de fundo no mesmo instante da entrada é competir com o que
-  //    importa. Ele descreveu isso antes de eu medir: "talvez ele esteja
-  //    tentando conectar na sala e descobrir gente de outros grupos ao mesmo
-  //    tempo".
-  // 2. A sala que acabamos de deixar ainda está registrada no Trystero — o
-  //    `leave` demora um envio e mais 99ms. Observar o grupo anterior nesse
-  //    intervalo devolveria a sala ATIVA agonizando em vez de abrir uma
-  //    passiva, com o ouvinte sobrescrito por cima.
-  //
-  // Recarregar a página sempre funcionou justamente porque lá não há sala
-  // nenhuma morrendo.
-  const presenca = observarGrupos([], abrirSalaDeFundo, PAUSA_ENTRE_SALAS_MS)
-  presenca.aoMudar(() => desenharSalasSalvas())
-  /**
-   * A presença só passa a observar depois disto virar verdadeiro.
-   *
-   * Não basta esperar: `desenharSalasSalvas` é chamada por todo `desenhar()`,
-   * e o primeiro acontece na montagem. Sem esta tranca o adiamento não adiava
-   * nada — foi o teste que pegou, não o navegador.
-   */
-  let presencaLiberada = false
-
-  /**
-   * Sala primeiro, presença depois — e "depois" é uma CONDIÇÃO, não um relógio.
-   *
-   * A versão anterior esperava quatro segundos. Quatro segundos é chute: numa
-   * rede lenta a sala ainda está se formando, e a presença volta a competir
-   * com ela. Aqui a espera acaba quando a sala está de pé, e não antes.
-   *
-   * `conectado` vale mesmo sozinho — assumir como anfitrião já conta —, então
-   * quem abre uma sala vazia não fica esperando para sempre.
-   *
-   * Uma vez liberada, não volta atrás: uma reconexão momentânea fecharia e
-   * reabriria as salas de fundo à toa, e reabrir é justamente o que colide.
-   */
-  function liberarPresencaSeAConexaoDeuCerto(): void {
-    if (presencaLiberada) return
-    if (sessao.statusConexao() !== 'conectado') return
-    presencaLiberada = true
-  }
-
-  let salasSalvas = renderizarSalasSalvas(
-    grupos(), codigo, acoesDeSalas, presenca.quantos)
+  let salasSalvas = renderizarSalasSalvas(grupos(), codigo, acoesDeSalas)
   let canais = renderizarCanais([], CANAL_PADRAO, { mudar: () => {} })
   coluna.append(salasSalvas, canais, nav)
   /**
@@ -711,18 +616,6 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * cada mudança de quem fala, muitas vezes por minuto. Trocar de foto é raro,
    * então avisar na mão é exato e muito mais barato que a alternativa.
    */
-  /** Só a tira de salas, sem redesenhar o resto. */
-  function desenharSalasSalvas(): void {
-    if (presencaLiberada) {
-      presenca.sincronizar(
-        grupos().map((g) => g.codigo).filter((c) => c !== codigo))
-    }
-    const novas = renderizarSalasSalvas(
-      grupos(), codigo, acoesDeSalas, presenca.quantos)
-    salasSalvas.replaceWith(novas)
-    salasSalvas = novas
-  }
-
   function invalidarRostos(): void {
     assinaturaDaRoda = ''
     assinaturaDosCanais = ''
@@ -781,7 +674,6 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   }
 
   function desenhar(): void {
-    liberarPresencaSeAConexaoDeuCerto()
     // A roda e os vídeos são irmãos persistentes do palco: eles NÃO são
     // trocados quando a tela muda, e por isso continuavam aparecendo por baixo
     // dos Ajustes e da galeria. Quem some é o CSS, e não o DOM: desmontar o
@@ -802,7 +694,9 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     naSala.replaceWith(novoNaSala)
     naSala = novoNaSala
 
-    desenharSalasSalvas()
+    const novasSalas = renderizarSalasSalvas(grupos(), codigo, acoesDeSalas)
+    salasSalvas.replaceWith(novasSalas)
+    salasSalvas = novasSalas
 
     const novaNav = renderizarTrilho(tela, irPara, { mesaEspera: mesaEspera() })
     nav.replaceWith(novaNav)
@@ -1025,9 +919,6 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   }
 
   encerrar = () => {
-    // Sem esperar, de propósito: a sala nova é aberta logo em seguida, e
-    // enquanto a velha ainda está registrada a piscina de relays sobrevive.
-    void presenca.encerrar()
     clearInterval(tique)
     clearInterval(tiqueVoz)
     monitorVoz.encerrar()
@@ -1110,40 +1001,12 @@ export function iniciarApp(app: HTMLElement): void {
         app.querySelector<HTMLInputElement>('input[placeholder="Seu apelido"]')?.focus()
         return
       }
-      irParaSala(apelido, cod)
-    }
-
-    /**
-     * Quem está online em cada grupo salvo.
-     *
-     * Salas de fundo em modo passivo: elas não anunciam, e duas passivas nunca
-     * se conectam. Um grupo em que ninguém está custa zero conexões — é o que
-     * torna razoável abrir todos os salvos de uma vez.
-     */
-    // Na tela inicial não há sala se formando, então ela pode começar já —
-    // mas as salas continuam espaçadas: são três redes por grupo, e abrir
-    // todas de uma vez trava a página de quem tem vários grupos salvos.
-    const presenca = observarGrupos(
-      grupos().map((g) => g.codigo), abrirSalaDeFundo, PAUSA_ENTRE_SALAS_MS)
-    presenca.aoMudar(() => desenharHome())
-
-    /**
-     * Entrar numa sala fecha a observação DELA antes, e espera.
-     *
-     * Aqui não custa: vindo da tela inicial não há sala aberta, então não há
-     * piscina de relays quente para perder — ela seria construída de qualquer
-     * jeito. É dentro de uma sala que esperar demais machuca.
-     */
-    const irParaSala = (apelido: string, codigo: string): void => {
-      void presenca.fecharUm(codigo)
-        .then(() => entrarNaSala(app, apelido, codigo))
+      entrarNaSala(app, apelido, cod)
     }
 
     const desenharHome = (): void => {
-      // Grupo removido (ou salvo noutra aba) deixa de ser observado na hora.
-      presenca.sincronizar(grupos().map((g) => g.codigo))
       app.replaceChildren(renderizarHome(
-        irParaSala,
+        (apelido, codigo) => entrarNaSala(app, apelido, codigo),
         // Sem a lista de servidores, de propósito. Aqui ninguém entrou em sala
         // ainda, então nenhum socket está aberto e a contagem sairia "0 de 20"
         // — que lê como falha catastrófica para quem acabou de abrir a página.
@@ -1155,7 +1018,7 @@ export function iniciarApp(app: HTMLElement): void {
           grupos: renderizarFaixaGrupos(grupos(), entrarNoGrupo, (cod) => {
             removerGrupo(cod)
             desenharHome()
-          }, presenca.quantos),
+          }),
         },
       ))
     }
