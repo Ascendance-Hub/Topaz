@@ -79,6 +79,20 @@ export function ehMensagemCall(bruto: unknown): bruto is MensagemCall {
   return false
 }
 
+/**
+ * Um canal e quem está nele.
+ *
+ * `quem` são peerIds e não nomes: o protocolo não sabe apelido nenhum — ele
+ * vem do estado da partida, e amarrar os dois aqui obrigaria a call a conhecer
+ * o jogo. Quem desenha resolve o nome.
+ */
+export interface CanalComGente {
+  id: string
+  nome: string
+  /** Os peerIds, com o meu incluído quando é o meu canal. */
+  quem: string[]
+}
+
 export interface CanalCall {
   meuId(): string
   /** Sem `para`, vai para todos os peers da sala. */
@@ -98,7 +112,7 @@ export interface EstadoCall {
   /** Quem está no MEU canal — é com essas pessoas que eu falo. */
   comigo: string[]
   /** Os canais que existem — os que têm gente. Contando eu no meu. */
-  porCanal: { id: string; nome: string; pessoas: number }[]
+  porCanal: CanalComGente[]
   /** Ainda há id livre para abrir mais um. */
   podeAbrirCanal: boolean
   /** Quem compartilha tela NO MEU CANAL: de outro canal não se assiste. */
@@ -334,19 +348,22 @@ export class ProtocoloCall {
    * Todo mundo calcula isto a partir do MESMO estado, então a lista é a mesma
    * em todas as telas sem nada precisar ser combinado.
    */
-  private quantosEm(
+  private quemEm(
     comFiltro: (teste: (p: Peer) => boolean) => string[], id: string,
-  ): number {
-    return comFiltro((p) => p.naCall && p.canal === id).length
-      // Eu conto no meu: a lista descreve onde as pessoas estão, e eu sou uma
-      // delas — ver "0" no canal em que se está seria absurdo.
-      + (this.euNaCall && this.meuCanal === id ? 1 : 0)
+  ): string[] {
+    const outros = comFiltro((p) => p.naCall && p.canal === id)
+    // Eu entro na lista do MEU canal: ela descreve onde as pessoas estão, e eu
+    // sou uma delas — um canal em que se está aparecer vazio seria absurdo.
+    // Na frente, porque é de onde o olho parte para se localizar.
+    return this.euNaCall && this.meuCanal === id
+      ? [this.canal.meuId(), ...outros]
+      : outros
   }
 
   private primeiroLivre(
     comFiltro: (teste: (p: Peer) => boolean) => string[],
   ): string | undefined {
-    return CANAIS.find((c) => this.quantosEm(comFiltro, c.id) === 0)?.id
+    return CANAIS.find((c) => this.quemEm(comFiltro, c.id).length === 0)?.id
   }
 
   /**
@@ -362,10 +379,10 @@ export class ProtocoloCall {
    */
   private canaisVisiveis(
     comFiltro: (teste: (p: Peer) => boolean) => string[],
-  ): { id: string; nome: string; pessoas: number }[] {
+  ): CanalComGente[] {
     return CANAIS
-      .map((c) => ({ id: c.id, nome: c.nome, pessoas: this.quantosEm(comFiltro, c.id) }))
-      .filter((c) => c.pessoas > 0)
+      .map((c) => ({ id: c.id, nome: c.nome, quem: this.quemEm(comFiltro, c.id) }))
+      .filter((c) => c.quem.length > 0)
   }
 
   aoMudar(cb: () => void): void {

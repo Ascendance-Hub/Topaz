@@ -146,9 +146,12 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
      --------------------------------------------------------------------- */
   #app:has(.trilho) {
     display: grid;
-    grid-template-columns: 132px minmax(0, 1fr);
-    /* barra · miolo que rola · canais · pessoas · controles */
-    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    /* 168px e não os 132px de antes: a coluna deixou de ser só três rótulos
+       e passou a listar gente. Um apelido cortado no meio não serve para
+       decidir em que canal entrar. */
+    grid-template-columns: 168px minmax(0, 1fr);
+    /* barra · miolo que rola · pessoas · controles */
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
     column-gap: 28px;
     height: 100dvh;
     max-width: 1440px;
@@ -157,19 +160,31 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
     overflow: hidden;
   }
 
-  #app:has(.trilho) .trilho {
+  /* A coluna inteira ocupa a primeira faixa: salas em cima, canais no miolo,
+     seções no pé. A borda que separa do resto mora nela, e não mais no
+     trilho — ela é que vai de ponta a ponta agora. */
+  #app:has(.trilho) .coluna {
     grid-column: 1;
     grid-row: 1 / -1;
+    display: flex;
     flex-direction: column;
-    align-items: stretch;
-    /* `start` e não `stretch`: os itens ficam juntos no topo, do tamanho do
-       próprio texto. */
-    align-self: stretch;
-    justify-content: flex-start;
+    /* `min-height: 0` para a lista de canais poder rolar aqui dentro em vez
+       de esticar a coluna e empurrar as seções para fora da tela. */
+    min-height: 0;
     margin: 18px 0 0;
     padding: 4px 12px 4px 0;
-    border-bottom: none;
     border-right: 1px solid var(--latao-fraco);
+  }
+  /* As seções vão para o PÉ da coluna: os canais mudam o tempo todo e as
+     seções não, então elas ficam ancoradas onde a mão sempre as encontra. */
+  #app:has(.trilho) .coluna .trilho {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    margin: 14px 0 0;
+    padding: 12px 0 0;
+    border-bottom: none;
+    border-top: 1px solid var(--latao-fraco);
   }
   /* O `flex: 1` serve à faixa HORIZONTAL do celular, onde os três dividem a
      largura. Na coluna ele faz cada item ocupar um terço da ALTURA da janela —
@@ -179,8 +194,7 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 
   #app:has(.trilho) .barra-sala { grid-column: 2; grid-row: 1; }
   #app:has(.trilho) .conteudo { grid-column: 2; grid-row: 2; }
-  #app:has(.trilho) .canais { grid-column: 2; grid-row: 3; }
-  #app:has(.trilho) .participantes { grid-column: 2; grid-row: 4; }
+  #app:has(.trilho) .participantes { grid-column: 2; grid-row: 3; }
   /* `position: static` é o conserto: `fixed` tira o elemento do fluxo, e um
      elemento fora do fluxo IGNORA o `grid-row` que a linha abaixo lhe dá. A
      regra dizia "quinta faixa" e o navegador entendia "flutue por cima de
@@ -197,7 +211,7 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
      que a faixa esteja sempre visível, e flutuar não compra nada. */
   #app:has(.trilho) .call-controles {
     grid-column: 2;
-    grid-row: 5;
+    grid-row: 4;
     position: static;
     transform: none;
     /* Sem isto o item de grid estica de ponta a ponta da coluna e a pílula
@@ -1948,48 +1962,114 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 }
 
 /* ---------------------------------------------------------------------------
-   CANAIS DE VOZ
+   A COLUNA DA ESQUERDA
    ---------------------------------------------------------------------------
-   Uma fileira de pílulas logo acima das pessoas: trocar de canal é trocar de
-   quem está ali, e as duas coisas precisam ser lidas juntas.
+   Salas em cima, canais no miolo, seções no pé.
 
-   Pílula e não lista vertical como no Discord: lá o trilho de canais é a
-   navegação principal do aplicativo. Aqui a navegação já é o trilho da sala, e
-   uma segunda coluna vertical brigaria com ela pela mesma leitura.
+   Os canais moraram no rodapé como pílulas e ficou ruim: a pílula dizia
+   QUANTOS, e escolher um canal é escolher COM QUEM. Vertical cabe o nome de
+   cada pessoa — e devolve ao meio a largura que a tela compartilhada precisa.
+
+   A convenção é a de todo aplicativo de voz, de propósito: a mão já sabe ir
+   para a esquerda. A diferença fica no material — feltro, latão e topázio —,
+   não na disposição.
    ------------------------------------------------------------------------ */
-.canais {
+
+/* No celular a coluna é só um empilhamento no topo: salas, canais e seções,
+   um embaixo do outro, com a página rolando normalmente. O grid da tela
+   grande é que a transforma em coluna de verdade. */
+.coluna {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* AS SALAS SALVAS ---------------------------------------------------------- */
+.salas-salvas {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 8px;
-  margin: 16px auto 0;
-  max-width: 940px;
+  flex: none;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--latao-fraco);
 }
-.canais:empty { margin: 0; }
 
-.canal {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 7px 14px;
-  border-radius: 999px;
+/* Ícone e não nome: a cor sai do código da sala e a inicial do nome que a
+   pessoa deu, então não há charada — ela reconhece a própria cor. */
+.sala-icone {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 11px;
   border: 1px solid var(--latao-fraco);
   background: transparent;
   color: var(--creme-fraco);
   font-family: var(--corpo);
-  font-size: 12.5px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   transition: color 160ms var(--easing), border-color 160ms var(--easing),
-    background 160ms var(--easing);
+    border-radius 160ms var(--easing), background 160ms var(--easing);
 }
-.canal:hover { color: var(--creme); border-color: var(--latao); }
+.sala-icone:hover {
+  color: var(--creme);
+  border-color: var(--cor-sala, var(--latao));
+  /* O canto que arredonda no hover é o gesto do Discord, e é dele que vem a
+     sensação de "isto é um atalho e não um botão". */
+  border-radius: 999px;
+}
+.sala-icone[data-aqui='1'] {
+  color: var(--cor-sala, var(--topazio));
+  border-color: var(--cor-sala, var(--topazio));
+  background: rgba(240, 179, 74, 0.08);
+}
+.sala-outra {
+  color: var(--creme-tenue);
+  border-style: dashed;
+  font-size: 16px;
+}
+.sala-outra:hover { color: var(--topazio); border-color: var(--topazio); }
 
-/* Onde eu estou. O preenchimento é discreto de propósito: o topázio cheio já é
-   do anel de quem fala, e duas coisas gritando em topázio na mesma tela fazem
-   as duas perderem o sentido. */
+/* OS CANAIS ---------------------------------------------------------------- */
+.canais {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* Rola aqui dentro: sete canais cheios não podem empurrar as seções para
+     fora da tela. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 0 0;
+}
+.canais:empty { padding: 0; }
+
+.canal-bloco { padding-bottom: 6px; }
+
+.canal {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--creme-fraco);
+  font-family: var(--corpo);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: color 160ms var(--easing), background 160ms var(--easing);
+}
+.canal:hover { color: var(--creme); background: rgba(244, 235, 215, 0.05); }
+.canal-nome { flex: 1 1 auto; }
+
+/* Onde eu estou. Discreto de propósito: o topázio cheio é do anel de quem
+   fala, e duas coisas gritando em topázio fazem as duas perderem o sentido. */
 .canal[data-aqui='1'] {
   color: var(--topazio);
-  border-color: var(--topazio);
   background: rgba(240, 179, 74, 0.08);
 }
 
@@ -1998,19 +2078,68 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   color: var(--creme-tenue);
   font-variant-numeric: tabular-nums;
 }
+.canal[data-aqui='1'] .canal-quantos { color: var(--topazio-claro); }
 
-/* Abrir um canal novo. Tracejado e sem contagem: ele não é um canal, é a ação
-   de criar um — e a borda tracejada é a mesma linguagem dos jogos "em breve",
-   que também são coisas que ainda não existem. */
+/* Abrir um canal novo. Tracejado e sem contagem: não é um canal, é a ação de
+   criar um — mesma linguagem dos cartões "em breve" da galeria de jogos. */
 .canal-abrir {
-  border-style: dashed;
-  padding: 7px 13px;
-  font-size: 14px;
-  line-height: 1;
+  flex: none;
+  margin-top: 4px;
+  border: 1px dashed var(--latao-fraco);
   color: var(--creme-tenue);
+  font-size: 12px;
 }
 .canal-abrir:hover { color: var(--topazio); border-color: var(--topazio); }
-.canal[data-aqui='1'] .canal-quantos { color: var(--topazio-claro); }
+
+/* AS PESSOAS DE CADA CANAL ------------------------------------------------- */
+.canal-gente {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 8px;
+}
+.canal-pessoa {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 0;
+}
+.canal-pessoa-circulo {
+  width: 21px;
+  height: 21px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--feltro-claro, rgba(244, 235, 215, 0.07));
+  color: var(--creme-fraco);
+  font-size: 10px;
+  font-weight: 600;
+  /* A borda existe para o anel de quem fala ter onde acender sem a linha
+     aparecer/sumir e empurrar o texto ao lado. */
+  box-shadow: 0 0 0 1px var(--latao-fraco);
+  transition: box-shadow 160ms var(--easing);
+}
+.canal-pessoa-circulo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.canal-pessoa-nome {
+  font-family: var(--corpo);
+  font-size: 12px;
+  color: var(--creme-fraco);
+  /* Apelido longo corta com reticências em vez de estourar a coluna. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.canal-pessoa[data-eu='1'] .canal-pessoa-nome { color: var(--creme); }
+.canal-pessoa[data-falando='1'] .canal-pessoa-circulo {
+  box-shadow: 0 0 0 2px var(--topazio);
+}
+.canal-pessoa[data-falando='1'] .canal-pessoa-nome { color: var(--topazio); }
+.canal-pessoa[data-mudo='1'] .canal-pessoa-circulo { opacity: 0.5; }
 
 /* ---------------------------------------------------------------------------
    PORTA FECHADA: NAVEGADOR SEM CRIPTOGRAFIA

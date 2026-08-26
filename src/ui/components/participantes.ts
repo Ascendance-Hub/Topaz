@@ -150,7 +150,11 @@ export function montarParticipantes(fonte: FonteDeParticipantes): Participante[]
   // aquele espaço representa.
   if (!fonte.euNaCall) return []
 
-  const eu: Participante = {
+  return [euNaLista(fonte), ...fonte.naCall.map((id) => outroNaLista(id, fonte))]
+}
+
+function euNaLista(fonte: FonteDeParticipantes): Participante {
+  return {
     peerId: EU,
     nome: fonte.meuApelido,
     euMesmo: true,
@@ -163,14 +167,32 @@ export function montarParticipantes(fonte: FonteDeParticipantes): Participante[]
     // própria foto pela rede.
     foto: fonte.minhaFoto,
   }
+}
 
-  const outros = fonte.naCall.map((peerId): Participante => ({
+function outroNaLista(peerId: string, fonte: FonteDeParticipantes): Participante {
+  return {
     peerId,
     nome: fonte.apelidoDe(peerId),
     falando: fonte.falantes.has(peerId),
     foto: fonte.fotos.get(peerId),
     selo: fonte.selos.get(peerId),
-  }))
+  }
+}
 
-  return [eu, ...outros]
+/**
+ * As pessoas de UM canal, na ordem em que o protocolo as entrega.
+ *
+ * Diferente de `montarParticipantes`, que só monta o MEU canal: aqui a lista
+ * pode ser de um canal em que eu não estou. Nesse caso `falando` fica sempre
+ * falso, e isso é a verdade e não uma limitação — só chega áudio de quem está
+ * comigo, então de fora não há como saber quem abriu a boca.
+ *
+ * O `meuId` é do transporte, não o `EU` da fileira: o protocolo fala em
+ * peerIds, e é aqui que os dois vocabulários se encontram.
+ */
+export function montarDoCanal(
+  quem: readonly string[], meuId: string, fonte: FonteDeParticipantes,
+): Participante[] {
+  return quem.map((peerId) =>
+    peerId === meuId ? euNaLista(fonte) : outroNaLista(peerId, fonte))
 }
