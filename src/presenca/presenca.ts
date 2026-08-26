@@ -77,10 +77,7 @@ export function observarGrupos(
 
   function avisar(): void {
     if (!viva) return
-    // Diagnóstico, e ele existe por um motivo: duas investigações se perderam
-    // sem saber se o problema era "não achou ninguém" ou "achou e não
-    // desenhou". Uma linha aqui separa as duas em dez segundos.
-    console.info('presença:', [...salas].map(([c, s]) => `${c}=${s.gente.size}`).join(' '))
+    relatar('mudou')
     for (const cb of [...ouvintes]) {
       try {
         cb()
@@ -88,6 +85,23 @@ export function observarGrupos(
         console.error('um ouvinte de presença estourou', erro)
       }
     }
+  }
+
+  /**
+   * O retrato do que a presença está fazendo.
+   *
+   * A primeira versão deste diagnóstico só falava quando alguém entrava ou
+   * saía — então "não vi nada no console" não distinguia "não achou ninguém"
+   * de "nem abriu sala nenhuma". Um instrumento que não separa as duas coisas
+   * não vale a viagem, e é a segunda vez que erro isso.
+   *
+   * Agora ele diz sempre: quantas salas, quais, e quanta gente em cada.
+   */
+  function relatar(porque: string): void {
+    const retrato = salas.size === 0
+      ? 'NENHUMA sala de fundo aberta'
+      : [...salas].map(([c, s]) => `${c}=${s.gente.size}`).join(' ')
+    console.info(`presença (${porque}): ${retrato}`)
   }
 
   function abrirUm(codigo: string): void {
@@ -132,9 +146,14 @@ export function observarGrupos(
     // Quem continua NÃO é reaberto: reabrir custa handshake e zeraria a
     // contagem por um instante, fazendo a tela piscar sem motivo.
     for (const codigo of querer) abrirUm(codigo)
+    relatar(`observando ${querer.length} de ${novos.length} grupos salvos`)
   }
 
   sincronizar(codigos)
+
+  // Um retrato periódico: sem ele, "o console não disse nada" pode significar
+  // tanto silêncio da rede quanto código que nunca rodou.
+  const tique = setInterval(() => relatar('a cada 10s'), 10_000)
 
   return {
     quantos: (codigo) => salas.get(codigo)?.gente.size ?? 0,
@@ -148,7 +167,8 @@ export function observarGrupos(
     aoMudar: (cb) => { ouvintes.push(cb) },
     encerrar: () => {
       viva = false
-      for (const { sala } of salas.values()) sala.sair()
+      clearInterval(tique)
+      for (const { sala } of salas.values()) void sala.sair()
       salas.clear()
     },
   }
