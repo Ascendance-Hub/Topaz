@@ -62,8 +62,11 @@ describe('ehFotoValida', () => {
     expect(MAX_BYTES_FOTO).toBeLessThan(200_000)
   })
 
-  it('o lado é pequeno — é um círculo de 52px na tela', () => {
-    expect(LADO_FOTO).toBeLessThanOrEqual(128)
+  it('o lado cobre o maior círculo da tela em densidade dupla', () => {
+    // A roda desenha a 144px. Menos que o dobro disso estica a foto, que foi
+    // exatamente o defeito; muito mais é peso na rede sem ninguém ver.
+    expect(LADO_FOTO).toBeGreaterThanOrEqual(288)
+    expect(LADO_FOTO).toBeLessThanOrEqual(384)
   })
 })
 

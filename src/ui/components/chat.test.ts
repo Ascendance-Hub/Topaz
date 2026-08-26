@@ -198,3 +198,56 @@ describe('o que chega de outro navegador', () => {
     expect(chat.raiz.querySelector('.chat-texto')!.textContent).toBe('boa sorte')
   })
 })
+
+describe('trocar o chat com o miolo', () => {
+  it('sem quem aplique a troca, o botão não existe', () => {
+    // Um botão que não muda nada seria um botão que engana.
+    const chat = criarChat(() => {})
+
+    expect(chat.raiz.querySelector('[data-chat="trocar"]')).toBeNull()
+  })
+
+  it('clicar pede a troca', () => {
+    const aoTrocar = vi.fn()
+    const chat = criarChat(() => {}, aoTrocar)
+
+    chat.raiz.querySelector<HTMLButtonElement>('[data-chat="trocar"]')!.click()
+
+    expect(aoTrocar).toHaveBeenCalledWith(true)
+  })
+
+  it('clicar de novo desfaz', () => {
+    const aoTrocar = vi.fn()
+    const chat = criarChat(() => {}, aoTrocar)
+    const botao = chat.raiz.querySelector<HTMLButtonElement>('[data-chat="trocar"]')!
+
+    botao.click()
+    botao.click()
+
+    expect(aoTrocar).toHaveBeenLastCalledWith(false)
+  })
+
+  it('o rótulo diz para onde vai, e muda junto', () => {
+    // "⇄" sozinho não diz o que acontece, e o que acontece depende de onde a
+    // pessoa está agora.
+    const chat = criarChat(() => {}, () => {})
+    const botao = chat.raiz.querySelector<HTMLButtonElement>('[data-chat="trocar"]')!
+
+    expect(botao.getAttribute('aria-label')).toContain('chat para o meio')
+
+    botao.click()
+
+    expect(botao.getAttribute('aria-label')).toContain('call para o meio')
+  })
+
+  it('o estado é anunciado como botão de duas posições', () => {
+    const chat = criarChat(() => {}, () => {})
+    const botao = chat.raiz.querySelector<HTMLButtonElement>('[data-chat="trocar"]')!
+
+    expect(botao.getAttribute('aria-pressed')).toBe('false')
+
+    botao.click()
+
+    expect(botao.getAttribute('aria-pressed')).toBe('true')
+  })
+})

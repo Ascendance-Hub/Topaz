@@ -97,6 +97,11 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // A rede não devolve ao remetente o que ele mesmo mandou; sem este eco,
     // eu seria o único da sala a não ver a própria mensagem.
     chat.receber(apelido, texto)
+  }, (trocado) => {
+    // Um atributo na raiz e o CSS resolve o resto: as duas áreas trocam de
+    // coluna, e nada se desmonta. Refazer o miolo aqui derrubaria o vídeo que
+    // está tocando, e a troca é justamente para continuar vendo os dois.
+    app.dataset['trocado'] = trocado ? '1' : ''
   })
   transporte.aoReceberMensagem((texto, peerId) => chat.receber(apelidoDe(peerId), texto))
 

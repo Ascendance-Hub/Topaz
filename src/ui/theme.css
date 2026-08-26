@@ -305,6 +305,36 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
     width: auto;
     align-items: stretch;
   }
+
+  /* O botão de trocar só existe onde há dois lugares para trocar. No celular o
+     chat é uma gaveta sobre a tela e não há miolo ao lado. */
+  #app:has(.trilho) .chat-trocar { display: inline-flex; }
+
+  /* ---------------------------------------------------------------------
+     TROCADO: o chat vai para o meio e a call para a lateral.
+
+     Só as COLUNAS mudam de dono — nada se desmonta. Refazer o miolo aqui
+     derrubaria o vídeo que está tocando, e a troca existe justamente para
+     continuar vendo os dois.
+
+     A borda acompanha quem foi para a direita: ela não é do chat nem da
+     call, é o que explica por que aquela coluna existe.
+     --------------------------------------------------------------------- */
+  #app:has(.trilho):has(.chat[data-aberto='1'])[data-trocado='1'] .lateral,
+  #app:has(.trilho):has(.mixer-linha)[data-trocado='1'] .lateral {
+    grid-column: 2;
+    grid-row: 3;
+    border-left: none;
+    padding-left: 0;
+  }
+  #app:has(.trilho)[data-trocado='1'] .conteudo {
+    grid-column: 3;
+    grid-row: 2 / -1;
+    border-left: 1px solid var(--latao-fraco);
+    padding-left: 20px;
+  }
+  /* No meio, a conversa merece a largura toda da coluna. */
+  #app:has(.trilho)[data-trocado='1'] .lateral .chat-log { max-width: none; }
 }
 
 /* ---------------------------------------------------------------------------
@@ -2215,7 +2245,10 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   justify-content: flex-start;
   gap: 14px;
   width: 108px;
-  padding-right: 4px;
+  /* A folga em volta é o brilho do anel, não enfeite: ele passa dos limites do
+     círculo, e a coluna rola — sem essa margem o `overflow` corta o halo de
+     quem está no topo. Foi o que apareceu na primeira pessoa da faixa. */
+  padding: 14px 10px;
   overflow-y: auto;
 }
 .roda[data-modo='faixa'] .roda-pessoa { width: 100%; gap: 6px; }
@@ -2248,4 +2281,37 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   color: var(--creme-tenue);
   text-align: center;
   margin: 0;
+}
+
+/* O cabeçalho do chat: o gatilho e, ao lado, a troca de lugar com o miolo. */
+.chat-cabeca {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Escondido por padrão: só faz sentido onde existe um miolo ao lado para
+   trocar, e o media query da tela grande é quem o revela. */
+.chat-trocar {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 999px;
+  border: 1px solid var(--latao-fraco);
+  background: transparent;
+  color: var(--creme-fraco);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 160ms var(--easing), border-color 160ms var(--easing),
+    background 160ms var(--easing);
+}
+.chat-trocar:hover { color: var(--topazio); border-color: var(--topazio); }
+.chat-trocar[aria-pressed='true'] {
+  color: var(--topazio);
+  border-color: var(--topazio);
+  background: rgba(240, 179, 74, 0.08);
 }

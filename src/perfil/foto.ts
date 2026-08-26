@@ -17,18 +17,33 @@
  * colar um ZIP no fim de um JPEG válido.
  */
 
-/** Lado do quadrado gerado. O círculo na tela tem 52px; 96 cobre telas de
- *  alta densidade sem virar peso na rede. */
-export const LADO_FOTO = 96
+/**
+ * Lado do quadrado gerado.
+ *
+ * 288 e não os 96 de antes: o número saía de um círculo de 52px na tela, e a
+ * roda de conversa desenha a 144px. Numa tela de alta densidade isso são 288
+ * pixels reais saindo de 96 — três vezes esticado, e é exatamente assim que
+ * parecia.
+ *
+ * O número é o maior lugar onde a foto aparece (144px) vezes a densidade de
+ * uma tela comum (2). Não é redondo de propósito: redondo aqui seria escolher
+ * o número por gosto em vez de pelo uso.
+ */
+export const LADO_FOTO = 288
 
 /**
  * Teto de bytes do texto que trafega.
  *
- * O nosso encolhimento produz uns 4 a 8 mil bytes. O teto é folgado para caber
- * uma foto com muito detalhe, e apertado o bastante para que ninguém mande
- * dezenas de megabytes e trave o navegador de todo mundo na sala.
+ * Subiu junto com o lado: nove vezes mais pixels não são nove vezes mais
+ * bytes (JPEG comprime melhor quanto maior a área), mas são umas quatro. O
+ * teto continua folgado para uma foto com muito detalhe, e apertado o
+ * bastante para ninguém mandar dezenas de megabytes e travar o navegador de
+ * todo mundo na sala.
+ *
+ * A foto viaja UMA vez por pessoa por sessão, então dezenas de milhares de
+ * bytes aqui não são custo de conversa — são custo de entrada.
  */
-export const MAX_BYTES_FOTO = 64_000
+export const MAX_BYTES_FOTO = 120_000
 
 /**
  * Só os formatos que o `canvas.toDataURL` sabe produzir.

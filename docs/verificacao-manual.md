@@ -553,8 +553,20 @@ Dura o tempo de um round-trip.
 - [ ] Mudo e sem microfone se distinguem um do outro
 - [ ] Assistindo uma tela, os círculos **encolhem para a lateral** e a tela
       fica com o meio
-- [ ] A tela compartilhada sai **nítida**, com texto legível — o padrão passou
-      a ser nitidez, não fluidez
+- [ ] A tela compartilhada nasce ruim e **se ajeita em 10–15s** — é o
+      codificador achando o bitrate, não defeito. Para tela parada de texto,
+      trocar o seletor para nitidez ajuda
+- [ ] Na faixa lateral, o brilho de quem fala **não é cortado** no primeiro
+      círculo
+- [ ] As fotos nos círculos grandes saem nítidas (é preciso **reescolher a
+      foto** uma vez: as guardadas antes têm 96px)
+
+## Trocar o chat com o miolo
+
+- [ ] O botão ⇄ aparece no cabeçalho do chat, só em tela grande
+- [ ] Clicar leva o chat para o meio e a call para a direita
+- [ ] Clicar de novo devolve
+- [ ] Com alguém compartilhando tela, a troca **não derruba o vídeo**
 - [ ] Parando de assistir, eles voltam ao centro
 
 ## Tela grande, com a call ligada
