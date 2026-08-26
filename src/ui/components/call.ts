@@ -85,7 +85,9 @@ export function renderizarControlesCall(
   contagem.className = 'call-contagem'
   // Eu conto: "2 na call" descreve a conversa, enquanto "1 na call" com alguém
   // do outro lado descreveria uma lista de terceiros que ninguém pediu.
-  contagem.textContent = `${estado.naCall.length + 1} na call`
+  // Quem está COMIGO, não quem está na sala: o número descreve a conversa de
+  // que eu faço parte. Quem está noutro canal aparece na lista de canais.
+  contagem.textContent = `${estado.comigo.length + 1} no canal`
 
   barra.append(contagem)
 
