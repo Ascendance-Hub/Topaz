@@ -246,6 +246,28 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   /* Sem isto os filhos encolheriam para caber, em vez de rolar. */
   .conteudo > * { flex: 0 0 auto; }
 
+  /* Assistindo alguém: a tela fica com o meio e a roda vira coluna ao lado.
+     `stretch` e não `safe center` porque agora as duas peças dividem a
+     ALTURA, e uma tela compartilhada centrada verticalmente deixaria faixas
+     de feltro em cima e embaixo por nada. */
+  .conteudo[data-assistindo='1'] {
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: flex-start;
+    overflow-y: hidden;
+  }
+  .conteudo[data-assistindo='1'] .palco { flex: none; overflow-y: auto; }
+  /* A tela cresce até o que sobrar. `min-width: 0` porque um item de flex não
+     encolhe abaixo do conteúdo sem isso, e um vídeo largo empurraria a roda
+     para fora. */
+  .conteudo[data-assistindo='1'] .call-videos {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+    justify-content: center;
+  }
+
   /* A largura passa a ser a da coluna: um `max-width` menor aqui dentro
      recentralizaria cada peça por conta própria e desalinharia de novo. */
   .barra-sala,
@@ -2185,4 +2207,114 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   font-size: 12.5px;
   color: var(--topazio);
   word-break: break-all;
+}
+
+/* ---------------------------------------------------------------------------
+   A RODA DE CONVERSA
+   ---------------------------------------------------------------------------
+   O miolo da sala era uma lista de nomes. Numa conversa por voz o que se olha
+   o tempo todo é quem está aqui, e nome escrito não é rosto.
+
+   Dois modos, e o layout do miolo inteiro depende de qual. Em `grade` os
+   círculos SÃO o conteúdo — grandes e centrados, porque nada disputa a
+   atenção. Em `faixa` eles encolhem para a lateral e a tela compartilhada
+   fica com o meio.
+   ------------------------------------------------------------------------ */
+.roda {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  gap: 26px 34px;
+}
+
+.roda-pessoa {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 116px;
+}
+
+.roda-circulo {
+  width: 104px;
+  height: 104px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(244, 235, 215, 0.06);
+  /* `box-shadow` e não `border`: o anel de quem fala engrossa sem mudar o
+     tamanho da caixa, então nada ao redor se mexe quando alguém fala. */
+  box-shadow: 0 0 0 1px var(--latao-fraco);
+  transition: box-shadow 200ms var(--easing), transform 200ms var(--easing);
+}
+.roda-circulo img { width: 100%; height: 100%; object-fit: cover; }
+
+.roda-inicial {
+  font-family: var(--display);
+  font-size: 40px;
+  color: var(--creme-fraco);
+  line-height: 1;
+}
+
+.roda-nome {
+  font-family: var(--corpo);
+  font-size: 13px;
+  color: var(--creme-fraco);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.roda-pessoa[data-eu='1'] .roda-nome { color: var(--creme); }
+
+/* Quem fala. O anel respira em vez de piscar: o brilho duro ligando e
+   desligando a cada sílaba vira um estrobo na periferia da visão. */
+.roda-pessoa[data-falando='1'] .roda-circulo {
+  box-shadow: 0 0 0 3px var(--topazio), 0 0 24px rgba(240, 179, 74, 0.35);
+}
+.roda-pessoa[data-falando='1'] .roda-nome { color: var(--topazio); }
+
+/* Mudo e sem microfone são coisas diferentes: um é escolha, o outro é o
+   aparelho que não abriu. A opacidade separada da borda tracejada mantém os
+   dois diagnósticos distinguíveis. */
+.roda-pessoa[data-mudo='1'] .roda-circulo { opacity: 0.45; }
+.roda-pessoa[data-sem-microfone='1'] .roda-circulo {
+  opacity: 0.45;
+  box-shadow: 0 0 0 1px var(--latao-fraco), inset 0 0 0 2px rgba(244, 235, 215, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roda-circulo { transition: none; }
+}
+
+/* MODO FAIXA --------------------------------------------------------------- */
+.roda[data-modo='faixa'] {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 14px;
+  width: 108px;
+  padding-right: 4px;
+  overflow-y: auto;
+}
+.roda[data-modo='faixa'] .roda-pessoa { width: 100%; gap: 6px; }
+.roda[data-modo='faixa'] .roda-circulo { width: 56px; height: 56px; }
+.roda[data-modo='faixa'] .roda-inicial { font-size: 21px; }
+.roda[data-modo='faixa'] .roda-nome { font-size: 11.5px; }
+.roda[data-modo='faixa'] .roda-pessoa[data-falando='1'] .roda-circulo {
+  box-shadow: 0 0 0 2px var(--topazio), 0 0 16px rgba(240, 179, 74, 0.3);
+}
+
+/* O "Na sala" quando a roda já ocupa o miolo. Ele continua sendo o único
+   lugar que mostra quem está na sala SEM estar em canal nenhum — a coluna da
+   esquerda só conhece quem entrou numa call. Mas vira coadjuvante. */
+.sala-parada[data-compacto='1'] {
+  margin-top: 8px;
+  opacity: 0.72;
+}
+.sala-parada[data-compacto='1'] .sala-titulo {
+  font-size: 15px;
+  margin-bottom: 8px;
 }

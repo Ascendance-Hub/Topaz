@@ -542,6 +542,18 @@ Dura o tempo de um round-trip.
 
 **O painel nunca foi visto num navegador de verdade**, só em DOM de teste.
 
+## O palco da call
+
+- [ ] Fora da call, o miolo continua sendo o "Na sala" de sempre
+- [ ] Entrando num canal, o miolo vira **círculos grandes** com as fotos
+- [ ] O anel de topázio acende no círculo de quem fala
+- [ ] Mudo e sem microfone se distinguem um do outro
+- [ ] "Na sala" continua embaixo, compacto — é o único lugar que mostra quem
+      está na sala sem estar em canal nenhum
+- [ ] Assistindo uma tela, os círculos **encolhem para a lateral** e a tela
+      fica com o meio
+- [ ] Parando de assistir, eles voltam ao centro
+
 ## Tela grande, com a call ligada
 
 A barra de controles é `fixed` no celular e faixa do grid no computador. Só a

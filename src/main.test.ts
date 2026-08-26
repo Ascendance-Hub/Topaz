@@ -1080,3 +1080,103 @@ describe('entrarNaSala — a coluna da esquerda', () => {
     }
   })
 })
+
+describe('entrarNaSala — o palco da call', () => {
+  function semMicrofone(): () => void {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices')
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: () =>
+          Promise.reject(Object.assign(new Error('x'), { name: 'NotAllowedError' })),
+        enumerateDevices: () => Promise.resolve([]),
+        addEventListener: () => {},
+      },
+    })
+    return () => {
+      if (original) Object.defineProperty(navigator, 'mediaDevices', original)
+      else Reflect.deleteProperty(navigator as unknown as object, 'mediaDevices')
+    }
+  }
+
+  async function escoar(): Promise<void> {
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+  }
+
+  function sala() {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
+    outraAba.entrar('Alex')
+    vi.mocked(criarSalasTrystero).mockImplementation(() => criarSalasFalsas([]).salas)
+    vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
+    const app = document.createElement('div')
+    entrarNaSala(app, 'Bruno', 'CODIGO01')
+    rede.bombear()
+    vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+    outraAba.tique(Date.now())
+    return app
+  }
+
+  it('fora da call o miolo continua sendo "Na sala"', () => {
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+
+      expect(app.querySelector('.roda')).toBeNull()
+      expect(app.querySelector('.sala-parada')).not.toBeNull()
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+
+  it('dentro do canal o miolo vira a roda de círculos', async () => {
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+      app.querySelector<HTMLButtonElement>('[data-call="entrar"]')!.click()
+      await escoar()
+
+      const roda = app.querySelector('.roda')!
+      expect(roda).not.toBeNull()
+      expect(roda.getAttribute('data-modo')).toBe('grade')
+      expect(roda.querySelectorAll('.roda-pessoa')).toHaveLength(1)
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+
+  it('"Na sala" continua junto, porque só ele mostra quem não está em canal', async () => {
+    // A coluna da esquerda só conhece quem entrou numa call.
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+      app.querySelector<HTMLButtonElement>('[data-call="entrar"]')!.click()
+      await escoar()
+
+      expect(app.querySelector('.sala-parada')!.getAttribute('data-compacto')).toBe('1')
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+
+  it('sem assistir ninguém, o miolo não está em modo de tela', async () => {
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+      app.querySelector<HTMLButtonElement>('[data-call="entrar"]')!.click()
+      await escoar()
+
+      expect(app.querySelector('.conteudo')!.getAttribute('data-assistindo')).toBe('')
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+})
