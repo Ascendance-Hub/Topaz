@@ -3,7 +3,6 @@ import { criarCanalCall } from './canal'
 import { criarTransporte } from '../net/transport'
 import { criarSalasFalsas } from '../net/salas.fake'
 import type { MensagemCall } from './protocolo'
-import { CANAL_PADRAO } from './protocolo'
 
 describe('criarCanalCall', () => {
   it('usa um canal próprio, sem encostar nos canais do jogo', () => {
@@ -18,7 +17,7 @@ describe('criarCanalCall', () => {
 
   it('envia para todos quando não há destinatário', () => {
     const { salas, acoes } = criarSalasFalsas()
-    const msg: MensagemCall = { tipo: 'estado', naCall: true, compartilhando: false, canal: CANAL_PADRAO }
+    const msg: MensagemCall = { tipo: 'estado', naCall: true, compartilhando: false }
 
     criarCanalCall(salas, criarTransporte(salas)).enviar(msg)
 
@@ -38,7 +37,7 @@ describe('criarCanalCall', () => {
     const { salas, acoes } = criarSalasFalsas()
     const recebido = vi.fn()
     criarCanalCall(salas, criarTransporte(salas)).aoReceber(recebido)
-    const msg: MensagemCall = { tipo: 'estado', naCall: true, compartilhando: true, canal: CANAL_PADRAO }
+    const msg: MensagemCall = { tipo: 'estado', naCall: true, compartilhando: true }
 
     acoes.get('call')!.entregar!(msg, 'pa')
 
