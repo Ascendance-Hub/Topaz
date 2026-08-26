@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // `main.ts` importa o transporte real do Trystero; substituímos por uma
 // fábrica controlável para poder ligar duas "sessões" (uma delas simulando
@@ -158,6 +158,48 @@ describe('entrarNaSala — estado da conexão em vez de mesa travada', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+/**
+ * O happy-dom não implementa `isSecureContext` — ele fica `undefined`, e o
+ * guarda de criptografia leria isso como página insegura. Declarar o ambiente
+ * aqui é dizer a verdade sobre onde o teste roda; o `crypto.subtle`, esse o
+ * happy-dom tem de verdade.
+ */
+function contextoSeguro(valor: boolean): () => void {
+  const antes = Object.getOwnPropertyDescriptor(window, 'isSecureContext')
+  Object.defineProperty(window, 'isSecureContext', { value: valor, configurable: true })
+  return () => {
+    if (antes) Object.defineProperty(window, 'isSecureContext', antes)
+    else delete (window as { isSecureContext?: boolean }).isSecureContext
+  }
+}
+
+beforeEach(() => {
+  const desfazer = contextoSeguro(true)
+  return desfazer
+})
+
+describe('sem criptografia no navegador', () => {
+  it('a página diz o que houve, em vez de montar uma sala que nunca conecta', () => {
+    const desfazer = contextoSeguro(false)
+    const app = document.createElement('div')
+
+    iniciarApp(app)
+
+    expect(app.textContent).toContain('https')
+    desfazer()
+  })
+
+  it('e não monta o lobby por baixo do aviso', () => {
+    const desfazer = contextoSeguro(false)
+    const app = document.createElement('div')
+
+    iniciarApp(app)
+
+    expect(app.querySelector('input[placeholder="Seu apelido"]')).toBeNull()
+    desfazer()
   })
 })
 
@@ -779,5 +821,99 @@ describe('iniciarApp — a home', () => {
 
     expect(app.querySelector('.teste-rede-relays-resumo')).toBeNull()
     expect(app.textContent).not.toContain('Servidores de descoberta')
+  })
+})
+
+describe('entrarNaSala — canais de voz', () => {
+  function semMicrofone(): () => void {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices')
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: () =>
+          Promise.reject(Object.assign(new Error('x'), { name: 'NotAllowedError' })),
+        enumerateDevices: () => Promise.resolve([]),
+        addEventListener: () => {},
+      },
+    })
+    return () => {
+      if (original) Object.defineProperty(navigator, 'mediaDevices', original)
+      else Reflect.deleteProperty(navigator as unknown as object, 'mediaDevices')
+    }
+  }
+
+  async function escoar(): Promise<void> {
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+  }
+
+  function sala() {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
+    outraAba.entrar('Alex')
+    vi.mocked(criarSalasTrystero).mockImplementation(() => salaFalsa())
+    vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
+    const app = document.createElement('div')
+    entrarNaSala(app, 'Bruno', 'CODIGO01')
+    rede.bombear()
+    vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+    outraAba.tique(Date.now())
+    return app
+  }
+
+  it('fora da call não há lista de canais', async () => {
+    // Fora dela não há para onde ir, e uma fileira de pílulas mortas seria
+    // só ruído.
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+
+      expect(app.querySelector('[data-canal]')).toBeNull()
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+
+  it('na call aparece o meu canal, e mais nenhum vazio', async () => {
+    // Um canal sem gente não existe: para sair de perto dos outros, abre-se um.
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+      app.querySelector<HTMLButtonElement>('[data-call="entrar"]')!.click()
+      await escoar()
+
+      expect(app.querySelectorAll('[data-canal]:not([data-canal="novo"])'))
+        .toHaveLength(1)
+      expect(app.querySelector('[data-canal="principal"]')!
+        .getAttribute('aria-current')).toBe('true')
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+
+  it('abrir um canal novo leva a pessoa para ele', async () => {
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+      app.querySelector<HTMLButtonElement>('[data-call="entrar"]')!.click()
+      await escoar()
+
+      app.querySelector<HTMLButtonElement>('[data-canal="novo"]')!.click()
+
+      // Sozinho na call, o canal antigo se esvazia e some — sobra o novo, com
+      // a pessoa dentro.
+      const pilulas = [...app.querySelectorAll('[data-canal]')]
+        .filter((b) => b.getAttribute('data-canal') !== 'novo')
+      expect(pilulas).toHaveLength(1)
+      expect(pilulas[0]!.getAttribute('data-canal')).not.toBe('principal')
+      expect(pilulas[0]!.getAttribute('aria-current')).toBe('true')
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
   })
 })

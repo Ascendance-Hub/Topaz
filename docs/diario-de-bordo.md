@@ -271,6 +271,46 @@ jogo entre amigos, e essa é a premissa de confiança que ele assume.
 
 ---
 
+## Capítulo 9 — O rollback, e um culpado que nunca confessou
+
+Os canais de voz subiram e a sala parou de conectar. Duas salas diferentes,
+duas falhas. Reversão imediata da `main`, e com ela a sala voltou.
+
+O que veio depois é a parte que interessa, porque a investigação **não
+encontrou o culpado**. A camada de rede não tinha sido tocada — `salas.ts`,
+`transport.ts` e `canal.ts` estavam byte a byte iguais à versão anterior. O
+deploy tinha passado. E o código revertido, rodando localmente em duas abas,
+conectava sem reclamar.
+
+Três achados de verdade saíram dessa caçada, e nenhum deles é a resposta:
+
+**Um ouvinte que estoura levava os outros junto.** Quem entra na sala avisa
+três assinantes pelo mesmo `for`: o jogo, a call e o anúncio de foto. Uma
+exceção no meio do laço apaga tudo que vem depois, em silêncio — e o sintoma é
+exatamente "entrei na sala e estou sozinho", com o chat e o jogo funcionando
+por cima. É a forma da falha, mesmo sem prova de que foi a falha. Agora cada
+ouvinte é isolado, e o estouro fica registrado em vez de engolido.
+
+**O `?.` que sumiu.** A guarda de anúncio repetido virou
+`anterior.compartilhando`, sem o `?.`. O TypeScript aceitou porque a
+comparação anterior estreita o tipo — mas `msg` vem da rede, e ali o tipo é uma
+promessa que ninguém do outro lado assinou. Reproduzido em teste, corrigido, e
+o canal da call passou a conferir o que chega, como `src/net/validar.ts` já
+fazia pelo jogo.
+
+**O site morria mudo sem https.** Descoberto por acidente: um teste pelo IP da
+rede local falhou, e o console mostrou `crypto.subtle` indefinido. O código da
+sala vira chave antes do primeiro anúncio, e essa conta só existe em contexto
+seguro. A identidade registrava o erro e seguia; o Trystero soltava rejeições
+que ninguém pegava; a pessoa via uma sala que não conectava, sem uma palavra na
+tela. Custou uma sessão inteira de investigação por um erro de montagem meu.
+
+A lição não é técnica. É que **"logo depois do merge" e "por causa do merge"
+não são a mesma coisa**, e que valia dizer isso em voz alta em vez de fechar o
+diagnóstico no primeiro suspeito plausível. A reversão ter resolvido também é
+compatível com relays de descoberta que voltaram sozinhos — foram vários
+falhando no console durante todo o episódio.
+
 ## Erros de processo que vale não repetir
 
 Não são erros de código; são de método, e custaram tempo real.
