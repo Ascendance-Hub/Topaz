@@ -529,6 +529,18 @@ Dura o tempo de um round-trip.
 
 **O painel nunca foi visto num navegador de verdade**, só em DOM de teste.
 
+## Tela grande, com a call ligada
+
+A barra de controles é `fixed` no celular e faixa do grid no computador. Só a
+segunda metade se confere aqui, e só numa janela larga (o DevTools aberto
+estreita a janela o bastante para desligar o grid — foi o que escondeu o
+defeito).
+
+- [ ] Com dois seletores de dispositivo e "compartilhar tela" na barra, os
+      canais e os avatares continuam **visíveis acima dela**
+- [ ] Nada de avatar ou selo espiando por baixo da barra
+- [ ] Abrindo o chat e o mixer de volumes, as faixas continuam no lugar
+
 ## Contexto seguro
 
 - [ ] Abrir o site pelo IP da rede local (`http://192.168.x.x:5173`) mostra a

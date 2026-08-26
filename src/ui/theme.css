@@ -181,7 +181,31 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   #app:has(.trilho) .conteudo { grid-column: 2; grid-row: 2; }
   #app:has(.trilho) .canais { grid-column: 2; grid-row: 3; }
   #app:has(.trilho) .participantes { grid-column: 2; grid-row: 4; }
-  #app:has(.trilho) .call-controles { grid-column: 2; grid-row: 5; }
+  /* `position: static` é o conserto: `fixed` tira o elemento do fluxo, e um
+     elemento fora do fluxo IGNORA o `grid-row` que a linha abaixo lhe dá. A
+     regra dizia "quinta faixa" e o navegador entendia "flutue por cima de
+     tudo" — então a barra cobria os canais e os avatares, que é exatamente
+     onde ela pousa.
+
+     Ninguém viu porque a barra cresceu depois: com só "mutar" e "sair" ela
+     era baixa e sobrava feltro embaixo das pessoas. Os dois seletores de
+     dispositivo e o "compartilhar tela" a fizeram embrulhar em três linhas, e
+     aí ela passou a alcançar as faixas de baixo.
+
+     No celular ela continua `fixed`, que é o certo lá: a página rola, e a
+     barra precisa acompanhar. Aqui a tela não rola — o `100dvh` já garante
+     que a faixa esteja sempre visível, e flutuar não compra nada. */
+  #app:has(.trilho) .call-controles {
+    grid-column: 2;
+    grid-row: 5;
+    position: static;
+    transform: none;
+    /* Sem isto o item de grid estica de ponta a ponta da coluna e a pílula
+       vira uma faixa. `center` a devolve ao tamanho do próprio conteúdo. */
+    justify-self: center;
+    max-width: 100%;
+    margin-top: 10px;
+  }
   /* Elementos de áudio não desenham nada; vão para a mesma célula da barra
      para não abrirem uma linha só deles. */
   #app:has(.trilho) .call-audios { grid-column: 2; grid-row: 1; }
