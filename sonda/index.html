@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Topaz — sonda de presença</title>
+    <meta name="theme-color" content="#061511" />
+    <meta name="robots" content="noindex, nofollow" />
+
+    <!-- Mesma política do site. Uma sonda com política mais frouxa provaria
+         algo sobre uma configuração que o site não usa. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self';
+               style-src 'self' 'unsafe-inline';
+               font-src 'self';
+               img-src 'self' data:;
+               connect-src 'self' wss: ws:;
+               worker-src 'self' blob:;
+               object-src 'none';
+               base-uri 'self';
+               form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+  </head>
+  <body>
+    <div id="sonda"></div>
+    <script type="module" src="/sonda/sonda.ts"></script>
+  </body>
+</html>
