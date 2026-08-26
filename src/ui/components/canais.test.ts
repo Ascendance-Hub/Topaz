@@ -1,10 +1,14 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest'
 import { renderizarCanais } from './canais'
+import type { Participante } from './participantes'
+
+const pessoa = (nome: string, extra: Partial<Participante> = {}): Participante =>
+  ({ peerId: nome.toLowerCase(), nome, ...extra })
 
 const canais = [
-  { id: 'principal', nome: 'Principal', pessoas: 3 },
-  { id: 'segundo', nome: 'Canal 2', pessoas: 1 },
+  { id: 'principal', nome: 'Principal', gente: [pessoa('Ana'), pessoa('Bia'), pessoa('Caio')] },
+  { id: 'segundo', nome: 'Canal 2', gente: [pessoa('Dan')] },
 ]
 
 const item = (a: HTMLElement, id: string) =>
@@ -16,6 +20,22 @@ describe('renderizarCanais', () => {
 
     expect(area.querySelectorAll('[data-canal]')).toHaveLength(2)
     expect(item(area, 'principal').textContent).toContain('3')
+  })
+
+  it('lista QUEM está em cada canal, que é o que decide para onde ir', () => {
+    const area = renderizarCanais(canais, 'principal', { mudar: vi.fn() })
+
+    const nomes = [...area.querySelectorAll('.canal-pessoa-nome')].map((n) => n.textContent)
+    expect(nomes).toEqual(['Ana', 'Bia', 'Caio', 'Dan'])
+  })
+
+  it('mostra as pessoas de um canal em que eu NÃO estou', () => {
+    // É metade do motivo de a sala ser uma só: dá para ver com quem se vai
+    // falar antes de trocar.
+    const area = renderizarCanais(canais, 'principal', { mudar: vi.fn() })
+    const outro = area.querySelector('[data-canal="segundo"]')!.parentElement!
+
+    expect(outro.querySelector('.canal-pessoa-nome')!.textContent).toBe('Dan')
   })
 
   it('marca onde eu estou', () => {
@@ -43,7 +63,6 @@ describe('renderizarCanais', () => {
   })
 
   it('quem lê por leitor de tela recebe as três informações', () => {
-    // A pílula diz visualmente: qual canal, quantos, e se é onde eu estou.
     const area = renderizarCanais(canais, 'segundo', { mudar: vi.fn() })
 
     const rotulo = item(area, 'segundo').getAttribute('aria-label')!
@@ -56,6 +75,52 @@ describe('renderizarCanais', () => {
     const area = renderizarCanais(canais, 'principal', { mudar: vi.fn() })
 
     expect(item(area, 'principal').getAttribute('aria-label')).toContain('3 pessoas')
+  })
+})
+
+describe('as pessoas na lista', () => {
+  it('quem tem foto aparece com ela', () => {
+    const foto = 'data:image/png;base64,AAAA'
+    const area = renderizarCanais(
+      [{ id: 'principal', nome: 'Principal', gente: [pessoa('Ana', { foto })] }],
+      'principal', { mudar: vi.fn() },
+    )
+
+    expect(area.querySelector('img')!.src).toBe(foto)
+  })
+
+  it('quem não tem foto aparece com a inicial', () => {
+    const area = renderizarCanais(canais, 'principal', { mudar: vi.fn() })
+
+    expect(area.querySelector('.canal-pessoa-circulo')!.textContent).toBe('A')
+  })
+
+  it('a foto não é anunciada duas vezes por leitor de tela', () => {
+    // O nome está logo ao lado; um `alt` com o nome faria o leitor repetir.
+    const area = renderizarCanais(
+      [{ id: 'principal', nome: 'Principal', gente: [pessoa('Ana', { foto: 'data:image/png;base64,A' })] }],
+      'principal', { mudar: vi.fn() },
+    )
+
+    expect(area.querySelector('img')!.alt).toBe('')
+  })
+
+  it('quem está falando fica marcado', () => {
+    const area = renderizarCanais(
+      [{ id: 'principal', nome: 'Principal', gente: [pessoa('Ana', { falando: true })] }],
+      'principal', { mudar: vi.fn() },
+    )
+
+    expect(area.querySelector('.canal-pessoa')!.getAttribute('data-falando')).toBe('1')
+  })
+
+  it('eu fico marcado, para me achar na lista', () => {
+    const area = renderizarCanais(
+      [{ id: 'principal', nome: 'Principal', gente: [pessoa('Eu', { euMesmo: true })] }],
+      'principal', { mudar: vi.fn() },
+    )
+
+    expect(area.querySelector('.canal-pessoa')!.getAttribute('data-eu')).toBe('1')
   })
 })
 
@@ -82,14 +147,7 @@ describe('abrir um canal novo', () => {
     expect(area.querySelector('[data-canal="novo"]')).toBeNull()
   })
 
-  it('o "+" sozinho não diz o que acontece — o rótulo diz', () => {
-    // E o que acontece é ir para lá, não só criar.
-    const area = renderizarCanais(canais, 'principal', { mudar: vi.fn(), abrir: vi.fn() })
-
-    expect(item(area, 'novo').getAttribute('aria-label')).toContain('ir para ele')
-  })
-
-  it('nenhum canal vazio aparece na fileira', () => {
+  it('nenhum canal vazio aparece na lista', () => {
     // Um canal sem gente não existe: quem quiser um novo abre.
     const area = renderizarCanais(canais, 'principal', { mudar: vi.fn(), abrir: vi.fn() })
 

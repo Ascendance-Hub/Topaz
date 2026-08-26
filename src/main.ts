@@ -44,6 +44,8 @@ import { renderizar } from './ui/render'
 import { rngSemente } from './game/shoe'
 import { mesaEsperaPor } from './game/rules'
 import { faltaCripto, renderizarSemCripto } from './ui/components/sem-cripto'
+import { renderizarSalasSalvas, type AcoesDeSalas } from './ui/components/salas-salvas'
+import { montarDoCanal, type FonteDeParticipantes } from './ui/components/participantes'
 
 /** Quem falou antes de a mesa saber o nome dele. */
 export const APELIDO_DESCONHECIDO = 'Alguém'
@@ -290,9 +292,16 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   }
 
   /** Junta o que a sala sabe e deixa a decisão com `montarParticipantes`. */
-  function participantesAgora(): Participante[] {
+  /**
+   * Tudo que se sabe sobre quem está na call, num lugar só.
+   *
+   * Serve à fileira de baixo e à lista de canais da esquerda. Separada porque
+   * as duas precisam exatamente do mesmo, e uma cópia divergiria na primeira
+   * vez que alguém acrescentasse um campo.
+   */
+  function fonteDeParticipantes(): FonteDeParticipantes {
     const atual = protocolo.estado()
-    return montarParticipantes({
+    return {
       euNaCall: atual.euNaCall,
       naCall: atual.comigo,
       meuApelido: apelido,
@@ -303,7 +312,30 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       fotos,
       selos,
       apelidoDe,
-    })
+    }
+  }
+
+  function participantesAgora(): Participante[] {
+    return montarParticipantes(fonteDeParticipantes())
+  }
+
+  /**
+   * Trocar de sala sem passar pela home.
+   *
+   * Desmonta ESTA sala antes de montar a outra, pelo mesmo caminho que
+   * `reconectar` usa: uma conexão de cada vez, e o desmonte é local para duas
+   * salas na mesma página continuarem sendo um caso de teste legítimo.
+   */
+  const acoesDeSalas: AcoesDeSalas = {
+    ir: (destino: string) => {
+      encerrar()
+      entrarNaSala(app, apelido, destino)
+    },
+    outra: () => {
+      encerrar()
+      window.location.hash = ''
+      iniciarApp(app)
+    },
   }
 
   try {
@@ -425,10 +457,24 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   // A fileira de pessoas fica logo acima da barra de controles: é onde
   // qualquer aplicativo de call põe, e essa é a metade convencional do
   // desenho — a diferença fica no material, não na disposição.
-  // Os canais ficam logo acima das pessoas: trocar de canal é trocar de quem
-  // está ali, e as duas coisas precisam ser lidas juntas.
-  let canais = renderizarCanais([], CANAL_PADRAO, { mudar: () => {} })
   let participantes = renderizarParticipantes([])
+
+  /**
+   * A coluna da esquerda: suas salas, os canais, e as seções.
+   *
+   * Os canais moraram no rodapé por um tempo e ficou ruim: uma fileira de
+   * pílulas embaixo dizia quantos, e o que se quer saber ao escolher um canal
+   * é COM QUEM. Vertical cabe o nome de cada pessoa, e sobra largura no meio
+   * para o que importa — a tela compartilhada.
+   *
+   * Os três moram no mesmo invólucro para o grid ter uma coluna só. Cada um
+   * se redesenha por dentro, sem a coluna se desmontar.
+   */
+  const coluna = document.createElement('div')
+  coluna.className = 'coluna'
+  let salasSalvas = renderizarSalasSalvas(grupos(), codigo, acoesDeSalas)
+  let canais = renderizarCanais([], CANAL_PADRAO, { mudar: () => {} })
+  coluna.append(salasSalvas, canais, nav)
   /**
    * O que rola: o palco e as telas compartilhadas, juntos.
    *
@@ -442,8 +488,29 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   conteudo.append(palco, area.videos)
 
   app.replaceChildren(
-    barra, nav, conteudo, canais, participantes, controles, lateral, area.audios,
+    barra, coluna, conteudo, participantes, controles, lateral, area.audios,
   )
+
+  /**
+   * Quem está falando, marcado no lugar.
+   *
+   * O anel acende trocando um atributo, sem refazer elemento nenhum: é a
+   * única parte da lista de canais que muda em ritmo de fala.
+   */
+  function acenderQuemFala(): void {
+    for (const linha of canais.querySelectorAll<HTMLElement>('.canal-pessoa')) {
+      const quem = linha.dataset['pessoa']
+      // Eu apareço sob a chave própria do medidor, não sob o meu peerId: o
+      // meu microfone é local e nunca chega pelo caminho de mídia recebida.
+      const falando = quem !== undefined
+        && falantes.has(linha.dataset['eu'] === '1' ? EU : quem)
+      if (falando) linha.dataset['falando'] = '1'
+      else delete linha.dataset['falando']
+    }
+  }
+
+  /** A assinatura da última lista desenhada, para não refazê-la à toa. */
+  let assinaturaDosCanais = ''
 
   /** Só a fileira, sem redesenhar o resto. Chamada a cada mudança de quem
    *  está falando, que acontece muitas vezes por minuto. */
@@ -451,18 +518,38 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     const atual = protocolo.estado()
     // A lista de canais só existe dentro da call: fora dela não há para onde
     // ir, e uma fileira de pílulas mortas seria só ruído.
-    const novosCanais = renderizarCanais(
-      atual.euNaCall ? atual.porCanal : [],
-      atual.meuCanal,
-      {
-        mudar: (id: string) => protocolo.mudarCanal(id),
-        // O botão só existe quando há id livre: um "+" que não abre nada
-        // seria um botão que engana.
-        ...(atual.podeAbrirCanal ? { abrir: () => protocolo.abrirCanal() } : {}),
-      },
-    )
-    canais.replaceWith(novosCanais)
-    canais = novosCanais
+    // A lista só se reconstrói quando a COMPOSIÇÃO muda. Esta função roda a
+    // cada mudança de quem fala, e refazer os retratos nesse ritmo mandaria o
+    // navegador redecodificar toda foto várias vezes por minuto — a mesma
+    // preocupação que fez a fileira existir separada do resto.
+    const assinatura = atual.euNaCall
+      ? `${atual.meuCanal}|${atual.podeAbrirCanal}|`
+        + atual.porCanal.map((c) => `${c.id}:${c.quem.join(',')}`).join(';')
+      : ''
+    if (assinatura !== assinaturaDosCanais) {
+      assinaturaDosCanais = assinatura
+      const novosCanais = renderizarCanais(
+        atual.euNaCall
+          ? atual.porCanal.map((c) => ({
+            id: c.id,
+            nome: c.nome,
+            // O protocolo entrega peerIds; nome e foto vêm do jogo e das
+            // fotos recebidas. É aqui que os dois vocabulários se encontram.
+            gente: montarDoCanal(c.quem, transporte.meuId(), fonteDeParticipantes()),
+          }))
+          : [],
+        atual.meuCanal,
+        {
+          mudar: (id: string) => protocolo.mudarCanal(id),
+          // O botão só existe quando há id livre: um "+" que não abre nada
+          // seria um botão que engana.
+          ...(atual.podeAbrirCanal ? { abrir: () => protocolo.abrirCanal() } : {}),
+        },
+      )
+      canais.replaceWith(novosCanais)
+      canais = novosCanais
+    }
+    acenderQuemFala()
 
     const nova = renderizarParticipantes(participantesAgora())
     participantes.replaceWith(nova)
@@ -477,6 +564,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     })
     barra.replaceWith(novaBarra)
     barra = novaBarra
+
+    const novasSalas = renderizarSalasSalvas(grupos(), codigo, acoesDeSalas)
+    salasSalvas.replaceWith(novasSalas)
+    salasSalvas = novasSalas
 
     const novaNav = renderizarTrilho(tela, irPara, { mesaEspera: mesaEspera() })
     nav.replaceWith(novaNav)

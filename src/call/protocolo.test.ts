@@ -227,7 +227,7 @@ describe('canais de voz', () => {
 
     expect(a.estado().naCall).toEqual(['pb'])
     const contagem = Object.fromEntries(
-      a.estado().porCanal.map((c) => [c.id, c.pessoas]),
+      a.estado().porCanal.map((c) => [c.id, c.quem.length]),
     )
     expect(contagem[CANAL_PADRAO]).toBe(1)
     expect(contagem[OUTRO]).toBe(1)
@@ -238,13 +238,13 @@ describe('canais de voz', () => {
     a.entrar()
 
     const meu = a.estado().porCanal.find((c) => c.id === CANAL_PADRAO)!
-    expect(meu.pessoas).toBe(1)
+    expect(meu.quem.length).toBe(1)
   })
 
   it('fora da call eu não conto em canal nenhum', () => {
     const { a } = doisPares()
 
-    expect(a.estado().porCanal.every((c) => c.pessoas === 0)).toBe(true)
+    expect(a.estado().porCanal.every((c) => c.quem.length === 0)).toBe(true)
   })
 
   it('trocar para o canal em que já estou não anuncia nada', () => {

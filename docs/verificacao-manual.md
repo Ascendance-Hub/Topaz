@@ -333,6 +333,12 @@ jogo — cada jogo terá o seu.
 Precisa de duas pessoas (ou duas abas com fones, para não haver microfonia).
 
 - [ ] Fora da call **não** aparece lista de canais
+- [ ] Os canais estão na **coluna da esquerda**, não no rodapé
+- [ ] Cada canal lista **quem** está nele, com foto e nome
+- [ ] Dá para ver quem está num canal em que você NÃO está
+- [ ] O anel acende no nome de quem fala, também na coluna
+- [ ] Suas salas salvas aparecem no topo da coluna, e clicar troca de sala
+- [ ] A sala em que você está fica marcada entre elas
 - [ ] Na call aparece **só o canal em que há gente**, mais o botão "+"
 - [ ] O "+" abre um canal novo e leva você para ele
 - [ ] Quando o último sai de um canal, ele **some sozinho** da fileira

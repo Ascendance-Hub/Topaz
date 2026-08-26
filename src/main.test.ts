@@ -956,3 +956,82 @@ describe('entrarNaSala — canais de voz', () => {
     }
   })
 })
+
+describe('entrarNaSala — a coluna da esquerda', () => {
+  function semMicrofone(): () => void {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices')
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: () =>
+          Promise.reject(Object.assign(new Error('x'), { name: 'NotAllowedError' })),
+        enumerateDevices: () => Promise.resolve([]),
+        addEventListener: () => {},
+      },
+    })
+    return () => {
+      if (original) Object.defineProperty(navigator, 'mediaDevices', original)
+      else Reflect.deleteProperty(navigator as unknown as object, 'mediaDevices')
+    }
+  }
+
+  function sala() {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
+    outraAba.entrar('Alex')
+    vi.mocked(criarSalasTrystero).mockImplementation(() => criarSalasFalsas([]).salas)
+    vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
+    const app = document.createElement('div')
+    entrarNaSala(app, 'Bruno', 'CODIGO01')
+    rede.bombear()
+    vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+    outraAba.tique(Date.now())
+    return app
+  }
+
+  it('a coluna existe e segura as três peças', () => {
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+      const coluna = app.querySelector('.coluna')!
+
+      expect(coluna).not.toBeNull()
+      expect(coluna.querySelector('.salas-salvas')).not.toBeNull()
+      expect(coluna.querySelector('.canais')).not.toBeNull()
+      expect(coluna.querySelector('.trilho')).not.toBeNull()
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+
+  it('os canais saíram do rodapé: ficam DENTRO da coluna', () => {
+    // Como pílula no rodapé a lista dizia quantos; o que se quer saber ao
+    // escolher um canal é com quem.
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+
+      expect(app.querySelector(':scope > .canais')).toBeNull()
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+
+  it('dá para entrar em outra sala sem passar pela home', () => {
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+
+      // Sempre existe ao menos o caminho de entrar numa sala não salva.
+      expect(app.querySelector('[data-sala="outra"]')).not.toBeNull()
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+})

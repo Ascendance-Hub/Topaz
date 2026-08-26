@@ -25,7 +25,7 @@ describe('a barra de controles ocupa a faixa que o grid reserva', () => {
   it('dentro do grid ela volta ao fluxo', () => {
     const dentro = regra(css, '#app:has(.trilho) .call-controles')
 
-    expect(dentro).toContain('grid-row: 5')
+    expect(dentro).toContain('grid-row: 4')
     expect(dentro).toContain('position: static')
   })
 
