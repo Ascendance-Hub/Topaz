@@ -226,10 +226,10 @@ Desenho completo em
 |---|---|---|
 | 1 | Identidade estável | **feito** |
 | 2 | Barra lateral + grupos persistentes | **feito** |
-| 3 | Presença entre grupos | **feito** |
+| 3 | Presença entre grupos + mensagem direta | a fazer |
 | 4 | Galeria de jogos + configuração da partida | **feito** |
 | 5 | Canais de voz | **feito** |
-| 6 | Amigos (com mensagem direta) | a fazer |
+| 6 | Amigos | a fazer |
 
 Decisões que já valem:
 
