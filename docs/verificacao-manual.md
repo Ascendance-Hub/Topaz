@@ -544,14 +544,17 @@ Dura o tempo de um round-trip.
 
 ## O palco da call
 
-- [ ] Fora da call, o miolo continua sendo o "Na sala" de sempre
+- [ ] "Na sala" fica **logo abaixo da barra**, numa linha só
+- [ ] Fora da call o miolo convida a entrar, em vez de ficar vazio
 - [ ] Entrando num canal, o miolo vira **círculos grandes** com as fotos
-- [ ] O anel de topázio acende no círculo de quem fala
+- [ ] **Não há duas fileiras de rostos** — a de baixo deixou de existir
+- [ ] O anel de topázio acende e respira no círculo de quem fala
+- [ ] O selo da identidade aparece embaixo do nome, na roda
 - [ ] Mudo e sem microfone se distinguem um do outro
-- [ ] "Na sala" continua embaixo, compacto — é o único lugar que mostra quem
-      está na sala sem estar em canal nenhum
 - [ ] Assistindo uma tela, os círculos **encolhem para a lateral** e a tela
       fica com o meio
+- [ ] A tela compartilhada sai **nítida**, com texto legível — o padrão passou
+      a ser nitidez, não fluidez
 - [ ] Parando de assistir, eles voltam ao centro
 
 ## Tela grande, com a call ligada

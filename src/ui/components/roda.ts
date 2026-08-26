@@ -1,3 +1,4 @@
+import { ehFotoValida } from '../../perfil/foto'
 import { inicialDe, type Participante } from './participantes'
 
 /**
@@ -26,7 +27,11 @@ function circulo(pessoa: Participante): HTMLElement {
   const area = document.createElement('div')
   area.className = 'roda-circulo'
 
-  if (pessoa.foto) {
+  // Segunda linha de defesa. `main.ts` já confere o que chega da rede, mas
+  // este componente não deve confiar em quem o chama: basta um caminho novo
+  // esquecer a conferência para virar `<img src>` com endereço de terceiro —
+  // e endereço de terceiro num `src` entrega o IP de quem olha.
+  if (pessoa.foto && ehFotoValida(pessoa.foto)) {
     const img = document.createElement('img')
     img.src = pessoa.foto
     // O nome está logo embaixo; repetir faria o leitor de tela dizer duas
@@ -65,6 +70,18 @@ export function renderizarRoda(
     nome.textContent = pessoa.nome
 
     item.append(circulo(pessoa), nome)
+
+    // O selo só existe depois de a pessoa PROVAR a identidade. Ele morava na
+    // fileira de baixo, que deixou de existir — e some-lo junto tiraria da
+    // tela a única prova de que aquele apelido é mesmo de quem diz ser.
+    if (pessoa.selo) {
+      const selo = document.createElement('span')
+      selo.className = 'roda-selo'
+      selo.textContent = pessoa.selo
+      selo.title = 'Selo da identidade desta pessoa'
+      item.append(selo)
+    }
+
     roda.append(item)
   }
 

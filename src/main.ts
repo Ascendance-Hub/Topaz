@@ -25,7 +25,7 @@ import { renderizarControlesCall } from './ui/components/call'
 import { renderizarMixer } from './ui/components/mixer'
 import { AreaDeMidia } from './ui/area-midia'
 import { criarAcoesCall } from './ui/acoes-da-call'
-import { EU, montarParticipantes, renderizarParticipantes } from './ui/components/participantes'
+import { EU, montarParticipantes } from './ui/components/participantes'
 import { renderizarCanais } from './ui/components/canais'
 import { CANAL_PADRAO } from './call/protocolo'
 import { fotoLembrada, fotoRecebida } from './perfil/foto-navegador'
@@ -455,10 +455,24 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   // elemento a cada ida e volta faria as cartas voarem de novo sem motivo.
   const palco = document.createElement('div')
   palco.className = 'palco'
-  // A fileira de pessoas fica logo acima da barra de controles: é onde
-  // qualquer aplicativo de call põe, e essa é a metade convencional do
-  // desenho — a diferença fica no material, não na disposição.
-  let participantes = renderizarParticipantes([])
+  /**
+   * A roda de conversa, irmã do palco e não filha dele.
+   *
+   * Ela precisa se redesenhar em ritmo de FALA, e o palco se redesenha em
+   * ritmo de partida. Dentro dele, o anel de quem fala só acenderia quando o
+   * jogo mudasse — que é o que acontecia até aqui.
+   */
+  let roda = renderizarRoda([])
+
+  /**
+   * Quem está na sala, logo abaixo da barra.
+   *
+   * Saiu do miolo: lá ele disputava o lugar com os rostos, e é informação de
+   * cabeçalho — quem está nesta sala, esteja em call ou não. Junto do código
+   * e do "2 de 2 conectados", que respondem à mesma pergunta.
+   */
+  let naSala = renderizarSalaParada(
+    sessao.estado(), sessao.meuId(), conectadosComigo())
 
   /**
    * A coluna da esquerda: suas salas, os canais, e as seções.
@@ -486,10 +500,12 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    */
   const conteudo = document.createElement('div')
   conteudo.className = 'conteudo'
-  conteudo.append(palco, area.videos)
+  // A roda vem antes: em modo faixa ela é a coluna da esquerda do miolo, e a
+  // ordem no DOM é a ordem na tela.
+  conteudo.append(roda, palco, area.videos)
 
   app.replaceChildren(
-    barra, coluna, conteudo, participantes, controles, lateral, area.audios,
+    barra, naSala, coluna, conteudo, controles, lateral, area.audios,
   )
 
   /**
@@ -499,6 +515,11 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * única parte da lista de canais que muda em ritmo de fala.
    */
   function acenderQuemFala(): void {
+    for (const item of roda.querySelectorAll<HTMLElement>('.roda-pessoa')) {
+      const quem = item.dataset['pessoa']
+      if (quem !== undefined && falantes.has(quem)) item.dataset['falando'] = '1'
+      else delete item.dataset['falando']
+    }
     for (const linha of canais.querySelectorAll<HTMLElement>('.canal-pessoa')) {
       const quem = linha.dataset['pessoa']
       // Eu apareço sob a chave própria do medidor, não sob o meu peerId: o
@@ -532,8 +553,23 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     acoesCall.entrar()
   }
 
+  /**
+   * O miolo de quem ainda não entrou na call.
+   *
+   * Antes ele mostrava a lista de quem está na sala; ela subiu para o topo, e
+   * o que sobra aqui é um espaço vazio. Vazio sem explicação lê como falha —
+   * uma linha dizendo o que fazer custa nada e responde a pergunta.
+   */
+  function renderizarConvite(): HTMLElement {
+    const convite = document.createElement('p')
+    convite.className = 'convite-call'
+    convite.textContent = 'Entre na call para conversar, ou clique num canal ao lado.'
+    return convite
+  }
+
   /** A assinatura da última lista desenhada, para não refazê-la à toa. */
   let assinaturaDosCanais = ''
+  let assinaturaDaRoda = ''
 
   /** Só a fileira, sem redesenhar o resto. Chamada a cada mudança de quem
    *  está falando, que acontece muitas vezes por minuto. */
@@ -572,9 +608,19 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     }
     acenderQuemFala()
 
-    const nova = renderizarParticipantes(participantesAgora())
-    participantes.replaceWith(nova)
-    participantes = nova
+    // A roda segue a mesma regra dos canais: só se refaz quando a composição
+    // muda. Assistindo alguém ela vira faixa, e o modo entra na assinatura
+    // porque muda o desenho inteiro.
+    const gente = participantesAgora()
+    const modo = atual.assistindo.length > 0 ? 'faixa' : 'grade'
+    const assinaturaRoda = `${modo}|`
+      + gente.map((p) => `${p.peerId}:${p.mudo}${p.semMicrofone}${p.selo ?? ''}`).join(',')
+    if (assinaturaRoda !== assinaturaDaRoda) {
+      assinaturaDaRoda = assinaturaRoda
+      const nova = renderizarRoda(gente, modo)
+      roda.replaceWith(nova)
+      roda = nova
+    }
   }
 
   function desenhar(): void {
@@ -585,6 +631,11 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     })
     barra.replaceWith(novaBarra)
     barra = novaBarra
+
+    const novoNaSala = renderizarSalaParada(
+      sessao.estado(), sessao.meuId(), conectadosComigo())
+    naSala.replaceWith(novoNaSala)
+    naSala = novoNaSala
 
     const novasSalas = renderizarSalasSalvas(grupos(), codigo, acoesDeSalas)
     salasSalvas.replaceWith(novasSalas)
@@ -668,28 +719,16 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // Assistindo alguém, a roda cede o meio para a tela e vira faixa. Saber
     // quem está falando importa MAIS com uma tela na frente, não menos — por
     // isso ela encolhe em vez de sumir.
-    const assistindo = call.assistindo.length > 0
-    conteudo.dataset['assistindo'] = assistindo ? '1' : ''
+    conteudo.dataset['assistindo'] = call.assistindo.length > 0 ? '1' : ''
 
+    // Dentro de um canal o miolo são os rostos, e quem desenha a roda é
+    // `desenharParticipantes` — aqui o palco fica de fora do caminho.
     if (call.euNaCall) {
-      // Dentro de um canal o miolo é a roda: numa conversa por voz, o que se
-      // olha o tempo todo é quem está aqui, e nome escrito não é rosto.
-      palco.replaceChildren(
-        renderizarRoda(participantesAgora(), assistindo ? 'faixa' : 'grade'))
-      // "Na sala" continua existindo, e é o único lugar que mostra quem está
-      // na sala SEM estar em canal nenhum — a coluna da esquerda só conhece
-      // quem entrou numa call. Compacto, porque agora é o coadjuvante.
-      if (!assistindo) {
-        const naSala = renderizarSalaParada(
-          sessao.estado(), sessao.meuId(), conectadosComigo())
-        naSala.dataset['compacto'] = '1'
-        palco.append(naSala)
-      }
+      palco.replaceChildren()
       return
     }
 
-    palco.replaceChildren(
-      renderizarSalaParada(sessao.estado(), sessao.meuId(), conectadosComigo()))
+    palco.replaceChildren(renderizarConvite())
 
     // Quem está sozinho é exatamente quem precisa do teste: a aplicação não
     // distingue de dentro "ninguém me achou" de "minha rede não deixa

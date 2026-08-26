@@ -436,10 +436,10 @@ describe('Midia — áudio do compartilhamento', () => {
     expect(faixaAudio.contentHint).toBe('music')
   })
 
-  it('a faixa de vídeo continua com a dica de vídeo, não de música', async () => {
+  it('a faixa de vídeo recebe dica de nitidez, e não de música', async () => {
     const { faixaVideo } = await telaComSom()
 
-    expect(faixaVideo.contentHint).toBe('motion')
+    expect(faixaVideo.contentHint).toBe('detail')
   })
 
   it('dá bitrate de música ao áudio da tela', async () => {

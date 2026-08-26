@@ -97,7 +97,15 @@ export class Midia {
   private micPara = new Set<string>()
   private telaPara = new Set<string>()
   private altura: number = ALTURA_PADRAO
-  private conteudo: TipoConteudo = 'motion'
+  /**
+   * `detail` e não `motion` por padrão.
+   *
+   * `motion` manda o codificador preferir fluidez a nitidez, e numa tela cheia
+   * de texto e interface o resultado é exatamente "ficou borrada". O caso
+   * comum de compartilhar tela é mostrar uma tela — código, site, documento —,
+   * não vídeo. Quem for mostrar um jogo troca no seletor, que continua ali.
+   */
+  private conteudo: TipoConteudo = 'detail'
   private mudo = false
   private idMicrofone: string | null = null
 
@@ -378,6 +386,18 @@ export class Midia {
       if (!encoding) continue
       encoding.active = ativo
       encoding.maxBitrate = BITRATE_POR_ALTURA[this.altura] ?? BITRATE_FALLBACK
+      // Sob aperto de banda ou de CPU, o que sacrificar. O padrão do navegador
+      // é `balanced`, que derruba a RESOLUÇÃO — e resolução derrubada numa
+      // tela de texto é texto ilegível, que é a única coisa que não pode
+      // acontecer aqui.
+      //
+      // Anda junto com o `contentHint`, e tem de andar: dizer "priorize
+      // nitidez" e deixar o navegador escolher derrubar nitidez seriam duas
+      // ordens contrárias. Quem escolheu `motion` está mostrando vídeo, e aí
+      // é o inverso — perder quadro é pior que perder pixel.
+      params.degradationPreference = this.conteudo === 'detail'
+        ? 'maintain-resolution'
+        : 'maintain-framerate'
       // A escala sai da altura REAL da captura, não de um 1080 presumido.
       // Numa tela 1440p ou 4K, presumir 1080 dava fator 1: mandava resolução
       // nativa com bitrate de tela pequena, e o resultado era exatamente o

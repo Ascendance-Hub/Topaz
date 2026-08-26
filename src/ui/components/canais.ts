@@ -1,3 +1,4 @@
+import { ehFotoValida } from '../../perfil/foto'
 import { inicialDe, type Participante } from './participantes'
 
 /**
@@ -36,7 +37,9 @@ function retratinho(pessoa: Participante): HTMLElement {
   const circulo = document.createElement('span')
   circulo.className = 'canal-pessoa-circulo'
 
-  if (pessoa.foto) {
+  // Mesma guarda da roda, e pelo mesmo motivo: um `src` de terceiro entrega
+  // o IP de quem olha a lista.
+  if (pessoa.foto && ehFotoValida(pessoa.foto)) {
     const img = document.createElement('img')
     img.src = pessoa.foto
     // A foto já se explica pelo nome ao lado; repetir seria o leitor de tela

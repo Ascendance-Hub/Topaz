@@ -154,3 +154,15 @@ describe('abrir um canal novo', () => {
     expect(area.textContent).not.toContain('vazio')
   })
 })
+
+describe('a foto na lista passa pelo mesmo portão', () => {
+  it('recusa endereço que não é foto nossa', () => {
+    const area = renderizarCanais(
+      [{ id: 'principal', nome: 'Principal', gente: [pessoa('Ana', { foto: 'https://exemplo.com/x.png' })] }],
+      'principal', { mudar: vi.fn() },
+    )
+
+    expect(area.querySelector('img')).toBeNull()
+    expect(area.querySelector('.canal-pessoa-circulo')!.textContent).toBe('A')
+  })
+})
