@@ -35,6 +35,15 @@ export interface AcoesConfiguracoes {
   renomear(apelido: string): void
   salvarGrupo(nome: string): void
   esquecerGrupo(): void
+  /**
+   * A foto mudou nesta máquina.
+   *
+   * O retrato guarda a foto sozinho; quem precisa saber é o resto do mundo —
+   * os peers, que só recebem foto quando alguém a anuncia, e os círculos, que
+   * já estão desenhados com a anterior. Sem esta ligação a foto era salva e
+   * mais nada acontecia, e só reentrar na sala a fazia aparecer.
+   */
+  trocouFoto(): void
   identidade: AcoesIdentidade
 }
 
@@ -97,7 +106,7 @@ function secaoVoce(
     acoes.renomear(novo)
   }
 
-  const retrato = renderizarRetrato(() => inicialDe(campo.value))
+  const retrato = renderizarRetrato(() => inicialDe(campo.value), acoes.trocouFoto)
   campo.addEventListener('input', () => retrato.atualizar())
 
   form.append(campo, salvar)

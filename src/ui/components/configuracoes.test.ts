@@ -8,6 +8,7 @@ const acoes = () => ({
   renomear: vi.fn(),
   salvarGrupo: vi.fn(),
   esquecerGrupo: vi.fn(),
+  trocouFoto: vi.fn(),
   identidade: { entrarComSegredo: vi.fn(), sair: vi.fn(), guardei: vi.fn() },
 })
 
@@ -138,5 +139,21 @@ describe('ordem das seções', () => {
       // "A partida" saiu daqui: o formato agora mora na aba de Jogos, no
       // cartão do jogo a que ele pertence.
       .toEqual(['Você', 'Esta sala', 'Sua identidade'])
+  })
+})
+
+describe('trocar a foto avisa o resto do mundo', () => {
+  it('o retrato recebe quem avisar', () => {
+    // O defeito era este: `renderizarRetrato` era chamado com um argumento só,
+    // e o segundo — o aviso — caía no padrão vazio. A foto era guardada e
+    // mais nada acontecia: os peers não recebiam, e os círculos continuavam
+    // com a anterior. Só reentrar na sala a fazia aparecer.
+    const meus = acoes()
+    const area = renderizarConfiguracoes(dados(), meus)
+
+    // Tirar a foto é o caminho que não depende de escolher arquivo.
+    area.querySelector<HTMLButtonElement>('[data-perfil="remover"]')!.click()
+
+    expect(meus.trocouFoto).toHaveBeenCalled()
   })
 })

@@ -129,6 +129,9 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     void fotoRecebida(foto).then((valida) => {
       if (!valida) return
       fotos.set(peerId, valida)
+      // Mesma razão da minha: a assinatura dos círculos não olha a foto, e sem
+      // isto a foto de quem trocou no meio da conversa nunca apareceria.
+      invalidarRostos()
       desenharParticipantes()
     })
   })
@@ -278,6 +281,16 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     esquecerGrupo: () => {
       removerGrupo(codigo)
       desenhar()
+    },
+    trocouFoto: () => {
+      // Os peers só recebem foto quando alguém a anuncia.
+      anunciarFoto()
+      // E os círculos já estão desenhados com a anterior: a assinatura deles
+      // não olha a foto — olhar exigiria comparar dezenas de milhares de
+      // caracteres a cada mudança de quem fala. Invalidar na mão é exato e
+      // custa nada, porque trocar de foto é raro.
+      invalidarRostos()
+      desenharParticipantes()
     },
     identidade: {
       guardei: () => {
@@ -594,6 +607,19 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   let assinaturaDosCanais = ''
   let assinaturaDaConfig = ''
   let assinaturaDaRoda = ''
+
+  /**
+   * Força o próximo desenho a refazer os rostos.
+   *
+   * As assinaturas comparam quem está onde, não como cada um está desenhado —
+   * incluir a foto obrigaria a concatenar dezenas de milhares de caracteres a
+   * cada mudança de quem fala, muitas vezes por minuto. Trocar de foto é raro,
+   * então avisar na mão é exato e muito mais barato que a alternativa.
+   */
+  function invalidarRostos(): void {
+    assinaturaDaRoda = ''
+    assinaturaDosCanais = ''
+  }
 
   /** Só a fileira, sem redesenhar o resto. Chamada a cada mudança de quem
    *  está falando, que acontece muitas vezes por minuto. */
