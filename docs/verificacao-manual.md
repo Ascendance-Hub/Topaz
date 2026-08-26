@@ -542,14 +542,6 @@ Dura o tempo de um round-trip.
 
 **O painel nunca foi visto num navegador de verdade**, só em DOM de teste.
 
-## Trocar de sala
-
-- [ ] **Reconectar** realmente reabre a conexão (antes reentrava na velha)
-- [ ] Trocando para um grupo que a presença observava, você **aparece para os
-      outros** — sem "Alguém" e sem "2 de 1 conectados"
-- [ ] E a voz vai de primeira, sem precisar sair e entrar na call
-- [ ] Clicar duas vezes rápido num grupo não monta duas salas
-
 ## Presença entre grupos salvos
 
 Precisa de duas máquinas: uma DENTRO de um grupo salvo, outra na tela inicial.

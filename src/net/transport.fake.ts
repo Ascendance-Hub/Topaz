@@ -131,9 +131,6 @@ export function criarRedeFalsa(opcoes: OpcoesRedeFalsa = {}) {
       aoSairPeer: (cb) => {
         no.aoSair.push(cb)
       },
-      // Assíncrono como o de verdade: lá o Trystero espera um envio e mais
-      // 99ms antes de desregistrar a sala, e quem reentra sem esperar recebe a
-      // sala velha. A rede falsa promete o mesmo contrato.
       sair: () => {
         nos.delete(id)
         visiveis.delete(id)
@@ -141,7 +138,6 @@ export function criarRedeFalsa(opcoes: OpcoesRedeFalsa = {}) {
           if (!visiveis.has(outro.id)) continue
           for (const cb of outro.aoSair) cb(id)
         }
-        return Promise.resolve()
       },
     }
   }

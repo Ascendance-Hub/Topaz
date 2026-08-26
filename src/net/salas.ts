@@ -40,17 +40,7 @@ export interface Salas {
   despublicarStream(stream: MediaStream, alvos?: string[]): void
   /** Troca a faixa sem renegociar; a rede sem esse sender ignora. */
   substituirFaixa(velha: MediaStreamTrack, nova: MediaStreamTrack): void
-  /**
-   * Fecha as salas — e é preciso ESPERAR.
-   *
-   * O `leave` do Trystero é assíncrono: ele envia um aviso aos peers e ainda
-   * espera 99ms antes de desregistrar a sala. Enquanto isso não termina,
-   * `joinRoom` no mesmo código devolve a MESMA sala
-   * (`strategy.mjs`: `if (occupiedRooms[appId]?.[roomId]) return ...`).
-   *
-   * Quem não espera reentra na sala velha achando que abriu uma nova.
-   */
-  sair(): Promise<void>
+  sair(): void
 }
 
 /**
@@ -186,11 +176,8 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
       // Sem alvo: a rede que não tem esse sender simplesmente não faz nada.
       for (const nomeada of salas) nomeada.sala.replaceTrack(velha, nova)
     },
-    sair: async () => {
-      // Uma falha ao avisar não pode impedir o desmonte das outras: o que
-      // importa aqui é a sala sair do registro do Trystero.
-      await Promise.all(salas.map((nomeada) =>
-        Promise.resolve(nomeada.sala.leave()).catch(() => {})))
+    sair: () => {
+      for (const nomeada of salas) void nomeada.sala.leave()
     },
   }
 }

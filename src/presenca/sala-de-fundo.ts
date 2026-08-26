@@ -1,32 +1,21 @@
 import { joinRoom as entrarNostr } from '@trystero-p2p/nostr'
-import { APP_ID, REDUNDANCIA } from '../net/transport'
+import { APP_ID } from '../net/transport'
 import type { SalaDeFundo } from './presenca'
 
 /**
  * A sala de um grupo que você NÃO abriu.
  *
- * Só nostr, mas com os MESMOS relays da sala de verdade — e aqui eu estava
- * errado antes.
- *
- * O desenho dizia "menos relays, porque presença é enfeite". A economia não
- * existia: o Trystero abre os sockets de relay UMA vez por estratégia e os
- * compartilha entre todas as salas do mesmo `appId`. Quatro relays não
- * economizavam socket nenhum — só reduziam a chance de ouvir.
- *
- * E reduziam muito, porque vários dos primeiros relays da lista estão mortos:
- * o console mostra `chorus`, `hol.is`, `artio` e `libernet` falhando o tempo
- * todo. A sala de verdade sobrevive a isso por ter vinte; a de fundo, com
- * quatro, assinava quase só relay morto e não ouvia ninguém.
- *
- * O que continua valendo do desenho original: só nostr. As outras duas redes
- * ficam para a sala em que a pessoa está.
+ * Só nostr, e com poucos relays. A sala em que a pessoa está usa as três redes
+ * de descoberta e vinte relays porque conectar ali é obrigação; aqui é
+ * enfeite, e enfeite não pode ameaçar a peça que mais custou para funcionar
+ * neste projeto.
  *
  * `passive: true` é o que torna isto viável. Passivo não anuncia e não
  * pré-fabrica conexões, e dois passivos nunca se conectam — então um grupo em
  * que ninguém está custa zero conexões, e o tráfego de anúncio não multiplica
  * pelo número de grupos salvos.
  */
-
+export const RELAYS_DE_FUNDO = 4
 
 interface SalaCrua {
   onPeerJoin: ((peerId: string) => void) | null
@@ -39,7 +28,7 @@ export function abrirSalaDeFundo(codigo: string): SalaDeFundo {
     {
       appId: APP_ID,
       passive: true,
-      relayConfig: { redundancy: REDUNDANCIA },
+      relayConfig: { redundancy: RELAYS_DE_FUNDO },
     } as Parameters<typeof entrarNostr>[0],
     codigo,
   ) as unknown as SalaCrua

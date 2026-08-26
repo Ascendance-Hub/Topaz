@@ -30,7 +30,7 @@
 export interface SalaDeFundo {
   aoEntrarPeer(cb: (peerId: string) => void): void
   aoSairPeer(cb: (peerId: string) => void): void
-  sair(): void | Promise<void>
+  sair(): void
 }
 
 export interface Presenca {
@@ -39,7 +39,7 @@ export interface Presenca {
   /** Acompanha a lista de grupos salvos: abre os novos, fecha os que saíram. */
   sincronizar(codigos: readonly string[]): void
   aoMudar(cb: () => void): void
-  encerrar(): Promise<void>
+  encerrar(): void
 }
 
 /**
@@ -121,15 +121,10 @@ export function observarGrupos(
     quantos: (codigo) => salas.get(codigo)?.gente.size ?? 0,
     sincronizar,
     aoMudar: (cb) => { ouvintes.push(cb) },
-    encerrar: async () => {
+    encerrar: () => {
       viva = false
-      const fechando = [...salas.values()].map(({ sala }) =>
-        Promise.resolve(sala.sair()).catch(() => {}))
+      for (const { sala } of salas.values()) sala.sair()
       salas.clear()
-      // Esperar importa: sem isso, entrar num grupo que estava sendo observado
-      // devolveria a sala PASSIVA em vez de abrir uma ativa. Passiva não
-      // anuncia — a pessoa entrava e ninguém a via.
-      await Promise.all(fechando)
     },
   }
 }

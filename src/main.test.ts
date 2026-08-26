@@ -1307,30 +1307,3 @@ describe('entrarNaSala — presença entre grupos', () => {
     }
   })
 })
-
-describe('entrarNaSala — trocar de sala espera o desmonte', () => {
-  it('reconectar abre uma sala NOVA, e não a que ainda estava saindo', async () => {
-    // O `leave` do Trystero desregistra a sala só depois de um envio e mais
-    // 99ms. Reentrar antes disso devolvia a MESMA sala — "Reconectar" não
-    // reconectava nada, e trocar para um grupo observado pela presença dava
-    // uma sala passiva, que não anuncia.
-    vi.useFakeTimers()
-    try {
-      const rede = criarRedeFalsa({ conexaoDiferida: true })
-      vi.mocked(criarSalasTrystero).mockImplementation(() => criarSalasFalsas([]).salas)
-      vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
-      const app = document.createElement('div')
-      entrarNaSala(app, 'Bruno', 'CODIGO01')
-      const antes = vi.mocked(criarSalasTrystero).mock.calls.length
-
-      app.querySelector<HTMLButtonElement>('[data-sala="reconectar"]')?.click()
-      // Tempo suficiente para a promessa de saída resolver; `runAllTimers`
-      // não serve porque a sala tem tiques periódicos e nunca esvazia.
-      await vi.advanceTimersByTimeAsync(300)
-
-      expect(vi.mocked(criarSalasTrystero).mock.calls.length).toBe(antes + 1)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-})

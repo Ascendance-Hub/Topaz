@@ -420,73 +420,6 @@ chat, com o `<details>` da conexão e com a roda de conversa.
 
 ---
 
-## Capítulo 12 — A sala fantasma
-
-Três defeitos relatados juntos, e uma causa só.
-
-**Problema.** A presença não via ninguém. Uma bolinha verde não apagava depois
-de a pessoa sair. E, ao trocar de grupo e entrar na call, a voz não ia — era
-preciso sair e entrar na call para funcionar. Junto disso, "Alguém" na roda e
-"2 de 1 conectados" na barra.
-
-**Causa.** `strategy.mjs`, linha 79:
-
-```js
-if (occupiedRooms[appId]?.[roomId]) return occupiedRooms[appId][roomId];
-```
-
-Entrar numa sala já aberta **devolve o mesmo objeto**. E o `leave` é
-assíncrono: `room.mjs` envia um aviso aos peers e **ainda espera 99ms** antes
-de desregistrar a sala.
-
-Nós não esperávamos. Então:
-
-1. A presença mandava `leave()` na sala de fundo e seguia em frente.
-2. `entrarNaSala` chamava `joinRoom` no mesmo código, imediatamente.
-3. A linha 79 devolvia a sala **passiva**, que ainda estava registrada.
-
-Passiva não anuncia. A pessoa entrava numa sala em que ninguém a via — daí o
-"Alguém" (peer conectado que a partida não conhece), o "2 de 1", e o áudio que
-só ia depois de sair e voltar da call.
-
-Pior: `onPeerJoin` é uma **propriedade única**. Com o mesmo objeto servindo à
-presença e à sala de verdade, quem atribuía por último apagava o outro — e era
-por isso que a bolinha verde não apagava.
-
-E valia para o **Reconectar** desde sempre: ele reentrava no mesmo código e
-recebia a conexão velha, sem reconectar nada.
-
-**Correção.** A saída passou a ser esperável ponta a ponta — `Salas.sair`,
-`Transporte.sair`, `Sessao.encerrar` e a presença devolvem promessa, e quem
-reentra numa sala espera. Com um guarda contra clique duplo, que montaria duas
-salas para a mesma aba.
-
-**O que foi descartado.** Usar um `appId` diferente para as salas de fundo
-resolveria a colisão de registro, mas o tópico da sala deriva do `appId` — elas
-deixariam de ver as pessoas que queriam observar. E correr uma corrida com
-tempo limite (entrar de qualquer jeito depois de 400ms) devolveria o defeito
-sempre que o limite vencesse.
-
-### E os relays, onde eu estava errado
-
-O desenho dizia "salas de fundo com menos relays, porque presença é enfeite".
-A economia não existia: o Trystero abre os sockets de relay **uma vez por
-estratégia** e os compartilha entre todas as salas do mesmo `appId`. Quatro
-relays não economizavam socket nenhum — só reduziam a chance de ouvir.
-
-E reduziam muito, porque vários dos primeiros relays da lista estão mortos: o
-console mostra `chorus`, `hol.is`, `artio` e `libernet` falhando o tempo todo.
-A sala de verdade sobrevive a isso por ter vinte; a de fundo, com quatro,
-assinava quase só relay morto.
-
-O Alexandre propôs "usar todas as redes primeiro e depois reduzir para a que
-respondeu". O diagnóstico dele estava certo — a redução era o problema —, mas
-a correção é mais simples do que a proposta: usar os mesmos vinte relays, que
-já estão abertos de graça. As outras duas redes continuam fora da presença,
-por enquanto.
-
----
-
 ## As ideias que vieram de fora do código
 
 Boa parte do que ficou bom aqui não saiu de mim. Vale registrar o que
@@ -544,10 +477,6 @@ que são as mais fáceis de esquecer.
   `contentHint` para `detail` achando que resolveria a tela borrada. O que eu
   fiz foi trocar um ajuste temporário por uma perda de fluidez permanente.
   Voltou para `motion`.
-- **"E se usarmos todas as redes primeiro e depois reduzirmos?"** O
-  diagnóstico estava certo: reduzir os relays da presença era problema. A
-  correção acabou sendo mais simples que a proposta — os vinte relays já estão
-  abertos e compartilhados, então não havia economia nenhuma em usar quatro.
 - **"Só acontece quando eu aperto F12."** Foi essa frase que resolveu o caso da
   barra cobrindo a tela. Eu estava caçando exceção em JavaScript; a resposta
   era CSS, e ele tinha dado a pista no primeiro print — um selo de identidade
