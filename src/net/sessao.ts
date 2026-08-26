@@ -366,7 +366,9 @@ export class Sessao {
     if (purgou || JSON.stringify(this.ctx.estado) !== antes) this.publicar()
   }
 
-  encerrar(): void {
-    this.transporte.sair()
+  /** Devolve promessa porque a saída do Trystero é assíncrona — e quem for
+   *  reentrar na mesma sala precisa esperar, senão recebe a sala velha. */
+  encerrar(): Promise<void> {
+    return this.transporte.sair()
   }
 }
