@@ -542,6 +542,19 @@ Dura o tempo de um round-trip.
 
 **O painel nunca foi visto num navegador de verdade**, só em DOM de teste.
 
+## Presença entre grupos salvos
+
+Precisa de duas máquinas: uma DENTRO de um grupo salvo, outra na tela inicial.
+
+- [ ] Com alguém dentro do grupo, a tela inicial mostra "1 online" no cartão
+- [ ] Essa pessoa saindo, o selo some
+- [ ] Grupo sem ninguém não mostra selo nenhum (e não "0 online")
+- [ ] Dentro de uma sala, o ícone de OUTRO grupo com gente ganha um ponto verde
+- [ ] O ícone da sala em que você está **não** ganha ponto
+- [ ] Removendo um grupo, ele para de ser observado na hora
+- [ ] Entrar numa sala não deixa conexões para trás — confira em "ver detalhes
+      de conexão" que a contagem de relays não cresce a cada navegação
+
 ## O palco da call
 
 - [ ] "Na sala" fica **logo abaixo da barra**, numa linha só

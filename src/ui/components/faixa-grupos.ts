@@ -18,6 +18,14 @@ export function renderizarFaixaGrupos(
   lista: Grupo[],
   aoEntrar: (codigo: string) => void,
   aoRemover: (codigo: string) => void,
+  /**
+   * Quantas OUTRAS pessoas estão em cada grupo agora.
+   *
+   * Chega por função e não por número dentro do `Grupo`: presença muda o tempo
+   * todo e o grupo salvo não, e guardar as duas coisas juntas faria a lista
+   * salva parecer volátil.
+   */
+  quantosEm: (codigo: string) => number = () => 0,
 ): HTMLElement {
   const faixa = document.createElement('section')
   faixa.className = 'faixa-grupos'
@@ -54,6 +62,18 @@ export function renderizarFaixaGrupos(
     codigo.textContent = formatarCodigo(grupo.codigo)
 
     entrar.append(nome, codigo)
+
+    // Só aparece quando há alguém. "0 online" é ruído: a ausência do selo já
+    // diz isso, e diz mais baixo.
+    const quantos = quantosEm(grupo.codigo)
+    if (quantos > 0) {
+      const online = document.createElement('span')
+      online.className = 'grupo-online'
+      online.dataset['online'] = grupo.codigo
+      online.textContent = `${quantos} online`
+      entrar.append(online)
+    }
+
     entrar.onclick = () => aoEntrar(grupo.codigo)
 
     const remover = document.createElement('button')
