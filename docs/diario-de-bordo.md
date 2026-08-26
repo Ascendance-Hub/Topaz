@@ -478,6 +478,30 @@ A rede que conecta uma pessoa não é a mesma que conecta outra.
 uma sonda e não acha o app. Isso não foi resolvido: foi contornado. Fica
 registrado como pergunta em aberto, não como coisa entendida.
 
+### O desfecho: achar a causa não bastou
+
+A correção funcionou — a presença passou a ver gente. E **mesmo assim ela foi
+retirada.**
+
+Com as três redes, cada grupo observado abre três salas de fundo, e elas
+colidem com o ciclo de vida da sala de verdade. O Trystero devolve a mesma sala
+ao entrar num id já registrado, só desregistra ~100 ms depois do `leave`, e
+destrói a piscina de relays quando a última sala fecha. Trocar de grupo passou
+a ser lento e inconstante.
+
+Corrigi três colisões: espaçar a abertura das salas, cancelar as que ficaram na
+fila, e esperar a sala estar de pé antes de observar — condição, não relógio.
+Cada correção melhorou e nenhuma resolveu.
+
+**A decisão foi voltar ao último estado que o usuário aprovou.** Presença é
+enfeite; trocar de grupo e conectar é o produto. Quatro tentativas atrapalhando
+o produto é três a mais do que eu devia ter insistido.
+
+O que a próxima tentativa precisa está em
+[`onde-paramos.md`](onde-paramos.md) — e o essencial é: uma sala de presença
+com **id próprio**, que não possa ser confundida com a sala de verdade, e nada
+acontecendo no momento da entrada.
+
 ### O erro de método, que é a lição
 
 Eu instrumentei **três vezes** antes de instrumentar direito:

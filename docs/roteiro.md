@@ -204,8 +204,18 @@ eliminam.
 
 ## O que falta
 
+### Onde paramos
+
+O estado atual, o que está pendente e como trabalhamos ficam em
+[`onde-paramos.md`](onde-paramos.md). **Comece por ele.**
+
 ### Defeitos conhecidos
 
+- **`Reconectar` reentra na conexão velha.** `joinRoom` num id já registrado
+  devolve a MESMA sala, e a saída do Trystero só desregistra ~100ms depois.
+  Esperar essa saída conserta — e destrói a piscina de relays, deixando a
+  reconexão lenta e às vezes falha. Ficou sem conserto, e ninguém nunca
+  percebeu o defeito.
 - **A conexão reserva não é adotada.** Quando a rede dona de um peer cai, a
   duplicata das outras redes não é promovida — o `onPeerJoin` dela já tinha
   sido ignorado. Ela custa memória e não serve para nada. Fechá-la não é a
