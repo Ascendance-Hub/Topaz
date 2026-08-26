@@ -5,6 +5,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // fábrica controlável para poder ligar duas "sessões" (uma delas simulando
 // outra aba/navegador) na mesma rede em memória usada pelos testes de
 // `Sessao`. `vi.mock` é hoisted para antes dos imports abaixo.
+/**
+ * As salas de fundo da presença abrem conexão de verdade com relays nostr.
+ * Nenhum teste aqui é sobre presença — e um teste que abre socket é lento
+ * quando funciona e intermitente quando não.
+ */
+vi.mock('./presenca/sala-de-fundo', () => ({
+  abrirSalaDeFundo: () => ({
+    aoEntrarPeer: () => {},
+    aoSairPeer: () => {},
+    sair: () => {},
+  }),
+}))
+
 vi.mock('./net/transport', () => ({
   criarSalasTrystero: vi.fn(),
   criarTransporte: vi.fn(),

@@ -542,6 +542,21 @@ Dura o tempo de um round-trip.
 
 **O painel nunca foi visto num navegador de verdade**, só em DOM de teste.
 
+## Presença entre grupos salvos
+
+Precisa de duas máquinas. **Abra o console (F12) nas duas** — a presença
+escreve uma linha `presença: CODIGO=N` a cada mudança, e é ela que separa
+"não achou ninguém" de "achou e não desenhou".
+
+- [ ] Com alguém dentro do grupo, a tela inicial mostra "1 online" no cartão
+- [ ] O console da máquina que observa escreve `presença: <codigo>=1`
+- [ ] Demora até ~8s do lado de quem está na sala — é o tempo que o Trystero
+      leva para ativar um observador passivo, não defeito
+- [ ] Essa pessoa saindo, o selo some e o console volta a `=0`
+- [ ] Dentro de uma sala, o ícone de OUTRO grupo com gente ganha um ponto verde
+- [ ] O ícone da sala em que você está **não** ganha ponto
+- [ ] **Trocar de grupo continua rápido** — é o que quebrou da última vez
+
 ## O palco da call
 
 - [ ] "Na sala" fica **logo abaixo da barra**, numa linha só

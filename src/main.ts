@@ -47,6 +47,8 @@ import { faltaCripto, renderizarSemCripto } from './ui/components/sem-cripto'
 import { renderizarSalasSalvas, type AcoesDeSalas } from './ui/components/salas-salvas'
 import { montarDoCanal, type FonteDeParticipantes } from './ui/components/participantes'
 import { renderizarRoda } from './ui/components/roda'
+import { observarGrupos } from './presenca/presenca'
+import { abrirSalaDeFundo } from './presenca/sala-de-fundo'
 
 /** Quem falou antes de a mesa saber o nome dele. */
 export const APELIDO_DESCONHECIDO = 'Alguém'
@@ -352,8 +354,20 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    */
   const acoesDeSalas: AcoesDeSalas = {
     ir: (destino: string) => {
-      encerrar()
-      entrarNaSala(app, apelido, destino)
+      // Espera SÓ a observação do destino fechar — nunca o resto.
+      //
+      // O Trystero devolve a mesma sala quando se entra num id já aberto, e a
+      // saída dele só desregistra depois de um envio e mais 99ms. Sem isto, a
+      // sala "nova" seria a passiva, que não anuncia.
+      //
+      // E só ela: enquanto ESTA sala continua registrada, a piscina de relays
+      // sobrevive. Esperar tudo fazia `hasActiveRooms()` virar falso, e o
+      // Trystero destruía as vinte conexões de relay e as vinte ofertas
+      // pré-fabricadas — foi o que deixou a troca de sala lenta e falhando.
+      void presenca.fecharUm(destino).then(() => {
+        encerrar()
+        entrarNaSala(app, apelido, destino)
+      })
     },
     outra: () => {
       encerrar()
@@ -523,7 +537,20 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    */
   const coluna = document.createElement('div')
   coluna.className = 'coluna'
-  let salasSalvas = renderizarSalasSalvas(grupos(), codigo, acoesDeSalas)
+  /**
+   * Os OUTROS grupos salvos, em modo passivo.
+   *
+   * Este aqui é ativo — é onde você está de verdade. Observar a si mesmo
+   * abriria uma segunda sala para a mesma conversa; pior, o Trystero devolve a
+   * MESMA sala nesse caso, e o `onPeerJoin` é uma propriedade única: uma das
+   * duas perderia o seu ouvinte.
+   */
+  const presenca = observarGrupos(
+    grupos().map((g) => g.codigo).filter((c) => c !== codigo), abrirSalaDeFundo)
+  presenca.aoMudar(() => desenharSalasSalvas())
+
+  let salasSalvas = renderizarSalasSalvas(
+    grupos(), codigo, acoesDeSalas, presenca.quantos)
   let canais = renderizarCanais([], CANAL_PADRAO, { mudar: () => {} })
   coluna.append(salasSalvas, canais, nav)
   /**
@@ -616,6 +643,16 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * cada mudança de quem fala, muitas vezes por minuto. Trocar de foto é raro,
    * então avisar na mão é exato e muito mais barato que a alternativa.
    */
+  /** Só a tira de salas, sem redesenhar o resto. */
+  function desenharSalasSalvas(): void {
+    presenca.sincronizar(
+      grupos().map((g) => g.codigo).filter((c) => c !== codigo))
+    const novas = renderizarSalasSalvas(
+      grupos(), codigo, acoesDeSalas, presenca.quantos)
+    salasSalvas.replaceWith(novas)
+    salasSalvas = novas
+  }
+
   function invalidarRostos(): void {
     assinaturaDaRoda = ''
     assinaturaDosCanais = ''
@@ -694,9 +731,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     naSala.replaceWith(novoNaSala)
     naSala = novoNaSala
 
-    const novasSalas = renderizarSalasSalvas(grupos(), codigo, acoesDeSalas)
-    salasSalvas.replaceWith(novasSalas)
-    salasSalvas = novasSalas
+    desenharSalasSalvas()
 
     const novaNav = renderizarTrilho(tela, irPara, { mesaEspera: mesaEspera() })
     nav.replaceWith(novaNav)
@@ -919,6 +954,9 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   }
 
   encerrar = () => {
+    // Sem esperar, de propósito: a sala nova é aberta logo em seguida, e
+    // enquanto a velha ainda está registrada a piscina de relays sobrevive.
+    void presenca.encerrar()
     clearInterval(tique)
     clearInterval(tiqueVoz)
     monitorVoz.encerrar()
@@ -1001,12 +1039,37 @@ export function iniciarApp(app: HTMLElement): void {
         app.querySelector<HTMLInputElement>('input[placeholder="Seu apelido"]')?.focus()
         return
       }
-      entrarNaSala(app, apelido, cod)
+      irParaSala(apelido, cod)
+    }
+
+    /**
+     * Quem está online em cada grupo salvo.
+     *
+     * Salas de fundo em modo passivo: elas não anunciam, e duas passivas nunca
+     * se conectam. Um grupo em que ninguém está custa zero conexões — é o que
+     * torna razoável abrir todos os salvos de uma vez.
+     */
+    const presenca = observarGrupos(
+      grupos().map((g) => g.codigo), abrirSalaDeFundo)
+    presenca.aoMudar(() => desenharHome())
+
+    /**
+     * Entrar numa sala fecha a observação DELA antes, e espera.
+     *
+     * Aqui não custa: vindo da tela inicial não há sala aberta, então não há
+     * piscina de relays quente para perder — ela seria construída de qualquer
+     * jeito. É dentro de uma sala que esperar demais machuca.
+     */
+    const irParaSala = (apelido: string, codigo: string): void => {
+      void presenca.fecharUm(codigo)
+        .then(() => entrarNaSala(app, apelido, codigo))
     }
 
     const desenharHome = (): void => {
+      // Grupo removido (ou salvo noutra aba) deixa de ser observado na hora.
+      presenca.sincronizar(grupos().map((g) => g.codigo))
       app.replaceChildren(renderizarHome(
-        (apelido, codigo) => entrarNaSala(app, apelido, codigo),
+        irParaSala,
         // Sem a lista de servidores, de propósito. Aqui ninguém entrou em sala
         // ainda, então nenhum socket está aberto e a contagem sairia "0 de 20"
         // — que lê como falha catastrófica para quem acabou de abrir a página.
@@ -1018,7 +1081,7 @@ export function iniciarApp(app: HTMLElement): void {
           grupos: renderizarFaixaGrupos(grupos(), entrarNoGrupo, (cod) => {
             removerGrupo(cod)
             desenharHome()
-          }),
+          }, presenca.quantos),
         },
       ))
     }
