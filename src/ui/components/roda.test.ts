@@ -93,3 +93,21 @@ describe('os dois modos', () => {
     expect(renderizarRoda([]).getAttribute('data-modo')).toBe('grade')
   })
 })
+
+describe('a foto passa por um portão antes de virar src', () => {
+  it('recusa endereço que não é foto nossa', () => {
+    // Segunda linha de defesa. `main.ts` já confere o que chega da rede, mas
+    // o componente não deve confiar em quem o chama: um `src` de terceiro
+    // entrega o IP de quem olha a tela.
+    const roda = renderizarRoda([pessoa('Ana', { foto: 'https://exemplo.com/x.png' })])
+
+    expect(roda.querySelector('img')).toBeNull()
+    expect(roda.querySelector('.roda-inicial')!.textContent).toBe('A')
+  })
+
+  it('aceita a foto redesenhada aqui dentro', () => {
+    const roda = renderizarRoda([pessoa('Ana', { foto: 'data:image/jpeg;base64,AAAA' })])
+
+    expect(roda.querySelector('img')).not.toBeNull()
+  })
+})

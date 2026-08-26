@@ -360,13 +360,15 @@ describe('entrarNaSala — a sala é o espaço, a mesa é uma escolha', () => {
     try {
       const { app } = salaConectada()
 
+      // "Na sala" mora no topo agora, fora do palco: ele responde "quem está
+      // nesta sala", que vale tanto na mesa quanto fora dela.
       clicar(app, 'mesa')
       expect(app.querySelector('.mesa')).not.toBeNull()
-      expect(app.querySelector('.sala-parada')).toBeNull()
+      expect(app.querySelector('.convite-call')).toBeNull()
 
       clicar(app, 'sala')
       expect(app.querySelector('.mesa')).toBeNull()
-      expect(app.querySelector('.sala-parada')).not.toBeNull()
+      expect(app.querySelector('.convite-call')).not.toBeNull()
     } finally {
       vi.useRealTimers()
     }
@@ -971,7 +973,7 @@ describe('entrarNaSala — canais de voz', () => {
       )
 
       expect(app.querySelector('[data-canal="principal"]')!.textContent).toContain('2')
-      expect(app.querySelectorAll('.participante').length).toBe(2)
+      expect(app.querySelectorAll('.roda-pessoa').length).toBe(2)
     } finally {
       desfazer()
       vi.useRealTimers()
@@ -1117,14 +1119,15 @@ describe('entrarNaSala — o palco da call', () => {
     return app
   }
 
-  it('fora da call o miolo continua sendo "Na sala"', () => {
+  it('fora da call o miolo convida a entrar, em vez de ficar vazio', () => {
+    // Vazio sem explicação lê como falha.
     vi.useFakeTimers()
     const desfazer = semMicrofone()
     try {
       const app = sala()
 
-      expect(app.querySelector('.roda')).toBeNull()
-      expect(app.querySelector('.sala-parada')).not.toBeNull()
+      expect(app.querySelector('.roda-pessoa')).toBeNull()
+      expect(app.querySelector('.convite-call')).not.toBeNull()
     } finally {
       desfazer()
       vi.useRealTimers()
@@ -1149,8 +1152,10 @@ describe('entrarNaSala — o palco da call', () => {
     }
   })
 
-  it('"Na sala" continua junto, porque só ele mostra quem não está em canal', async () => {
-    // A coluna da esquerda só conhece quem entrou numa call.
+  it('"Na sala" fica no topo, logo abaixo da barra', async () => {
+    // Ele responde à mesma pergunta que o código e o "2 de 2 conectados": quem
+    // está nesta sala, esteja em call ou não. No miolo disputava lugar com os
+    // rostos, que é outra pergunta.
     vi.useFakeTimers()
     const desfazer = semMicrofone()
     try {
@@ -1158,7 +1163,27 @@ describe('entrarNaSala — o palco da call', () => {
       app.querySelector<HTMLButtonElement>('[data-call="entrar"]')!.click()
       await escoar()
 
-      expect(app.querySelector('.sala-parada')!.getAttribute('data-compacto')).toBe('1')
+      const filhos = [...app.children]
+      const posBarra = filhos.findIndex((f) => f.classList.contains('barra-sala'))
+      const posSala = filhos.findIndex((f) => f.classList.contains('sala-parada'))
+      expect(posSala).toBe(posBarra + 1)
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+
+  it('não há duas fileiras de rostos: só a roda', async () => {
+    // A fileira de baixo e a roda mostravam a mesma gente duas vezes.
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const app = sala()
+      app.querySelector<HTMLButtonElement>('[data-call="entrar"]')!.click()
+      await escoar()
+
+      expect(app.querySelector('.participantes')).toBeNull()
+      expect(app.querySelectorAll('.roda')).toHaveLength(1)
     } finally {
       desfazer()
       vi.useRealTimers()
