@@ -284,7 +284,7 @@ describe('entrarNaSala — chat da sala', () => {
     try {
       const { app, transporteA } = salaComDoisJogadores()
 
-      transporteA.enviarMensagem('e aí')
+      transporteA.enviarMensagem('e aí', 'geral')
 
       const linha = app.querySelector('.chat-linha')!
       expect(linha.textContent).toContain('Alex')
@@ -299,7 +299,7 @@ describe('entrarNaSala — chat da sala', () => {
     vi.useFakeTimers()
     try {
       const { app, transporteA, outraAba } = salaComDoisJogadores()
-      transporteA.enviarMensagem('e aí')
+      transporteA.enviarMensagem('e aí', 'geral')
       const campo = digitar(app, 'ainda estou escrevend')
 
       // Cada despacho do host publica um snapshot novo, e cada snapshot

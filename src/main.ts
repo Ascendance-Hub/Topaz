@@ -92,18 +92,23 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   // todos os filhos do `palco` a cada mudança de estado, e um campo de texto
   // ali dentro perderia foco e conteúdo a cada broadcast do host. Por isso
   // ele é irmão do palco, não filho.
-  const chat = criarChat((texto) => {
-    transporte.enviarMensagem(texto)
+  const chat = criarChat((texto, escopo) => {
+    // No canal, vai só para quem está comigo — e é isso que o torna do canal.
+    // Mandar a todos e esconder na tela deixaria o texto viajando para quem
+    // não devia recebê-lo.
+    if (escopo === 'canal') transporte.enviarMensagem(texto, escopo, protocolo.estado().comigo)
+    else transporte.enviarMensagem(texto, escopo)
     // A rede não devolve ao remetente o que ele mesmo mandou; sem este eco,
     // eu seria o único da sala a não ver a própria mensagem.
-    chat.receber(apelido, texto)
+    chat.receber(apelido, texto, escopo)
   }, (trocado) => {
     // Um atributo na raiz e o CSS resolve o resto: as duas áreas trocam de
     // coluna, e nada se desmonta. Refazer o miolo aqui derrubaria o vídeo que
     // está tocando, e a troca é justamente para continuar vendo os dois.
     app.dataset['trocado'] = trocado ? '1' : ''
   })
-  transporte.aoReceberMensagem((texto, peerId) => chat.receber(apelidoDe(peerId), texto))
+  transporte.aoReceberMensagem((texto, peerId, escopo) =>
+    chat.receber(apelidoDe(peerId), texto, escopo))
 
   /**
    * Anuncia a minha foto para a sala inteira.
@@ -429,7 +434,20 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     }
   }
 
+  /** Em que canal a aba de conversa está aberta agora. `''` fora da call. */
+  let canalDoChat = ''
+
   protocolo.aoMudar(() => {
+    const atual = protocolo.estado()
+    const agora = atual.euNaCall ? atual.meuCanal : ''
+    chat.definirEmCanal(atual.euNaCall)
+    // Mudou de canal (ou saiu): a conversa de lá foi endereçada às pessoas com
+    // quem você estava. Mantê-la na tela enquanto você fala com outras
+    // confunde de quem é o quê — e some junto com o motivo de existir.
+    if (agora !== canalDoChat) {
+      chat.limparCanal()
+      canalDoChat = agora
+    }
     sincronizarMidia()
     desenhar()
   })
@@ -574,6 +592,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
 
   /** A assinatura da última lista desenhada, para não refazê-la à toa. */
   let assinaturaDosCanais = ''
+  let assinaturaDaConfig = ''
   let assinaturaDaRoda = ''
 
   /** Só a fileira, sem redesenhar o resto. Chamada a cada mudança de quem
@@ -629,6 +648,13 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   }
 
   function desenhar(): void {
+    // A roda e os vídeos são irmãos persistentes do palco: eles NÃO são
+    // trocados quando a tela muda, e por isso continuavam aparecendo por baixo
+    // dos Ajustes e da galeria. Quem some é o CSS, e não o DOM: desmontar o
+    // vídeo o faria recomeçar do zero ao voltar, e a prévia da própria tela
+    // morreria junto.
+    conteudo.dataset['tela'] = tela
+
     const novaBarra = renderizarBarraSala(codigo, sessao.souHost(), {
       aoReconectar: reconectar,
       naSala: sessao.estado().jogadores.length,
@@ -710,13 +736,26 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     }
 
     if (tela === 'config') {
-      palco.replaceChildren(renderizarConfiguracoes({
-        apelido: sessao.estado().jogadores.find((j) => j.peerId === sessao.meuId())
-          ?.apelido ?? apelido,
-        codigo,
-        grupo: grupoSalvo(codigo),
-        identidade,
-      }, acoesConfiguracoes))
+      const meuApelido = sessao.estado().jogadores.find((j) => j.peerId === sessao.meuId())
+        ?.apelido ?? apelido
+      const grupo = grupoSalvo(codigo)
+      // Só refaz quando algo REALMENTE mudou.
+      //
+      // `desenhar` roda a cada tique e a cada mudança da sala — várias vezes
+      // por minuto. O painel tem um `<input type="file">` dentro, e o diálogo
+      // do sistema fica aberto por segundos: refazer o painel nesse meio-tempo
+      // desliga o campo que estava esperando o arquivo, e escolher a foto não
+      // faz nada. Era por isso que só funcionava na tela inicial, onde nada
+      // redesenha sozinho.
+      //
+      // Vale para os campos de texto pelo mesmo motivo: um nome sendo digitado
+      // sumia no meio da digitação.
+      const assinatura = `${meuApelido}|${grupo?.nome ?? ''}|${identidade?.selo ?? ''}`
+      if (assinatura !== assinaturaDaConfig || palco.querySelector('.config') === null) {
+        assinaturaDaConfig = assinatura
+        palco.replaceChildren(renderizarConfiguracoes(
+          { apelido: meuApelido, codigo, grupo, identidade }, acoesConfiguracoes))
+      }
       return
     }
 

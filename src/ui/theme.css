@@ -2158,6 +2158,14 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   word-break: break-all;
 }
 
+/* Fora da tela da sala, a roda e os vídeos somem — mas continuam no DOM.
+   Desmontá-los faria o vídeo recomeçar do zero ao voltar dos Ajustes, e a
+   prévia da própria tela morreria junto. `display: none` para de desenhar sem
+   soltar nada, e o áudio da tela continua tocando, que é o que se quer: quem
+   foi mexer nos ajustes não deixou a conversa. */
+.conteudo:not([data-tela='sala']) > .roda,
+.conteudo:not([data-tela='sala']) > .call-videos { display: none; }
+
 /* ---------------------------------------------------------------------------
    A RODA DE CONVERSA
    ---------------------------------------------------------------------------
@@ -2315,3 +2323,38 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   border-color: var(--topazio);
   background: rgba(240, 179, 74, 0.08);
 }
+
+/* AS DUAS CONVERSAS ---------------------------------------------------------
+   Sala e canal. Não é um filtro sobre a mesma conversa: a do canal é ENVIADA
+   só para quem está no seu canal. Duas abas, e não etiquetas numa lista só —
+   quem escreve num canal está falando com aquelas pessoas, e misturar as duas
+   obrigaria a ler etiqueta em cada linha para saber quem ouviu o quê. */
+.chat-abas {
+  display: flex;
+  gap: 6px;
+}
+.chat-abas[hidden] { display: none; }
+
+.chat-aba {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 13px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--creme-tenue);
+  font-family: var(--corpo);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 160ms var(--easing), border-color 160ms var(--easing),
+    background 160ms var(--easing);
+}
+.chat-aba:hover { color: var(--creme); }
+.chat-aba[data-ativa='1'] {
+  color: var(--topazio);
+  border-color: var(--latao-fraco);
+  background: rgba(240, 179, 74, 0.07);
+}
+.chat-aba[hidden] { display: none; }
+.chat-log[hidden] { display: none; }
