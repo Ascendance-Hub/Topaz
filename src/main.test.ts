@@ -860,6 +860,22 @@ describe('entrarNaSala — canais de voz', () => {
     return app
   }
 
+  /** Como `sala()`, mas guardando as ações para simular o outro lado. */
+  function salaComCanal() {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    const outraAba = new Sessao(rede.conectar('pa'), () => rngSemente(1))
+    outraAba.entrar('Alex')
+    const falsas = criarSalasFalsas([])
+    vi.mocked(criarSalasTrystero).mockImplementation(() => falsas.salas)
+    vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
+    const app = document.createElement('div')
+    entrarNaSala(app, 'Bruno', 'CODIGO01')
+    rede.bombear()
+    vi.advanceTimersByTime(MS_DESCOBERTA + 600)
+    outraAba.tique(Date.now())
+    return { app, acoes: falsas.acoes }
+  }
+
   it('fora da call não há lista de canais', async () => {
     // Fora dela não há para onde ir, e uma fileira de pílulas mortas seria
     // só ruído.
@@ -888,6 +904,29 @@ describe('entrarNaSala — canais de voz', () => {
         .toHaveLength(1)
       expect(app.querySelector('[data-canal="principal"]')!
         .getAttribute('aria-current')).toBe('true')
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+
+  it('com OUTRA pessoa na call, aparecem os avatares e o canal com 2', async () => {
+    // O caso que nenhum teste cobria: até agora todos tinham só a própria
+    // pessoa na call. Foi assim que os avatares sumiram sem ninguém notar.
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const { app, acoes } = salaComCanal()
+      app.querySelector<HTMLButtonElement>('[data-call="entrar"]')!.click()
+      await escoar()
+
+      acoes.get('call')!.entregar!(
+        { tipo: 'estado', naCall: true, compartilhando: false, canal: 'principal' },
+        'pa',
+      )
+
+      expect(app.querySelector('[data-canal="principal"]')!.textContent).toContain('2')
+      expect(app.querySelectorAll('.participante').length).toBe(2)
     } finally {
       desfazer()
       vi.useRealTimers()
