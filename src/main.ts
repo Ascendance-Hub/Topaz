@@ -353,14 +353,12 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * salas na mesma página continuarem sendo um caso de teste legítimo.
    */
   const acoesDeSalas: AcoesDeSalas = {
-    ir: (destino: string) => {
-      encerrar()
-      entrarNaSala(app, apelido, destino)
-    },
+    ir: (destino: string) => { void trocarPara(destino) },
     outra: () => {
-      encerrar()
-      window.location.hash = ''
-      iniciarApp(app)
+      void encerrar().then(() => {
+        window.location.hash = ''
+        iniciarApp(app)
+      })
     },
   }
 
@@ -849,7 +847,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   }
 
   /** Preenchido no fim da montagem, quando o tique já existe. */
-  let encerrar: () => void = () => {}
+  let encerrar: () => Promise<void> = () => Promise.resolve()
 
   let analiseRede: Analise | null = null
   /** Sobrevive ao redesenho: a sala é reconstruída a cada clique na call. */
@@ -884,8 +882,32 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * pessoas), e uma variável de módulo faria a segunda matar a primeira.
    */
   function reconectar(): void {
-    encerrar()
-    entrarNaSala(app, apelido, codigo)
+    // ESPERA o desmonte antes de reentrar. Sem isso, `joinRoom` no mesmo
+    // código devolvia a sala que ainda não tinha saído do registro — e
+    // "Reconectar" reentrava na conexão velha achando que abrira uma nova.
+    void trocarPara(codigo)
+  }
+
+  /**
+   * Desmonta esta sala e monta outra (ou a mesma).
+   *
+   * O `await` não é elegância: o `leave` do Trystero envia um aviso e ainda
+   * espera 99ms antes de desregistrar a sala. Enquanto isso não termina,
+   * `joinRoom` devolve a MESMA sala. Se a que estava aberta era passiva — o
+   * caso de um grupo que a presença observava —, a sala "nova" nascia sem
+   * anunciar: a pessoa entrava e ninguém a via.
+   */
+  let trocando = false
+  async function trocarPara(destino: string): Promise<void> {
+    // Dois cliques seguidos montariam duas salas para a mesma aba.
+    if (trocando) return
+    trocando = true
+    try {
+      await encerrar()
+    } finally {
+      trocando = false
+    }
+    entrarNaSala(app, apelido, destino)
   }
 
   // O host avalia prazos vencidos (turno, reconexão); nos clientes o tique
@@ -941,16 +963,17 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     }, MS_AMOSTRAGEM)
   }
 
-  encerrar = () => {
-    // As salas de fundo seguram assinatura em relay: sem isto, cada troca de
-    // sala deixaria um punhado delas para trás.
-    presenca.encerrar()
+  encerrar = async () => {
     clearInterval(tique)
     clearInterval(tiqueVoz)
     monitorVoz.encerrar()
     midia.desligarMicrofone()
     midia.pararTela()
-    sessao.encerrar()
+    // As duas esperas importam pelo mesmo motivo: enquanto uma sala não sai do
+    // registro do Trystero, reentrar nela devolve a antiga. Vale para a sala em
+    // que estou e para as de fundo da presença — um grupo observado que vira o
+    // seu destino é exatamente o caso que quebrava.
+    await Promise.all([presenca.encerrar(), sessao.encerrar()])
   }
 
   window.addEventListener('beforeunload', () => sessao.encerrar())
@@ -1048,9 +1071,16 @@ export function iniciarApp(app: HTMLElement): void {
      * a cada navegação, e o relay é justamente a peça que não pode ser
      * ameaçada por presença.
      */
+    let entrando = false
     const irParaSala = (apelido: string, codigo: string): void => {
-      presenca.encerrar()
-      entrarNaSala(app, apelido, codigo)
+      if (entrando) return
+      entrando = true
+      // ESPERA. A presença pode estar observando justamente este grupo, e a
+      // sala passiva dele ainda registrada faria `joinRoom` devolvê-la: a
+      // pessoa entraria numa sala que não anuncia, e ninguém a veria.
+      void presenca.encerrar()
+        .then(() => entrarNaSala(app, apelido, codigo))
+        .finally(() => { entrando = false })
     }
 
     const desenharHome = (): void => {
