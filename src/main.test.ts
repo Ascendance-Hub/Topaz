@@ -876,15 +876,60 @@ describe('entrarNaSala — canais de voz', () => {
     return { app, acoes: falsas.acoes }
   }
 
-  it('fora da call não há lista de canais', async () => {
-    // Fora dela não há para onde ir, e uma fileira de pílulas mortas seria
-    // só ruído.
+  it('sem ninguém em canal nenhum, não há lista', async () => {
+    // Um canal sem gente não existe, então não há o que listar.
     vi.useFakeTimers()
     const desfazer = semMicrofone()
     try {
       const app = sala()
 
       expect(app.querySelector('[data-canal]')).toBeNull()
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+
+  it('FORA da call eu vejo os canais que já têm gente', async () => {
+    // Ver quem está conversando é o que faz alguém decidir entrar. Esconder
+    // isso até a pessoa entrar invertia a ordem das coisas.
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const { app, acoes } = salaComCanal()
+
+      acoes.get('call')!.entregar!(
+        { tipo: 'estado', naCall: true, compartilhando: false, canal: 'segundo' },
+        'pa',
+      )
+
+      expect(app.querySelector('[data-canal="segundo"]')).not.toBeNull()
+      // Nenhum aceso: fora da call eu não estou em canal nenhum.
+      expect(app.querySelector('[data-canal][aria-current]')).toBeNull()
+    } finally {
+      desfazer()
+      vi.useRealTimers()
+    }
+  })
+
+  it('clicar num canal fora da call entra na call ALI', async () => {
+    // Quem clicou no Canal 2 já disse para onde quer ir; "entre primeiro,
+    // depois escolha" seria um passo a mais para dizer a mesma coisa.
+    vi.useFakeTimers()
+    const desfazer = semMicrofone()
+    try {
+      const { app, acoes } = salaComCanal()
+      acoes.get('call')!.entregar!(
+        { tipo: 'estado', naCall: true, compartilhando: false, canal: 'segundo' },
+        'pa',
+      )
+
+      app.querySelector<HTMLButtonElement>('[data-canal="segundo"]')!.click()
+      await escoar()
+
+      expect(app.querySelector('[data-canal="segundo"]')!
+        .getAttribute('aria-current')).toBe('true')
+      expect(app.querySelector('[data-call="sair"]')).not.toBeNull()
     } finally {
       desfazer()
       vi.useRealTimers()
