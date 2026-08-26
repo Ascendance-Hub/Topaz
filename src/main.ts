@@ -47,6 +47,8 @@ import { faltaCripto, renderizarSemCripto } from './ui/components/sem-cripto'
 import { renderizarSalasSalvas, type AcoesDeSalas } from './ui/components/salas-salvas'
 import { montarDoCanal, type FonteDeParticipantes } from './ui/components/participantes'
 import { renderizarRoda } from './ui/components/roda'
+import { observarGrupos } from './presenca/presenca'
+import { abrirSalaDeFundo } from './presenca/sala-de-fundo'
 
 /** Quem falou antes de a mesa saber o nome dele. */
 export const APELIDO_DESCONHECIDO = 'Alguém'
@@ -523,7 +525,19 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    */
   const coluna = document.createElement('div')
   coluna.className = 'coluna'
-  let salasSalvas = renderizarSalasSalvas(grupos(), codigo, acoesDeSalas)
+  /**
+   * Os OUTROS grupos salvos, em modo passivo.
+   *
+   * Este aqui é ativo — é onde você está de verdade. Observar a si mesmo
+   * abriria uma segunda sala para a mesma conversa, e ela contaria as pessoas
+   * uma segunda vez.
+   */
+  const presenca = observarGrupos(
+    grupos().map((g) => g.codigo).filter((c) => c !== codigo), abrirSalaDeFundo)
+  presenca.aoMudar(() => desenharSalasSalvas())
+
+  let salasSalvas = renderizarSalasSalvas(
+    grupos(), codigo, acoesDeSalas, presenca.quantos)
   let canais = renderizarCanais([], CANAL_PADRAO, { mudar: () => {} })
   coluna.append(salasSalvas, canais, nav)
   /**
@@ -616,6 +630,17 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * cada mudança de quem fala, muitas vezes por minuto. Trocar de foto é raro,
    * então avisar na mão é exato e muito mais barato que a alternativa.
    */
+  /** Só a tira de salas, sem redesenhar o resto. */
+  function desenharSalasSalvas(): void {
+    // Um grupo salvo ou removido nos Ajustes muda quem deve ser observado.
+    presenca.sincronizar(
+      grupos().map((g) => g.codigo).filter((c) => c !== codigo))
+    const novas = renderizarSalasSalvas(
+      grupos(), codigo, acoesDeSalas, presenca.quantos)
+    salasSalvas.replaceWith(novas)
+    salasSalvas = novas
+  }
+
   function invalidarRostos(): void {
     assinaturaDaRoda = ''
     assinaturaDosCanais = ''
@@ -694,9 +719,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     naSala.replaceWith(novoNaSala)
     naSala = novoNaSala
 
-    const novasSalas = renderizarSalasSalvas(grupos(), codigo, acoesDeSalas)
-    salasSalvas.replaceWith(novasSalas)
-    salasSalvas = novasSalas
+    desenharSalasSalvas()
 
     const novaNav = renderizarTrilho(tela, irPara, { mesaEspera: mesaEspera() })
     nav.replaceWith(novaNav)
@@ -919,6 +942,9 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   }
 
   encerrar = () => {
+    // As salas de fundo seguram assinatura em relay: sem isto, cada troca de
+    // sala deixaria um punhado delas para trás.
+    presenca.encerrar()
     clearInterval(tique)
     clearInterval(tiqueVoz)
     monitorVoz.encerrar()
@@ -1001,12 +1027,37 @@ export function iniciarApp(app: HTMLElement): void {
         app.querySelector<HTMLInputElement>('input[placeholder="Seu apelido"]')?.focus()
         return
       }
-      entrarNaSala(app, apelido, cod)
+      irParaSala(apelido, cod)
+    }
+
+    /**
+     * Quem está online em cada grupo salvo.
+     *
+     * Salas de fundo em modo passivo: elas não anunciam, e duas passivas nunca
+     * se conectam. Um grupo em que ninguém está custa zero conexões — o que é
+     * o que torna razoável abrir todos os salvos de uma vez.
+     */
+    const presenca = observarGrupos(
+      grupos().map((g) => g.codigo), abrirSalaDeFundo)
+    presenca.aoMudar(() => desenharHome())
+
+    /**
+     * Entrar numa sala fecha as salas de fundo ANTES de abrir a de verdade.
+     *
+     * Elas seguram assinatura em relay. Deixá-las abertas acumularia uma cópia
+     * a cada navegação, e o relay é justamente a peça que não pode ser
+     * ameaçada por presença.
+     */
+    const irParaSala = (apelido: string, codigo: string): void => {
+      presenca.encerrar()
+      entrarNaSala(app, apelido, codigo)
     }
 
     const desenharHome = (): void => {
+      // Grupo removido (ou salvo noutra aba) deixa de ser observado na hora.
+      presenca.sincronizar(grupos().map((g) => g.codigo))
       app.replaceChildren(renderizarHome(
-        (apelido, codigo) => entrarNaSala(app, apelido, codigo),
+        irParaSala,
         // Sem a lista de servidores, de propósito. Aqui ninguém entrou em sala
         // ainda, então nenhum socket está aberto e a contagem sairia "0 de 20"
         // — que lê como falha catastrófica para quem acabou de abrir a página.
@@ -1018,7 +1069,7 @@ export function iniciarApp(app: HTMLElement): void {
           grupos: renderizarFaixaGrupos(grupos(), entrarNoGrupo, (cod) => {
             removerGrupo(cod)
             desenharHome()
-          }),
+          }, presenca.quantos),
         },
       ))
     }
