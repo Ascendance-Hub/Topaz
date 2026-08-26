@@ -274,3 +274,51 @@ describe('fecharUm', () => {
     await expect(p.fecharUm('aaa')).resolves.toBeUndefined()
   })
 })
+
+/**
+ * A mesma pessoa, achada por duas redes.
+ *
+ * A sala de fundo observa nostr E mqtt, e as duas chamam o mesmo ouvinte —
+ * porque foi só assim que a presença passou a enxergar alguém: o diagnóstico
+ * do app mostrou `nostr=0 mqtt=1`, ou seja, as máquinas se acham por mqtt e o
+ * observador de nostr esperava numa rede vazia.
+ *
+ * O preço disso é o anúncio em dobro, e quem conta tem de aguentar.
+ */
+describe('duas redes, uma pessoa', () => {
+  it('achada nas duas redes, conta uma vez', () => {
+    const { abrir, abertas } = fabrica()
+    const p = observarGrupos(['aaa'], abrir)
+
+    // Duas entregas do mesmo peerId, como se viessem de redes diferentes.
+    abertas.get('aaa')!.chega('pa')
+    abertas.get('aaa')!.chega('pa')
+
+    expect(p.quantos('aaa')).toBe(1)
+  })
+
+  it('e avisa quem desenha uma vez só', () => {
+    const { abrir, abertas } = fabrica()
+    const p = observarGrupos(['aaa'], abrir)
+    const mudou = vi.fn()
+    p.aoMudar(mudou)
+
+    abertas.get('aaa')!.chega('pa')
+    abertas.get('aaa')!.chega('pa')
+
+    expect(mudou).toHaveBeenCalledTimes(1)
+  })
+
+  it('saindo de uma rede, some da conta', () => {
+    // Presença é melhor-esforço: se a pessoa continuar visível pela outra
+    // rede, o próximo anúncio a traz de volta. Errar para menos é melhor que
+    // mostrar gente que já foi embora.
+    const { abrir, abertas } = fabrica()
+    const p = observarGrupos(['aaa'], abrir)
+    abertas.get('aaa')!.chega('pa')
+
+    abertas.get('aaa')!.vaiEmbora('pa')
+
+    expect(p.quantos('aaa')).toBe(0)
+  })
+})
