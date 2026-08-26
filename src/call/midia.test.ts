@@ -436,10 +436,13 @@ describe('Midia — áudio do compartilhamento', () => {
     expect(faixaAudio.contentHint).toBe('music')
   })
 
-  it('a faixa de vídeo recebe dica de nitidez, e não de música', async () => {
+  it('a faixa de vídeo recebe dica de vídeo, e não de música', async () => {
+    // A dica do vídeo e a do áudio são independentes: o som da tela quer
+    // `music`, a imagem quer `motion`. Trocar uma pela outra abafava o som ou
+    // travava a imagem, e já aconteceu.
     const { faixaVideo } = await telaComSom()
 
-    expect(faixaVideo.contentHint).toBe('detail')
+    expect(faixaVideo.contentHint).toBe('motion')
   })
 
   it('dá bitrate de música ao áudio da tela', async () => {

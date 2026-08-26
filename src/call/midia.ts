@@ -98,14 +98,17 @@ export class Midia {
   private telaPara = new Set<string>()
   private altura: number = ALTURA_PADRAO
   /**
-   * `detail` e não `motion` por padrão.
+   * `motion` por padrão.
    *
-   * `motion` manda o codificador preferir fluidez a nitidez, e numa tela cheia
-   * de texto e interface o resultado é exatamente "ficou borrada". O caso
-   * comum de compartilhar tela é mostrar uma tela — código, site, documento —,
-   * não vídeo. Quem for mostrar um jogo troca no seletor, que continua ali.
+   * Cheguei a trocar para `detail` achando que resolveria a tela borrada. Não
+   * era isso: a tela nasce ruim e se ajeita sozinha em dez ou quinze segundos,
+   * porque o codificador precisa de tempo para achar o bitrate. `detail`
+   * trocava esse ajuste por uma perda de fluidez que ficava para sempre.
+   *
+   * Quem for mostrar uma tela parada de texto troca no seletor, que existe
+   * justamente por isso.
    */
-  private conteudo: TipoConteudo = 'detail'
+  private conteudo: TipoConteudo = 'motion'
   private mudo = false
   private idMicrofone: string | null = null
 

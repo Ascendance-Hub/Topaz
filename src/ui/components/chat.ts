@@ -26,7 +26,15 @@ export interface Chat {
  * nesse ritmo perderia o foco e apagaria o que a pessoa está escrevendo
  * várias vezes por segundo.
  */
-export function criarChat(aoEnviar: (texto: string) => void): Chat {
+/**
+ * `aoTrocar` recebe o novo estado, não um pedido de alternância: quem aplica o
+ * layout precisa saber PARA ONDE ir, e deduzir isso do lado de lá criaria dois
+ * donos do mesmo booleano.
+ */
+export function criarChat(
+  aoEnviar: (texto: string) => void,
+  aoTrocar?: (trocado: boolean) => void,
+): Chat {
   const raiz = document.createElement('div')
   raiz.className = 'chat'
   raiz.dataset['aberto'] = '0'
@@ -61,7 +69,50 @@ export function criarChat(aoEnviar: (texto: string) => void): Chat {
   botao.textContent = 'Enviar'
 
   form.append(campo, botao)
-  raiz.append(gatilho, log, form)
+
+  /**
+   * Trocar o chat com o miolo de lugar.
+   *
+   * Fica no cabeçalho do chat, e não junto dos controles da call: é uma coisa
+   * que se faz PARA ler melhor a conversa, então o botão mora onde o olho já
+   * está quando esse desejo aparece.
+   *
+   * Só existe onde há dois lugares para trocar. No celular o chat é uma gaveta
+   * sobre a tela e não há miolo ao lado — o CSS o esconde lá.
+   */
+  const cabeca = document.createElement('div')
+  cabeca.className = 'chat-cabeca'
+  cabeca.append(gatilho)
+
+  let trocado = false
+  if (aoTrocar) {
+    const trocar = document.createElement('button')
+    trocar.type = 'button'
+    trocar.className = 'chat-trocar'
+    trocar.dataset['chat'] = 'trocar'
+    // Duas setas opostas: é o símbolo de "trocar de lugar" em toda parte, e
+    // aqui ele descreve literalmente o que acontece.
+    trocar.textContent = '⇄'
+
+    const rotularTrocar = (): void => {
+      const texto = trocado
+        ? 'Devolver a call para o meio'
+        : 'Trazer o chat para o meio'
+      trocar.title = texto
+      trocar.setAttribute('aria-label', texto)
+      trocar.setAttribute('aria-pressed', String(trocado))
+    }
+    rotularTrocar()
+
+    trocar.onclick = () => {
+      trocado = !trocado
+      rotularTrocar()
+      aoTrocar(trocado)
+    }
+    cabeca.append(trocar)
+  }
+
+  raiz.append(cabeca, log, form)
 
   let aberto = false
   let naoLidas = 0

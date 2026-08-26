@@ -1205,3 +1205,71 @@ describe('entrarNaSala — o palco da call', () => {
     }
   })
 })
+
+describe('entrarNaSala — trocar o chat com o miolo', () => {
+  function salaSimples() {
+    const rede = criarRedeFalsa({ conexaoDiferida: true })
+    vi.mocked(criarSalasTrystero).mockImplementation(() => criarSalasFalsas([]).salas)
+    vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
+    const app = document.createElement('div')
+    entrarNaSala(app, 'Bruno', 'CODIGO01')
+    return app
+  }
+
+  it('a raiz nasce sem troca', () => {
+    vi.useFakeTimers()
+    try {
+      const app = salaSimples()
+
+      expect(app.dataset['trocado']).toBeFalsy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('clicar marca a raiz, que é o que o CSS lê', () => {
+    // Só as colunas trocam de dono: nada se desmonta, senão o vídeo que está
+    // tocando cairia — e a troca existe para continuar vendo os dois.
+    vi.useFakeTimers()
+    try {
+      const app = salaSimples()
+
+      app.querySelector<HTMLButtonElement>('[data-chat="trocar"]')!.click()
+
+      expect(app.dataset['trocado']).toBe('1')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('e clicar de novo devolve', () => {
+    vi.useFakeTimers()
+    try {
+      const app = salaSimples()
+      const botao = app.querySelector<HTMLButtonElement>('[data-chat="trocar"]')!
+
+      botao.click()
+      botao.click()
+
+      expect(app.dataset['trocado']).toBe('')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a troca não desmonta o miolo nem a lateral', () => {
+    vi.useFakeTimers()
+    try {
+      const app = salaSimples()
+      const conteudo = app.querySelector('.conteudo')
+      const lateral = app.querySelector('.lateral')
+
+      app.querySelector<HTMLButtonElement>('[data-chat="trocar"]')!.click()
+
+      expect(app.querySelector('.conteudo')).toBe(conteudo)
+      expect(app.querySelector('.lateral')).toBe(lateral)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
