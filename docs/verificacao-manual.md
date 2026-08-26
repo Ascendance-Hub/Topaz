@@ -561,6 +561,26 @@ Dura o tempo de um round-trip.
 - [ ] As fotos nos círculos grandes saem nítidas (é preciso **reescolher a
       foto** uma vez: as guardadas antes têm 96px)
 
+## As duas conversas
+
+- [ ] Fora da call há uma conversa só, sem abas
+- [ ] Entrando num canal, aparecem as abas **Sala** e **Canal**
+- [ ] O que você escreve na aba Canal chega **só a quem está no seu canal** —
+      confira com uma terceira pessoa noutro canal
+- [ ] O que chega na aba escondida marca um selo de não lidas
+- [ ] Trocar de canal **esquece** a conversa do canal anterior
+- [ ] A conversa da sala sobrevive à troca de canal
+- [ ] Saindo da call, a aba Canal some e o foco volta para a Sala
+
+## Ajustes, com a call ligada
+
+- [ ] Abrindo Ajustes, a roda e a tela compartilhada **somem da tela**
+- [ ] Voltando para a Sala, o vídeo continua de onde estava (não recomeça)
+- [ ] O áudio da tela continua tocando enquanto você está nos Ajustes
+- [ ] **Escolher foto pelos Ajustes funciona dentro da sala** — antes só
+      funcionava na tela inicial
+- [ ] Digitar um nome novo não perde o texto no meio da digitação
+
 ## Trocar o chat com o miolo
 
 - [ ] O botão ⇄ aparece no cabeçalho do chat, só em tela grande

@@ -49,6 +49,32 @@ export const REDUNDANCIA = 20
 
 export const RELAYS = defaultRelayUrls.slice(0, REDUNDANCIA)
 
+/**
+ * Para quem esta mensagem é.
+ *
+ * `canal` não é um filtro de exibição: ela é ENVIADA só para quem está no meu
+ * canal. Filtrar na tela deixaria o texto viajando para quem não devia
+ * recebê-lo, e bastaria abrir o console para ler.
+ */
+export type EscopoChat = 'geral' | 'canal'
+
+interface MensagemChat {
+  texto: string
+  escopo: EscopoChat
+}
+
+/** Lê o que chegou pelo canal de chat, ou `null` se não fechar. */
+export function lerMensagemChat(bruto: unknown): MensagemChat | null {
+  // Versão anterior aos escopos mandava a string crua. Aceitar é o que impede
+  // uma aba não recarregada de ficar muda para quem já recarregou.
+  if (typeof bruto === 'string') return { texto: bruto, escopo: 'geral' }
+  if (typeof bruto !== 'object' || bruto === null) return null
+  const m = bruto as Record<string, unknown>
+  if (typeof m['texto'] !== 'string') return null
+  if (m['escopo'] !== 'geral' && m['escopo'] !== 'canal') return null
+  return { texto: m['texto'], escopo: m['escopo'] }
+}
+
 export interface Transporte {
   meuId(): string
   peers(): string[]
@@ -62,8 +88,8 @@ export interface Transporte {
    * isso o texto é só uma string aqui, e não um tipo em `game/types.ts`.
    * Mensagem perdida não tem como corromper partida nenhuma.
    */
-  enviarMensagem(texto: string): void
-  aoReceberMensagem(cb: (texto: string, peerId: string) => void): void
+  enviarMensagem(texto: string, escopo: EscopoChat, para?: string[]): void
+  aoReceberMensagem(cb: (texto: string, peerId: string, escopo: EscopoChat) => void): void
   /**
    * A foto de perfil, como `data:` de imagem gerado no próprio navegador.
    *
@@ -179,7 +205,7 @@ export function relaysConectados(): number {
 export function criarTransporte(salas: Salas): Transporte {
   const acaoAction = salas.criarAcao<Acao>('acao')
   const estadoAction = salas.criarAcao<EstadoJogo>('estado')
-  const chatAction = salas.criarAcao<string>('chat')
+  const chatAction = salas.criarAcao<unknown>('chat')
   const fotoAction = salas.criarAcao<string>('foto')
   const identidadeAction = salas.criarAcao<unknown>('identidade')
 
@@ -189,7 +215,7 @@ export function criarTransporte(salas: Salas): Transporte {
   const aoEstado: ((estado: EstadoJogo, peerId: string) => void)[] = []
   const aoEntrar: ((peerId: string) => void)[] = []
   const aoSair: ((peerId: string) => void)[] = []
-  const aoMensagem: ((texto: string, peerId: string) => void)[] = []
+  const aoMensagem: ((texto: string, peerId: string, escopo: EscopoChat) => void)[] = []
 
   // A fusão já entrega `de` desduplicado: só o que veio pela rede dona.
   acaoAction.onMessage((acao, de) => {
@@ -208,8 +234,14 @@ export function criarTransporte(salas: Salas): Transporte {
     avisarTodos(aoFoto, foto, de)
   })
 
-  chatAction.onMessage((texto, de) => {
-    avisarTodos(aoMensagem, texto, de)
+  chatAction.onMessage((bruto, de) => {
+    // Vem da rede: pode ser de uma versão antiga (só o texto), de uma futura,
+    // ou de alguém com o console aberto. O que não fecha o formato é
+    // descartado; texto solto continua valendo como mensagem geral, senão
+    // quem não recarregou a página ficaria mudo para nós.
+    const msg = lerMensagemChat(bruto)
+    if (msg === null) return
+    avisarTodos(aoMensagem, msg.texto, de, msg.escopo)
   })
   salas.aoEntrarPeer((peerId) => {
     avisarTodos(aoEntrar, peerId)
@@ -233,8 +265,20 @@ export function criarTransporte(salas: Salas): Transporte {
     aoReceberEstado: (cb) => {
       aoEstado.push(cb)
     },
-    enviarMensagem: (texto) => {
-      chatAction.send(texto)
+    enviarMensagem: (texto, escopo, para) => {
+      // `para` presente e vazio significa "não há ninguém no meu canal além
+      // de mim" — enviar sem alvo viraria broadcast, que é o oposto do
+      // pedido. Sem `para`, é geral mesmo.
+      if (para !== undefined && para.length === 0) return
+      if (para === undefined) {
+        chatAction.send({ texto, escopo })
+        return
+      }
+      // Um envio por destinatário: `send` fala com um peer por vez, e cada um
+      // pode ter vindo por uma rede de descoberta diferente. Numa conversa de
+      // amigos são poucos, e a alternativa — mandar a todos e filtrar na tela
+      // — deixaria o texto viajando para quem não devia recebê-lo.
+      for (const alvo of para) chatAction.send({ texto, escopo }, alvo)
     },
     aoReceberMensagem: (cb) => {
       aoMensagem.push(cb)

@@ -1,5 +1,6 @@
 import type { Acao, EstadoJogo } from '../game/types'
 import type { Transporte } from './transport'
+import type { EscopoChat } from './transport'
 
 interface No {
   id: string
@@ -7,7 +8,7 @@ interface No {
   aoEstado: ((estado: EstadoJogo, peerId: string) => void)[]
   aoEntrar: ((peerId: string) => void)[]
   aoSair: ((peerId: string) => void)[]
-  aoMensagem: ((texto: string, peerId: string) => void)[]
+  aoMensagem: ((texto: string, peerId: string, escopo: EscopoChat) => void)[]
   aoFoto: ((foto: unknown, peerId: string) => void)[]
   aoIdentidade: ((mensagem: unknown, peerId: string) => void)[]
 }
@@ -98,9 +99,10 @@ export function criarRedeFalsa(opcoes: OpcoesRedeFalsa = {}) {
       aoReceberEstado: (cb) => {
         no.aoEstado.push(cb)
       },
-      enviarMensagem: (texto) => {
+      enviarMensagem: (texto, escopo, para) => {
         for (const outro of destinatarios()) {
-          for (const cb of outro.aoMensagem) cb(texto, id)
+          if (para !== undefined && !para.includes(outro.id)) continue
+          for (const cb of outro.aoMensagem) cb(texto, id, escopo)
         }
       },
       aoReceberMensagem: (cb) => {

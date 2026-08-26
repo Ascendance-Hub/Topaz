@@ -34,9 +34,9 @@ describe('rede falsa', () => {
     const recebido = vi.fn()
     b.aoReceberMensagem(recebido)
 
-    a.enviarMensagem('boa mão')
+    a.enviarMensagem('boa mão', 'geral')
 
-    expect(recebido).toHaveBeenCalledWith('boa mão', 'p1')
+    expect(recebido).toHaveBeenCalledWith('boa mão', 'p1', 'geral')
   })
 
   it('não entrega a própria mensagem de chat de volta ao remetente', () => {
@@ -46,7 +46,7 @@ describe('rede falsa', () => {
     const recebido = vi.fn()
     a.aoReceberMensagem(recebido)
 
-    a.enviarMensagem('boa mão')
+    a.enviarMensagem('boa mão', 'geral')
 
     expect(recebido).not.toHaveBeenCalled()
   })
@@ -248,5 +248,56 @@ describe('rede falsa com conexão diferida', () => {
 
     expect(saiu).toHaveBeenCalledWith('p2')
     expect(a.peers()).toEqual([])
+  })
+})
+
+describe('mensagem de canal', () => {
+  it('chega só a quem foi endereçada', () => {
+    // É isto que faz o chat do canal ser DO canal. Mandar a todos e esconder
+    // na tela deixaria o texto viajando para quem não devia recebê-lo, e
+    // bastaria abrir o console para ler.
+    const rede = criarRedeFalsa()
+    const a = rede.conectar('p1')
+    const b = rede.conectar('p2')
+    const c = rede.conectar('p3')
+    const paraB = vi.fn()
+    const paraC = vi.fn()
+    b.aoReceberMensagem(paraB)
+    c.aoReceberMensagem(paraC)
+
+    a.enviarMensagem('só para você', 'canal', ['p2'])
+
+    expect(paraB).toHaveBeenCalledWith('só para você', 'p1', 'canal')
+    expect(paraC).not.toHaveBeenCalled()
+  })
+
+  it('a da sala chega a todo mundo', () => {
+    const rede = criarRedeFalsa()
+    const a = rede.conectar('p1')
+    const b = rede.conectar('p2')
+    const c = rede.conectar('p3')
+    const paraB = vi.fn()
+    const paraC = vi.fn()
+    b.aoReceberMensagem(paraB)
+    c.aoReceberMensagem(paraC)
+
+    a.enviarMensagem('oi todos', 'geral')
+
+    expect(paraB).toHaveBeenCalled()
+    expect(paraC).toHaveBeenCalled()
+  })
+
+  it('sozinho no canal, a mensagem não vira broadcast', () => {
+    // Lista vazia de destinatários significa "não há ninguém comigo". Enviar
+    // sem alvo faria virar geral, que é o oposto do pedido.
+    const rede = criarRedeFalsa()
+    const a = rede.conectar('p1')
+    const b = rede.conectar('p2')
+    const paraB = vi.fn()
+    b.aoReceberMensagem(paraB)
+
+    a.enviarMensagem('falando sozinho', 'canal', [])
+
+    expect(paraB).not.toHaveBeenCalled()
   })
 })

@@ -18,7 +18,7 @@ describe('envio', () => {
 
     const campo = digitarEEnviar(chat, 'boa mão')
 
-    expect(enviado).toHaveBeenCalledWith('boa mão')
+    expect(enviado).toHaveBeenCalledWith('boa mão', 'geral')
     expect(campo.value).toBe('')
   })
 
@@ -37,7 +37,7 @@ describe('envio', () => {
 
     digitarEEnviar(chat, 'a'.repeat(LIMITE_TEXTO + 50))
 
-    expect(enviado).toHaveBeenCalledWith('a'.repeat(LIMITE_TEXTO))
+    expect(enviado).toHaveBeenCalledWith('a'.repeat(LIMITE_TEXTO), 'geral')
   })
 })
 
@@ -249,5 +249,133 @@ describe('trocar o chat com o miolo', () => {
     botao.click()
 
     expect(botao.getAttribute('aria-pressed')).toBe('true')
+  })
+})
+
+describe('as duas conversas', () => {
+  const abrir = (chat: ReturnType<typeof criarChat>) => {
+    chat.raiz.querySelector<HTMLButtonElement>('.chat-gatilho')!.click()
+  }
+  const aba = (chat: ReturnType<typeof criarChat>, qual: string) =>
+    chat.raiz.querySelector<HTMLButtonElement>(`[data-aba="${qual}"]`)!
+  const linhasDe = (chat: ReturnType<typeof criarChat>, escopo: string) =>
+    chat.raiz.querySelectorAll(`[data-escopo="${escopo}"] .chat-linha`)
+
+  it('fora da call não há aba de canal', () => {
+    // Um lugar de falar com ninguém é pior que não ter o lugar.
+    const chat = criarChat(() => {})
+
+    expect(aba(chat, 'canal').hidden).toBe(true)
+  })
+
+  it('entrando num canal, a aba aparece', () => {
+    const chat = criarChat(() => {})
+
+    chat.definirEmCanal(true)
+
+    expect(aba(chat, 'canal').hidden).toBe(false)
+  })
+
+  it('cada mensagem vai para o log do seu escopo', () => {
+    const chat = criarChat(() => {})
+    chat.definirEmCanal(true)
+
+    chat.receber('Ana', 'oi sala', 'geral')
+    chat.receber('Bia', 'oi canal', 'canal')
+
+    expect(linhasDe(chat, 'geral')).toHaveLength(1)
+    expect(linhasDe(chat, 'canal')).toHaveLength(1)
+  })
+
+  it('o que eu escrever vai para a aba em que estou', () => {
+    const enviado = vi.fn()
+    const chat = criarChat(enviado)
+    chat.definirEmCanal(true)
+    aba(chat, 'canal').click()
+
+    const campo = chat.raiz.querySelector<HTMLInputElement>('.chat-campo')!
+    campo.value = 'só para vocês'
+    chat.raiz.querySelector('form')!.dispatchEvent(new Event('submit'))
+
+    expect(enviado).toHaveBeenCalledWith('só para vocês', 'canal')
+  })
+
+  it('sem canal, tudo vai para a sala', () => {
+    const enviado = vi.fn()
+    const chat = criarChat(enviado)
+
+    const campo = chat.raiz.querySelector<HTMLInputElement>('.chat-campo')!
+    campo.value = 'oi'
+    chat.raiz.querySelector('form')!.dispatchEvent(new Event('submit'))
+
+    expect(enviado).toHaveBeenCalledWith('oi', 'geral')
+  })
+
+  it('clicar na aba do canal não faz nada quando não há canal', () => {
+    const enviado = vi.fn()
+    const chat = criarChat(enviado)
+
+    aba(chat, 'canal').click()
+    const campo = chat.raiz.querySelector<HTMLInputElement>('.chat-campo')!
+    campo.value = 'oi'
+    chat.raiz.querySelector('form')!.dispatchEvent(new Event('submit'))
+
+    expect(enviado).toHaveBeenCalledWith('oi', 'geral')
+  })
+
+  it('mensagem que chega na aba escondida conta como perdida', () => {
+    const chat = criarChat(() => {})
+    chat.definirEmCanal(true)
+    abrir(chat)
+
+    chat.receber('Ana', 'oi canal', 'canal')
+
+    expect(aba(chat, 'canal').querySelector('.chat-nao-lidas')!.textContent).toBe('1')
+  })
+
+  it('abrir a aba zera o selo dela', () => {
+    const chat = criarChat(() => {})
+    chat.definirEmCanal(true)
+    abrir(chat)
+    chat.receber('Ana', 'oi canal', 'canal')
+
+    aba(chat, 'canal').click()
+
+    expect(aba(chat, 'canal').querySelector('.chat-nao-lidas')).toBeNull()
+  })
+
+  it('trocar de canal esquece a conversa de lá', () => {
+    // Aquelas mensagens foram endereçadas às pessoas com quem você estava.
+    const chat = criarChat(() => {})
+    chat.definirEmCanal(true)
+    chat.receber('Ana', 'segredo', 'canal')
+
+    chat.limparCanal()
+
+    expect(linhasDe(chat, 'canal')).toHaveLength(0)
+  })
+
+  it('mas a conversa da sala continua', () => {
+    const chat = criarChat(() => {})
+    chat.definirEmCanal(true)
+    chat.receber('Ana', 'oi sala', 'geral')
+
+    chat.limparCanal()
+
+    expect(linhasDe(chat, 'geral')).toHaveLength(1)
+  })
+
+  it('sair da call devolve o foco para a sala', () => {
+    const enviado = vi.fn()
+    const chat = criarChat(enviado)
+    chat.definirEmCanal(true)
+    aba(chat, 'canal').click()
+
+    chat.definirEmCanal(false)
+
+    const campo = chat.raiz.querySelector<HTMLInputElement>('.chat-campo')!
+    campo.value = 'oi'
+    chat.raiz.querySelector('form')!.dispatchEvent(new Event('submit'))
+    expect(enviado).toHaveBeenCalledWith('oi', 'geral')
   })
 })

@@ -311,6 +311,179 @@ diagnóstico no primeiro suspeito plausível. A reversão ter resolvido também 
 compatível com relays de descoberta que voltaram sozinhos — foram vários
 falhando no console durante todo o episódio.
 
+## Capítulo 10 — A sala vira um lugar: a coluna, os rostos e as duas conversas
+
+Quatro pedidos numa mensagem só, e eles se encaixavam: os canais para a
+esquerda; o miolo virando rostos; um botão trocando o chat com o centro; e as
+salas salvas sempre à vista.
+
+### Os canais desceram do rodapé
+
+**Problema.** A fileira de pílulas no rodapé dizia *quantos* estavam em cada
+canal.
+
+**Causa.** O número responde à pergunta errada. Escolher um canal é escolher
+**com quem** falar, e a contagem não diz isso.
+
+**Correção.** Lista vertical na esquerda, com o nome e a foto de cada pessoa —
+inclusive de canais em que você não está, que é metade do motivo de a sala ser
+uma só. `porCanal` passou a carregar `quem` (peerIds) em vez de `pessoas`
+(número); o protocolo continua sem saber apelido nenhum, e quem desenha
+resolve.
+
+**Descartado.** Duas colunas como no Discord (servidores + canais). Comem 72px
+a mais de largura, e a tela compartilhada precisa deles no notebook.
+
+### O miolo virou gente
+
+**Problema.** O centro da sala era uma lista de nomes escritos.
+
+**Causa.** Numa conversa por voz, o que se olha o tempo todo é quem está aqui —
+e nome escrito não é rosto.
+
+**Correção.** Círculos grandes com as fotos, anel de topázio acendendo em quem
+fala. Quando alguém compartilha tela, eles encolhem para uma faixa lateral e a
+tela fica com o meio.
+
+**Descartado.** Fazer os círculos sumirem quando há tela. Saber quem está
+falando importa **mais** com uma tela na frente, não menos.
+
+### As duas conversas
+
+**Problema.** O chat era um só, da sala inteira. Com canais, faltava um lugar
+de falar só com quem está com você.
+
+**Correção.** Duas abas: Sala e Canal. E a distinção que importa: a mensagem
+de canal é **enviada** só para quem está no seu canal — um `send` por
+destinatário —, não escondida dos outros na hora de desenhar.
+
+**Descartado.** Mandar a todos e filtrar na tela. Deixaria o texto viajando
+para quem não devia recebê-lo, e bastaria abrir o console para ler. A troca é
+um envio por pessoa em vez de um broadcast; numa conversa de amigos, são
+poucos.
+
+Trocar de canal esquece a conversa daquele canal. Aquelas mensagens foram
+endereçadas às pessoas com quem você estava.
+
+---
+
+## Capítulo 11 — Três defeitos que só apareceram na tela de alguém
+
+Nenhum destes tinha teste que o pegasse, e os três eram invisíveis na leitura.
+
+### A barra de controles cobria metade da tela
+
+**Problema.** Os canais e os avatares sumiram. Com o DevTools aberto, voltavam.
+
+**Causa.** `.call-controles` é `position: fixed`, e um elemento fora do fluxo
+**ignora** o `grid-row` que a regra logo abaixo lhe dá. O CSS dizia "quinta
+faixa" e o navegador entendia "flutue por cima de tudo" — duas linhas
+convivendo, uma anulando a outra em silêncio. O DevTools "consertava" porque
+estreitava a janela e desligava o grid inteiro.
+
+Ninguém viu antes porque a barra **cresceu**: com só "mutar" e "sair" ela era
+baixa e sobrava feltro embaixo; os dois seletores de dispositivo e o
+"compartilhar tela" a fizeram embrulhar em três linhas.
+
+**Correção.** No computador ela volta ao fluxo; no celular continua `fixed`,
+que é o certo lá. `layout.test.ts` guarda a contradição, porque ela não se vê
+lendo.
+
+### O site morria mudo sem HTTPS
+
+**Problema.** Achado por acidente: um teste pelo IP da rede local não conectava.
+
+**Causa.** `crypto.subtle` só existe em contexto seguro, e o código da sala
+vira chave antes do primeiro anúncio. Sem ela, as três redes de descoberta
+morrem antes de anunciar. A identidade registrava o erro e seguia; o Trystero
+soltava rejeições que ninguém pegava; a pessoa via uma sala que não conectava,
+**sem uma palavra na tela**.
+
+**Correção.** A porta fecha dizendo por quê.
+
+### O botão de trocar foto não funcionava dentro da sala
+
+**Problema.** Escolher foto pelos Ajustes não fazia nada. Na tela inicial,
+funcionava.
+
+**Causa.** O painel de Ajustes se refazia a cada `desenhar()` — várias vezes
+por minuto. O diálogo de arquivo do sistema fica aberto por segundos, e nesse
+meio-tempo o `<input type="file">` que esperava o arquivo era substituído. Na
+tela inicial nada redesenha sozinho, e por isso lá funcionava.
+
+**Correção.** O painel só se refaz quando algo mudou de verdade. Vale para os
+campos de texto pelo mesmo motivo — um nome sendo digitado sumia no meio.
+
+É a **quarta vez** que este projeto encontra a mesma família de bug: elemento
+com estado próprio sendo recriado por um desenho periódico. Já aconteceu com o
+chat, com o `<details>` da conexão e com a roda de conversa.
+
+---
+
+## As ideias que vieram de fora do código
+
+Boa parte do que ficou bom aqui não saiu de mim. Vale registrar o que
+aconteceu com cada sugestão do Alexandre — inclusive as que não foram adiante,
+que são as mais fáceis de esquecer.
+
+### Adotadas inteiras
+
+- **"Por que limitar a 3 canais?"** Eu tinha escolhido três sem razão técnica
+  nenhuma, e admiti. O modelo dele — cria quando quiser, some quando esvazia,
+  sem teto — é mais simples E mais honesto: um canal custa um campo de texto,
+  não uma conexão.
+- **"Não coloque o que não protege numa página pública."** Eu queria
+  documentar as limitações de privacidade no site. Ele disse que era "pedir
+  para ser atacado". Está certo: descrever a própria fraqueza para desconhecido
+  não é transparência, é mapa. Ficou só o que é verdade útil — que todo código
+  de sala é público.
+- **"Diferente do Discord, mas sem fugir da memória muscular."** Virou a regra
+  de desenho do projeto inteiro: convenção em onde a mão vai, diferença no
+  material. É a Lei de Jakob, e ele descreveu antes de saber o nome.
+- **Configuração de partida atrás da engrenagem, na aba Jogos.** Ele desenhou
+  onde deveria morar, e estava melhor que a minha proposta.
+- **Ver os canais de fora da call, e entrar clicando num deles.** Ele perguntou
+  se dava e se era seguro. Dava, e não expõe nada novo: o canal de cada pessoa
+  já viajava em toda mensagem de estado, para dentro e fora da call.
+
+### Adotadas pela metade
+
+- **Códigos de sala no estilo ObjectId do MongoDB.** A parte boa era o
+  diagnóstico: 8 caracteres repetiam demais. A parte que não foi é a fórmula —
+  timestamp e contador não somam aleatoriedade e ainda contam quando a sala
+  foi criada. Ficaram 16 caracteres de entropia pura.
+- **Fotos de perfil por URL do Google Imagens.** A ideia de ter foto foi dele.
+  O caminho não deu: um `src` de terceiro entrega o IP de quem olha, e é
+  exatamente o que o projeto inteiro tenta não fazer. Virou upload local com
+  redesenho no canvas — o que trafega são pixels que nós desenhamos, nunca o
+  arquivo. Ele perguntou sobre `.exe` renomeado; é justamente o que o redesenho
+  barra.
+- **"Melhore a qualidade da imagem."** Eu entendi tela compartilhada e mexi no
+  codificador. Ele quis dizer os ícones. A correção certa era outra:
+  `LADO_FOTO` era 96, herdado de um círculo de 52px, e a roda desenha a 144.
+
+### Recusadas, e por quê
+
+- **Tela cheia na janela flutuante (PiP).** Não dá: o navegador desenha a
+  moldura daquela janela e não aceita botão nosso. Nem o Document PiP resolve.
+  Ficou registrado como impossível, não como pendência.
+- **Salvar a sala automaticamente.** Ele pediu e depois se corrigiu sozinho —
+  o botão nos Ajustes já existia e funcionava. O trabalho foi descartado antes
+  de existir.
+
+### Correções dele que consertaram diagnósticos meus
+
+- **"A tela se ajeita em 10 ou 15 segundos."** Eu tinha trocado o
+  `contentHint` para `detail` achando que resolveria a tela borrada. O que eu
+  fiz foi trocar um ajuste temporário por uma perda de fluidez permanente.
+  Voltou para `motion`.
+- **"Só acontece quando eu aperto F12."** Foi essa frase que resolveu o caso da
+  barra cobrindo a tela. Eu estava caçando exceção em JavaScript; a resposta
+  era CSS, e ele tinha dado a pista no primeiro print — um selo de identidade
+  cortado no rodapé, que eu não li.
+
+---
+
 ## Erros de processo que vale não repetir
 
 Não são erros de código; são de método, e custaram tempo real.
@@ -325,6 +498,23 @@ Não são erros de código; são de método, e custaram tempo real.
 - **Testes que reprovei em vez de escutar.** Um teste de duas abas quebrou
   porque eu tinha posto o encerramento em escopo de módulo. O teste estava
   certo; o desenho é que estava errado.
+- **Empurrei para PR já mesclado mais duas vezes** (quatro no total). A regra
+  agora é conferir `gh pr view <n> --json state` depois de TODO push, e
+  resgatar com `cherry-pick` quando voltar `MERGED`.
+- **Fechei o diagnóstico no primeiro suspeito plausível.** Os canais subiram e
+  a sala parou de conectar; revertemos na hora, e a investigação **não achou
+  culpado**. "Logo depois do merge" e "por causa do merge" não são a mesma
+  coisa — havia relays de descoberta caindo o episódio inteiro. Três defeitos
+  reais saíram da caçada, e nenhum deles é prova de nada.
+- **Mandei testar num endereço que não podia funcionar.** Pedi para abrir pelo
+  IP da rede local, onde `crypto.subtle` não existe. Uma sessão inteira de
+  confusão por erro meu de montagem — e foi ela que revelou a porta fechada
+  sem HTTPS, que agora é funcionalidade.
+- **Reescrevi CSS com expressão regular** e quebrei o arquivo. Regex não sabe
+  contar chaves aninhadas. Consertado à mão, com uma conferência de chaves
+  balanceadas depois.
+- **Apaguei o `node_modules/.bin`** limpando um worktree cujo `node_modules`
+  era uma junção para o real.
 
 ---
 
@@ -337,7 +527,16 @@ Não são erros de código; são de método, e custaram tempo real.
   não serve para nada: quando a dona cai, ela não é promovida. Fechá-la não é
   a saída — o Trystero anuncia de novo a cada ~5 s e a redescoberta viraria um
   laço de reconexão.
-- **Salas persistentes** em `localStorage`, no estilo de servidores do Discord.
+- **Um teste intermitente.** `apresentacao.test.ts` — "reconectar prova de
+  novo" — falhou uma vez na suíte inteira e passou sozinho e em duas rodadas
+  seguidas depois. Ele depende de `crypto.subtle`, que é assíncrono de verdade
+  e já nos custou tempo antes (ele não resolve em microtarefas). Não foi
+  investigado ainda, e um teste que às vezes passa é pior que um que sempre
+  falha.
+- **A conversa do canal não tem histórico**, nem para quem chega, nem ao voltar
+  a um canal. É consequência de não haver servidor, e some junto com o motivo
+  de existir — mas é uma decisão, não um acidente.
+- **Presença entre grupos salvos** e **amigos**: o que resta do roteiro.
 - **Degradar a tela conforme o número de espectadores.** A malha é N²: quem
   compartilha sobe uma cópia por pessoa que assiste, e a 2,5 Mbps quatro
   espectadores são 10 Mbps de upload. A maior otimização possível já está

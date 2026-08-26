@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { criarTransporte, RELAYS, REDUNDANCIA, relaysDetalhados } from './transport'
+import { criarTransporte, lerMensagemChat, RELAYS, REDUNDANCIA, relaysDetalhados } from './transport'
 import type { Acao } from '../game/types'
 import { criarSalasFalsas } from './salas.fake'
 
@@ -38,9 +38,10 @@ describe('criarTransporte', () => {
 
   it('mensagem de chat sai pelo canal "chat", separado do canal do jogo', () => {
     const { salas, acoes } = criarSalasFalsas()
-    criarTransporte(salas).enviarMensagem('boa mão')
+    criarTransporte(salas).enviarMensagem('boa mão', 'geral')
 
-    expect(acoes.get('chat')!.send).toHaveBeenCalledWith('boa mão', undefined)
+    expect(acoes.get('chat')!.send)
+      .toHaveBeenCalledWith({ texto: 'boa mão', escopo: 'geral' }, undefined)
     expect(acoes.get('acao')!.send).not.toHaveBeenCalled()
   })
 })
@@ -94,6 +95,34 @@ describe('detalhe dos relays', () => {
     for (const item of relaysDetalhados()) {
       expect(item.nome.startsWith('wss://')).toBe(false)
       expect(item.url).toContain(item.nome)
+    }
+  })
+})
+
+describe('lerMensagemChat', () => {
+  it('aceita o formato com escopo', () => {
+    expect(lerMensagemChat({ texto: 'oi', escopo: 'canal' }))
+      .toEqual({ texto: 'oi', escopo: 'canal' })
+  })
+
+  it('aceita texto solto como mensagem da sala', () => {
+    // A versão anterior aos escopos mandava a string crua. Recusar deixaria
+    // uma aba não recarregada muda para quem já recarregou.
+    expect(lerMensagemChat('oi')).toEqual({ texto: 'oi', escopo: 'geral' })
+  })
+
+  it('recusa escopo que não existe', () => {
+    expect(lerMensagemChat({ texto: 'oi', escopo: 'secreto' })).toBeNull()
+  })
+
+  it('recusa o que não tem texto', () => {
+    expect(lerMensagemChat({ escopo: 'geral' })).toBeNull()
+    expect(lerMensagemChat({ texto: 42, escopo: 'geral' })).toBeNull()
+  })
+
+  it('recusa o que não é objeto nem texto', () => {
+    for (const lixo of [null, undefined, 7, ['oi']]) {
+      expect(lerMensagemChat(lixo)).toBeNull()
     }
   })
 })

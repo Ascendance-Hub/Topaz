@@ -1,4 +1,5 @@
 import { textoLimitado } from '../../net/validar'
+import type { EscopoChat } from '../../net/transport'
 
 /** Teto de uma mensagem. Papo de mesa, não redação. */
 export const LIMITE_TEXTO = 200
@@ -13,7 +14,22 @@ export const MAX_LINHAS = 100
 export interface Chat {
   raiz: HTMLElement
   /** Põe uma linha no fim do log. `apelido` já resolvido por quem chama. */
-  receber(apelido: string, texto: string): void
+  receber(apelido: string, texto: string, escopo?: EscopoChat): void
+  /**
+   * Diz se há um canal para conversar.
+   *
+   * Fora da call não há: a aba some e o que estiver escrito vai para o geral.
+   * Um lugar de falar com ninguém seria pior que não ter o lugar.
+   */
+  definirEmCanal(emCanal: boolean): void
+  /**
+   * Esquece a conversa do canal.
+   *
+   * Chamado ao trocar de canal. Aquelas mensagens foram endereçadas às pessoas
+   * com quem você estava, e mostrá-las enquanto você conversa com outras
+   * confunde de quem é o quê. Some junto com o motivo de existirem.
+   */
+  limparCanal(): void
 }
 
 /**
@@ -32,7 +48,7 @@ export interface Chat {
  * donos do mesmo booleano.
  */
 export function criarChat(
-  aoEnviar: (texto: string) => void,
+  aoEnviar: (texto: string, escopo: EscopoChat) => void,
   aoTrocar?: (trocado: boolean) => void,
 ): Chat {
   const raiz = document.createElement('div')
@@ -48,10 +64,51 @@ export function criarChat(
   rotulo.textContent = 'Chat'
   gatilho.append(rotulo)
 
-  const log = document.createElement('div')
-  log.className = 'chat-log'
-  log.setAttribute('role', 'log')
-  log.setAttribute('aria-live', 'polite')
+  /**
+   * Dois lugares de falar, e não um filtro sobre o mesmo.
+   *
+   * O geral vai para a sala inteira; o do canal vai SÓ para quem está no seu
+   * canal — enviado só a eles, não escondido dos outros na hora de desenhar.
+   * Filtrar na tela deixaria o texto viajando para quem não devia recebê-lo, e
+   * bastaria abrir o console para ler.
+   *
+   * Dois logs separados, e não um com etiquetas: quem escreve num canal está
+   * conversando com aquelas pessoas, e misturar as duas conversas obrigaria a
+   * ler etiqueta em cada linha para saber quem ouviu o quê.
+   */
+  const logs: Record<EscopoChat, HTMLElement> = {
+    geral: document.createElement('div'),
+    canal: document.createElement('div'),
+  }
+  for (const [escopo, el] of Object.entries(logs)) {
+    el.className = 'chat-log'
+    el.dataset['escopo'] = escopo
+    el.setAttribute('role', 'log')
+    el.setAttribute('aria-live', 'polite')
+  }
+
+  let escopoAtivo: EscopoChat = 'geral'
+  let emCanal = false
+  const naoLidasPorEscopo: Record<EscopoChat, number> = { geral: 0, canal: 0 }
+
+  const abas = document.createElement('div')
+  abas.className = 'chat-abas'
+  abas.setAttribute('role', 'tablist')
+
+  const botoesDeAba: Record<EscopoChat, HTMLButtonElement> = {
+    geral: document.createElement('button'),
+    canal: document.createElement('button'),
+  }
+  const ROTULOS: Record<EscopoChat, string> = { geral: 'Sala', canal: 'Canal' }
+  for (const escopo of ['geral', 'canal'] as const) {
+    const aba = botoesDeAba[escopo]
+    aba.type = 'button'
+    aba.className = 'chat-aba'
+    aba.dataset['aba'] = escopo
+    aba.setAttribute('role', 'tab')
+    aba.onclick = () => trocarEscopo(escopo)
+    abas.append(aba)
+  }
 
   const form = document.createElement('form')
   form.className = 'chat-form'
@@ -112,7 +169,7 @@ export function criarChat(
     cabeca.append(trocar)
   }
 
-  raiz.append(cabeca, log, form)
+  raiz.append(cabeca, abas, logs.geral, logs.canal, form)
 
   let aberto = false
   let naoLidas = 0
@@ -127,8 +184,11 @@ export function criarChat(
     gatilho.append(selo)
   }
 
-  /** Conversa é lida de baixo para cima: sem isto a gaveta abre no começo. */
+  /** Conversa é lida de baixo para cima: sem isto a gaveta abre no começo.
+   *  Só o log visível: o escondido tem altura zero e rolar nele não faz nada,
+   *  mas ele é rolado ao virar visível, na troca de aba. */
   function rolarAoFim(): void {
+    const log = logs[escopoAtivo]
     log.scrollTop = log.scrollHeight
   }
 
@@ -143,7 +203,56 @@ export function criarChat(
     }
   }
 
-  function receber(apelido: string, texto: string): void {
+  /** O log de onde a pessoa está agora. */
+  function trocarEscopo(escopo: EscopoChat): void {
+    if (escopo === 'canal' && !emCanal) return
+    escopoAtivo = escopo
+    // Ler é o que zera: mudar de aba é ter visto o que havia lá.
+    naoLidasPorEscopo[escopo] = 0
+    desenharAbas()
+    rolarAoFim()
+  }
+
+  function desenharAbas(): void {
+    for (const escopo of ['geral', 'canal'] as const) {
+      const aba = botoesDeAba[escopo]
+      const ativa = escopo === escopoAtivo
+      aba.setAttribute('aria-selected', String(ativa))
+      if (ativa) aba.dataset['ativa'] = '1'
+      else delete aba.dataset['ativa']
+      // A aba do canal só existe quando há canal: um lugar de falar com
+      // ninguém seria pior que não ter o lugar.
+      aba.hidden = escopo === 'canal' && !emCanal
+      aba.replaceChildren(document.createTextNode(ROTULOS[escopo]))
+      const perdidas = naoLidasPorEscopo[escopo]
+      if (perdidas > 0 && !ativa) {
+        const selo = document.createElement('span')
+        selo.className = 'chat-nao-lidas'
+        selo.textContent = String(perdidas)
+        aba.append(selo)
+      }
+      logs[escopo].hidden = !ativa
+    }
+    // As duas abas só valem a pena quando há duas: fora da call, a fileira é
+    // um rótulo solto dizendo o óbvio.
+    abas.hidden = !emCanal
+  }
+
+  function definirEmCanal(novo: boolean): void {
+    if (novo === emCanal) return
+    emCanal = novo
+    // Saiu do canal: o que estava escrito ali não tem mais para onde ir.
+    if (!emCanal && escopoAtivo === 'canal') escopoAtivo = 'geral'
+    desenharAbas()
+  }
+
+  function limparCanal(): void {
+    logs.canal.replaceChildren()
+    naoLidasPorEscopo.canal = 0
+    desenharAbas()
+  }
+
+  function receber(apelido: string, texto: string, escopo: EscopoChat = 'geral'): void {
     const linha = document.createElement('div')
     linha.className = 'chat-linha'
 
@@ -163,6 +272,7 @@ export function criarChat(
     corpo.textContent = textoLimitado(texto, LIMITE_TEXTO)
 
     linha.append(autor, corpo)
+    const log = logs[escopo]
     log.append(linha)
 
     while (log.childElementCount > MAX_LINHAS) log.firstElementChild?.remove()
@@ -170,6 +280,12 @@ export function criarChat(
     if (!aberto) {
       naoLidas += 1
       desenharNaoLidas()
+    }
+    // Perdida também quando a gaveta está aberta noutra aba: chegou onde a
+    // pessoa não está olhando, que é a definição de perdida.
+    if (!aberto || escopo !== escopoAtivo) {
+      naoLidasPorEscopo[escopo] += 1
+      desenharAbas()
     }
     rolarAoFim()
   }
@@ -182,8 +298,9 @@ export function criarChat(
     const texto = campo.value.trim().slice(0, LIMITE_TEXTO)
     campo.value = ''
     if (!texto) return
-    aoEnviar(texto)
+    aoEnviar(texto, escopoAtivo)
   }
 
-  return { raiz, receber }
+  desenharAbas()
+  return { raiz, receber, definirEmCanal, limparCanal }
 }
