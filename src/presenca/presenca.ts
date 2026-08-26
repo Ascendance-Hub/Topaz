@@ -66,13 +66,34 @@ export interface Presenca {
  */
 export const MAX_OBSERVADOS = 8
 
+/**
+ * Quanto esperar entre abrir a sala de fundo de um grupo e a do seguinte.
+ *
+ * Abrir todas de uma vez põe presença competindo com o que importa. Cada
+ * grupo são três salas (nostr, mqtt, torrent), e o Trystero assina tópicos e
+ * pré-fabrica conexões ao entrar em cada uma — tudo no mesmo momento em que a
+ * sala de verdade está tentando conectar.
+ *
+ * Presença é melhor-esforço e ninguém repara se ela chega alguns segundos
+ * depois. Ficar sozinho numa sala porque a máquina estava ocupada procurando
+ * gente noutro grupo, isso repara.
+ */
+export const PAUSA_ENTRE_SALAS_MS = 900
+
 export function observarGrupos(
   codigos: readonly string[],
   abrir: (codigo: string) => SalaDeFundo,
+  /** Zero nos testes: eles medem a lógica, não a espera. */
+  pausaMs = 0,
 ): Presenca {
   /** código → sala aberta e quem foi visto lá. */
   const salas = new Map<string, { sala: SalaDeFundo; gente: Set<string> }>()
   const ouvintes: (() => void)[] = []
+  /** Aberturas ainda na fila, para o encerramento poder cancelá-las. */
+  const pendentes = new Set<ReturnType<typeof setTimeout>>()
+  /** Salas agendadas mas ainda não abertas, para não agendar duas vezes. */
+  const agendadas = new Set<string>()
+  let ultimaLista: string[] = []
   let viva = true
 
   function avisar(): void {
@@ -129,6 +150,7 @@ export function observarGrupos(
   function sincronizar(novos: readonly string[]): void {
     if (!viva) return
     const querer = novos.slice(0, MAX_OBSERVADOS)
+    ultimaLista = [...querer]
     // Sem silêncio sobre o que ficou de fora: um teto invisível faria a pessoa
     // achar que o grupo está vazio quando ele só não está sendo olhado.
     if (novos.length > MAX_OBSERVADOS) {
@@ -145,7 +167,32 @@ export function observarGrupos(
     }
     // Quem continua NÃO é reaberto: reabrir custa handshake e zeraria a
     // contagem por um instante, fazendo a tela piscar sem motivo.
-    for (const codigo of querer) abrirUm(codigo)
+    // Uma de cada vez, espaçadas. Abrir todas juntas era competir com a sala
+    // de verdade — três salas por grupo, todas assinando tópicos no mesmo
+    // instante em que a conexão que importa está se formando.
+    let ordem = 0
+    for (const codigo of querer) {
+      if (salas.has(codigo) || agendadas.has(codigo)) continue
+      if (pausaMs === 0) {
+        abrirUm(codigo)
+        continue
+      }
+      agendadas.add(codigo)
+      const quando = setTimeout(() => {
+        agendadas.delete(codigo)
+        pendentes.delete(quando)
+        // A lista pode ter mudado — ou a presença ter sido encerrada — no
+        // tempo em que esta abertura esperou a vez.
+        if (!viva || !ultimaLista.includes(codigo)) return
+        abrirUm(codigo)
+        // `ordem + 1`, e não `ordem`: até a PRIMEIRA sala espera. Voltar para
+        // a tela inicial recria a presença enquanto a sala que se acabou de
+        // deixar ainda está saindo do registro do Trystero — abrir na hora
+        // devolveria aquela sala em vez de uma passiva.
+      }, (ordem + 1) * pausaMs)
+      pendentes.add(quando)
+      ordem += 1
+    }
     relatar(`observando ${querer.length} de ${novos.length} grupos salvos`)
   }
 
@@ -159,6 +206,10 @@ export function observarGrupos(
     quantos: (codigo) => salas.get(codigo)?.gente.size ?? 0,
     sincronizar,
     fecharUm: async (codigo) => {
+      // Tirar da lista primeiro: se a abertura deste grupo ainda estiver na
+      // fila, ela precisa desistir em vez de abrir logo depois de eu fechar.
+      ultimaLista = ultimaLista.filter((c) => c !== codigo)
+      agendadas.delete(codigo)
       const aberta = salas.get(codigo)
       if (!aberta) return
       salas.delete(codigo)
@@ -167,6 +218,11 @@ export function observarGrupos(
     aoMudar: (cb) => { ouvintes.push(cb) },
     encerrar: () => {
       viva = false
+      // Uma abertura agendada que dispara depois do encerramento abriria uma
+      // sala que ninguém mais vai fechar.
+      for (const quando of pendentes) clearTimeout(quando)
+      pendentes.clear()
+      agendadas.clear()
       clearInterval(tique)
       for (const { sala } of salas.values()) void sala.sair()
       salas.clear()

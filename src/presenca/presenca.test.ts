@@ -358,3 +358,103 @@ describe('a espera do fecharUm não pode ser de mentira', () => {
     expect(terminou).toBe(true)
   })
 })
+
+/**
+ * Sair do caminho de quem está conectando.
+ *
+ * Abrir salas de fundo no mesmo instante em que a sala de verdade se forma é
+ * competir com ela — são três redes por grupo, todas assinando tópicos ao
+ * mesmo tempo. E pior: a sala que se acabou de deixar ainda está registrada no
+ * Trystero por ~100ms, então observar o grupo anterior nesse intervalo devolve
+ * a sala ATIVA agonizando em vez de abrir uma passiva.
+ *
+ * Recarregar a página sempre funcionou justamente porque lá não há sala
+ * nenhuma morrendo.
+ */
+describe('as salas de fundo entram espaçadas', () => {
+  it('com pausa, nenhuma abre no mesmo instante do pedido', () => {
+    vi.useFakeTimers()
+    try {
+      const { abrir, abertas } = fabrica()
+
+      observarGrupos(['aaa', 'bbb'], abrir, 900)
+
+      expect(abertas.size).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('elas abrem uma de cada vez', () => {
+    vi.useFakeTimers()
+    try {
+      const { abrir, abertas } = fabrica()
+      observarGrupos(['aaa', 'bbb'], abrir, 900)
+
+      vi.advanceTimersByTime(900)
+      expect([...abertas.keys()]).toEqual(['aaa'])
+
+      vi.advanceTimersByTime(900)
+      expect([...abertas.keys()]).toEqual(['aaa', 'bbb'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('encerrar cancela o que ainda não abriu', () => {
+    // Uma abertura agendada que dispara depois do encerramento abriria uma
+    // sala que ninguém mais vai fechar.
+    vi.useFakeTimers()
+    try {
+      const { abrir, abertas } = fabrica()
+      const p = observarGrupos(['aaa', 'bbb'], abrir, 900)
+
+      p.encerrar()
+      vi.advanceTimersByTime(5000)
+
+      expect(abertas.size).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('fecharUm impede a abertura que estava na fila', () => {
+    // É o caso que quebrava: entrar num grupo que a presença ia observar. Sem
+    // isto, a abertura dispararia logo depois e devolveria a sala ativa.
+    vi.useFakeTimers()
+    try {
+      const { abrir, abertas } = fabrica()
+      const p = observarGrupos(['aaa'], abrir, 900)
+
+      void p.fecharUm('aaa')
+      vi.advanceTimersByTime(5000)
+
+      expect(abertas.has('aaa')).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('um grupo tirado da lista antes da vez não abre', () => {
+    vi.useFakeTimers()
+    try {
+      const { abrir, abertas } = fabrica()
+      const p = observarGrupos(['aaa', 'bbb'], abrir, 900)
+
+      p.sincronizar(['aaa'])
+      vi.advanceTimersByTime(5000)
+
+      expect([...abertas.keys()]).toEqual(['aaa'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('sem pausa, abre na hora — é o que os testes de lógica usam', () => {
+    const { abrir, abertas } = fabrica()
+
+    observarGrupos(['aaa'], abrir)
+
+    expect(abertas.size).toBe(1)
+  })
+})

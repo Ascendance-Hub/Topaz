@@ -47,8 +47,17 @@ import { faltaCripto, renderizarSemCripto } from './ui/components/sem-cripto'
 import { renderizarSalasSalvas, type AcoesDeSalas } from './ui/components/salas-salvas'
 import { montarDoCanal, type FonteDeParticipantes } from './ui/components/participantes'
 import { renderizarRoda } from './ui/components/roda'
-import { observarGrupos } from './presenca/presenca'
+import { observarGrupos, PAUSA_ENTRE_SALAS_MS } from './presenca/presenca'
 import { abrirSalaDeFundo } from './presenca/sala-de-fundo'
+
+/**
+ * Quanto a presença espera antes de começar a observar, dentro de uma sala.
+ *
+ * Tempo de sobra para a sala de verdade se formar e para a anterior terminar
+ * de sair do registro do Trystero. Presença chegando quatro segundos depois
+ * ninguém nota; ficar sozinho numa sala, sim.
+ */
+const ATRASO_PRESENCA_MS = 4000
 
 /** Quem falou antes de a mesa saber o nome dele. */
 export const APELIDO_DESCONHECIDO = 'Alguém'
@@ -571,9 +580,35 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * MESMA sala nesse caso, e o `onPeerJoin` é uma propriedade única: uma das
    * duas perderia o seu ouvinte.
    */
-  const presenca = observarGrupos(
-    grupos().map((g) => g.codigo).filter((c) => c !== codigo), abrirSalaDeFundo)
+  //
+  // Nasce SEM observar nada, e só começa segundos depois de a sala estar de
+  // pé. Duas razões, e as duas custaram teste do Alexandre:
+  //
+  // 1. Abrir salas de fundo no mesmo instante da entrada é competir com o que
+  //    importa. Ele descreveu isso antes de eu medir: "talvez ele esteja
+  //    tentando conectar na sala e descobrir gente de outros grupos ao mesmo
+  //    tempo".
+  // 2. A sala que acabamos de deixar ainda está registrada no Trystero — o
+  //    `leave` demora um envio e mais 99ms. Observar o grupo anterior nesse
+  //    intervalo devolveria a sala ATIVA agonizando em vez de abrir uma
+  //    passiva, com o ouvinte sobrescrito por cima.
+  //
+  // Recarregar a página sempre funcionou justamente porque lá não há sala
+  // nenhuma morrendo.
+  const presenca = observarGrupos([], abrirSalaDeFundo, PAUSA_ENTRE_SALAS_MS)
   presenca.aoMudar(() => desenharSalasSalvas())
+  /**
+   * A presença só passa a observar depois disto virar verdadeiro.
+   *
+   * Não basta agendar a primeira sincronização: `desenharSalasSalvas` é
+   * chamada por todo `desenhar()`, e o primeiro acontece na montagem. Sem esta
+   * tranca o adiamento não adiava nada — foi o teste que pegou.
+   */
+  let presencaLiberada = false
+  const comecarPresenca = setTimeout(() => {
+    presencaLiberada = true
+    desenharSalasSalvas()
+  }, ATRASO_PRESENCA_MS)
 
   let salasSalvas = renderizarSalasSalvas(
     grupos(), codigo, acoesDeSalas, presenca.quantos)
@@ -671,8 +706,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    */
   /** Só a tira de salas, sem redesenhar o resto. */
   function desenharSalasSalvas(): void {
-    presenca.sincronizar(
-      grupos().map((g) => g.codigo).filter((c) => c !== codigo))
+    if (presencaLiberada) {
+      presenca.sincronizar(
+        grupos().map((g) => g.codigo).filter((c) => c !== codigo))
+    }
     const novas = renderizarSalasSalvas(
       grupos(), codigo, acoesDeSalas, presenca.quantos)
     salasSalvas.replaceWith(novas)
@@ -980,6 +1017,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   }
 
   encerrar = () => {
+    clearTimeout(comecarPresenca)
     // Sem esperar, de propósito: a sala nova é aberta logo em seguida, e
     // enquanto a velha ainda está registrada a piscina de relays sobrevive.
     void presenca.encerrar()
@@ -1075,8 +1113,11 @@ export function iniciarApp(app: HTMLElement): void {
      * se conectam. Um grupo em que ninguém está custa zero conexões — é o que
      * torna razoável abrir todos os salvos de uma vez.
      */
+    // Na tela inicial não há sala se formando, então ela pode começar já —
+    // mas as salas continuam espaçadas: são três redes por grupo, e abrir
+    // todas de uma vez trava a página de quem tem vários grupos salvos.
     const presenca = observarGrupos(
-      grupos().map((g) => g.codigo), abrirSalaDeFundo)
+      grupos().map((g) => g.codigo), abrirSalaDeFundo, PAUSA_ENTRE_SALAS_MS)
     presenca.aoMudar(() => desenharHome())
 
     /**
