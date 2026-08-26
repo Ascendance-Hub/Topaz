@@ -11,11 +11,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * quando funciona e intermitente quando não.
  */
 vi.mock('./presenca/sala-de-fundo', () => ({
-  abrirSalaDeFundo: () => ({
+  abrirSalaDeFundo: vi.fn(() => ({
     aoEntrarPeer: () => {},
     aoSairPeer: () => {},
     sair: () => {},
-  }),
+  })),
 }))
 
 vi.mock('./net/transport', () => ({
@@ -37,6 +37,7 @@ import { criarRedeFalsa } from './net/transport.fake'
 import { MS_DESCOBERTA, MS_SEM_CONEXAO, Sessao } from './net/sessao'
 import { TITULO_SEM_CONEXAO } from './ui/components/conexao'
 import { rngSemente } from './game/shoe'
+import { abrirSalaDeFundo } from './presenca/sala-de-fundo'
 import { entrarNaSala, iniciarApp, MENSAGEM_ERRO_INICIAL } from './main'
 import { criarSalasFalsas } from './net/salas.fake'
 
@@ -1282,6 +1283,40 @@ describe('entrarNaSala — trocar o chat com o miolo', () => {
       expect(app.querySelector('.conteudo')).toBe(conteudo)
       expect(app.querySelector('.lateral')).toBe(lateral)
     } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('entrarNaSala — a presença sai do caminho', () => {
+  it('não observa nada nos primeiros segundos da sala', () => {
+    // Entrar e procurar gente noutros grupos ao mesmo tempo era competir com
+    // o que importa — e a sala que se acabou de deixar ainda está saindo do
+    // registro do Trystero, então observá-la agora devolveria ELA.
+    vi.useFakeTimers()
+    try {
+      localStorage.setItem('topaz:grupos', JSON.stringify([
+        { codigo: 'AAAABBBBCCCCDDDD', nome: 'Outro' },
+      ]))
+      const abertas: string[] = []
+      vi.mocked(abrirSalaDeFundo).mockImplementation((codigo: string) => {
+        abertas.push(codigo)
+        return { aoEntrarPeer: () => {}, aoSairPeer: () => {}, sair: () => {} }
+      })
+
+      const rede = criarRedeFalsa({ conexaoDiferida: true })
+      vi.mocked(criarSalasTrystero).mockImplementation(() => criarSalasFalsas([]).salas)
+      vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
+      entrarNaSala(document.createElement('div'), 'Bruno', 'CODIGO01')
+
+      vi.advanceTimersByTime(1000)
+      expect(abertas).toEqual([])
+
+      // E depois da espera ela começa, uma sala de cada vez.
+      vi.advanceTimersByTime(6000)
+      expect(abertas).toEqual(['AAAABBBBCCCCDDDD'])
+    } finally {
+      localStorage.clear()
       vi.useRealTimers()
     }
   })

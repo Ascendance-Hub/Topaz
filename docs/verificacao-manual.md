@@ -560,7 +560,11 @@ escreve uma linha `presença: CODIGO=N` a cada mudança, e é ela que separa
 - [ ] Essa pessoa saindo, o selo some e o console volta a `=0`
 - [ ] Dentro de uma sala, o ícone de OUTRO grupo com gente ganha um ponto verde
 - [ ] O ícone da sala em que você está **não** ganha ponto
-- [ ] **Trocar de grupo continua rápido** — é o que quebrou da última vez
+- [ ] **Trocar de grupo continua rápido** — é o que mais quebrou nesta caçada.
+      Trocar cinco vezes seguidas, sem recarregar, e conectar nas cinco
+- [ ] Trocando de grupo, você **não fica sozinho** numa sala onde há gente
+- [ ] A presença demora uns segundos para aparecer depois de entrar, e isso é
+      de propósito: ela espera a sala se formar antes de sair procurando
 
 ## O palco da call
 
