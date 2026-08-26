@@ -116,7 +116,7 @@ export interface Transporte {
   aoReceberIdentidade(cb: (mensagem: unknown, peerId: string) => void): void
   aoEntrarPeer(cb: (peerId: string) => void): void
   aoSairPeer(cb: (peerId: string) => void): void
-  sair(): Promise<void>
+  sair(): void
 }
 
 /** A conexão crua do Trystero. Dados e mídia viajam por ela. */
@@ -301,6 +301,8 @@ export function criarTransporte(salas: Salas): Transporte {
     aoSairPeer: (cb) => {
       aoSair.push(cb)
     },
-    sair: () => salas.sair(),
+    sair: () => {
+      salas.sair()
+    },
   }
 }

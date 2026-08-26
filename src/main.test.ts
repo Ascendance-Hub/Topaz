@@ -5,19 +5,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // fábrica controlável para poder ligar duas "sessões" (uma delas simulando
 // outra aba/navegador) na mesma rede em memória usada pelos testes de
 // `Sessao`. `vi.mock` é hoisted para antes dos imports abaixo.
-/**
- * As salas de fundo da presença abrem conexão de verdade com relays nostr.
- * Nenhum teste aqui é sobre presença — e um teste que abre socket é lento
- * quando funciona e intermitente quando não.
- */
-vi.mock('./presenca/sala-de-fundo', () => ({
-  abrirSalaDeFundo: () => ({
-    aoEntrarPeer: () => {},
-    aoSairPeer: () => {},
-    sair: () => {},
-  }),
-}))
-
 vi.mock('./net/transport', () => ({
   criarSalasTrystero: vi.fn(),
   criarTransporte: vi.fn(),
@@ -1281,54 +1268,6 @@ describe('entrarNaSala — trocar o chat com o miolo', () => {
 
       expect(app.querySelector('.conteudo')).toBe(conteudo)
       expect(app.querySelector('.lateral')).toBe(lateral)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-})
-
-describe('entrarNaSala — presença entre grupos', () => {
-  it('a tira de salas mostra as salvas', () => {
-    vi.useFakeTimers()
-    try {
-      localStorage.setItem('topaz:grupos', JSON.stringify([
-        { codigo: 'AAAABBBBCCCCDDDD', nome: 'Outro' },
-      ]))
-      const rede = criarRedeFalsa({ conexaoDiferida: true })
-      vi.mocked(criarSalasTrystero).mockImplementation(() => criarSalasFalsas([]).salas)
-      vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
-      const app = document.createElement('div')
-      entrarNaSala(app, 'Bruno', 'CODIGO01')
-
-      expect(app.querySelector('[data-sala="AAAABBBBCCCCDDDD"]')).not.toBeNull()
-    } finally {
-      localStorage.clear()
-      vi.useRealTimers()
-    }
-  })
-})
-
-describe('entrarNaSala — trocar de sala espera o desmonte', () => {
-  it('reconectar abre uma sala NOVA, e não a que ainda estava saindo', async () => {
-    // O `leave` do Trystero desregistra a sala só depois de um envio e mais
-    // 99ms. Reentrar antes disso devolvia a MESMA sala — "Reconectar" não
-    // reconectava nada, e trocar para um grupo observado pela presença dava
-    // uma sala passiva, que não anuncia.
-    vi.useFakeTimers()
-    try {
-      const rede = criarRedeFalsa({ conexaoDiferida: true })
-      vi.mocked(criarSalasTrystero).mockImplementation(() => criarSalasFalsas([]).salas)
-      vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
-      const app = document.createElement('div')
-      entrarNaSala(app, 'Bruno', 'CODIGO01')
-      const antes = vi.mocked(criarSalasTrystero).mock.calls.length
-
-      app.querySelector<HTMLButtonElement>('[data-sala="reconectar"]')?.click()
-      // Tempo suficiente para a promessa de saída resolver; `runAllTimers`
-      // não serve porque a sala tem tiques periódicos e nunca esvazia.
-      await vi.advanceTimersByTimeAsync(300)
-
-      expect(vi.mocked(criarSalasTrystero).mock.calls.length).toBe(antes + 1)
     } finally {
       vi.useRealTimers()
     }
