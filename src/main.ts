@@ -46,6 +46,7 @@ import { mesaEsperaPor } from './game/rules'
 import { faltaCripto, renderizarSemCripto } from './ui/components/sem-cripto'
 import { renderizarSalasSalvas, type AcoesDeSalas } from './ui/components/salas-salvas'
 import { montarDoCanal, type FonteDeParticipantes } from './ui/components/participantes'
+import { renderizarRoda } from './ui/components/roda'
 
 /** Quem falou antes de a mesa saber o nome dele. */
 export const APELIDO_DESCONHECIDO = 'Alguém'
@@ -660,6 +661,30 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
         grupo: grupoSalvo(codigo),
         identidade,
       }, acoesConfiguracoes))
+      return
+    }
+
+    const call = protocolo.estado()
+    // Assistindo alguém, a roda cede o meio para a tela e vira faixa. Saber
+    // quem está falando importa MAIS com uma tela na frente, não menos — por
+    // isso ela encolhe em vez de sumir.
+    const assistindo = call.assistindo.length > 0
+    conteudo.dataset['assistindo'] = assistindo ? '1' : ''
+
+    if (call.euNaCall) {
+      // Dentro de um canal o miolo é a roda: numa conversa por voz, o que se
+      // olha o tempo todo é quem está aqui, e nome escrito não é rosto.
+      palco.replaceChildren(
+        renderizarRoda(participantesAgora(), assistindo ? 'faixa' : 'grade'))
+      // "Na sala" continua existindo, e é o único lugar que mostra quem está
+      // na sala SEM estar em canal nenhum — a coluna da esquerda só conhece
+      // quem entrou numa call. Compacto, porque agora é o coadjuvante.
+      if (!assistindo) {
+        const naSala = renderizarSalaParada(
+          sessao.estado(), sessao.meuId(), conectadosComigo())
+        naSala.dataset['compacto'] = '1'
+        palco.append(naSala)
+      }
       return
     }
 
