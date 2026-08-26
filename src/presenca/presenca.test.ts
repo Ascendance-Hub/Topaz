@@ -322,3 +322,39 @@ describe('duas redes, uma pessoa', () => {
     expect(p.quantos('aaa')).toBe(0)
   })
 })
+
+/**
+ * A saída precisa ser esperável DE VERDADE.
+ *
+ * `fecharUm` existe para fechar a observação de um grupo antes de entrar nele,
+ * porque o Trystero devolve a MESMA sala num id já aberto. Isso só funciona se
+ * a promessa esperar mesmo — e houve uma versão em que `sair` devolvia `void`,
+ * o `await` resolvia na hora, e a proteção não protegia nada.
+ *
+ * Com três redes por grupo, uma só delas demorando basta para o defeito voltar.
+ */
+describe('a espera do fecharUm não pode ser de mentira', () => {
+  it('espera a rede mais LENTA das que a sala abriu', async () => {
+    let soltarLenta = (): void => {}
+    const abrir = (): SalaDeFundo => ({
+      aoEntrarPeer: () => {},
+      aoSairPeer: () => {},
+      // Como a sala de fundo real: várias redes, e a promessa só fecha quando
+      // todas fecharem.
+      sair: () => Promise.all([
+        Promise.resolve(),
+        new Promise<void>((res) => { soltarLenta = res }),
+      ]).then(() => undefined),
+    })
+    const p = observarGrupos(['aaa'], abrir)
+    let terminou = false
+
+    const fim = p.fecharUm('aaa').then(() => { terminou = true })
+    for (let i = 0; i < 5; i++) await Promise.resolve()
+
+    expect(terminou).toBe(false)
+    soltarLenta()
+    await fim
+    expect(terminou).toBe(true)
+  })
+})

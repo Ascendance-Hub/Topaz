@@ -460,10 +460,19 @@ sala (15s): relays nostr abertos 16 · peers 1 · por rede: nostr=0 mqtt=1 torre
 A presença era **só nostr**. As máquinas do teste se acham por **mqtt**. O
 observador esperava numa rede em que aquelas pessoas não aparecem.
 
-**A correção.** A sala de fundo passa a observar nostr **e** mqtt, e quem conta
-desduplica por peerId. É a ideia que o Alexandre tinha proposto rodadas antes —
-"usa todas as redes e depois reduz" —, e eu tinha respondido que o problema era
-outro. O diagnóstico dele estava certo e o meu não.
+**A correção.** A sala de fundo passa a observar **as três redes**, e quem
+conta desduplica por peerId. É a ideia que o Alexandre tinha proposto rodadas
+antes — "usa todas as redes e depois reduz" —, e eu tinha respondido que o
+problema era outro. O diagnóstico dele estava certo e o meu não.
+
+A metade que NÃO foi adotada é a redução, e ele mesmo apontou o motivo ao
+perguntar como eu a faria: uma rede desligada por estar quieta é uma rede que
+não vê quem chegar depois. Presença é justamente sobre quem chega depois.
+
+Ele também corrigiu a minha primeira versão da correção, que deixava o torrent
+de fora porque o diagnóstico dizia `torrent=0`. Zero ali significa "não chegou
+primeiro" — quem acha antes fica dono do peer e o outro nem aparece na conta.
+A rede que conecta uma pessoa não é a mesma que conecta outra.
 
 **O que continua sem explicação.** Entre as mesmas duas máquinas, o nostr acha
 uma sonda e não acha o app. Isso não foi resolvido: foi contornado. Fica
