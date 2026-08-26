@@ -105,13 +105,19 @@ export function observarGrupos(
   }
 
   function abrirUm(codigo: string): void {
-    if (salas.has(codigo)) return
+    if (salas.has(codigo)) {
+      console.info(`presença: JÁ observava "${codigo}", não reabre`)
+      return
+    }
     const gente = new Set<string>()
+    console.info(`presença: abrindo sala de fundo para "${codigo}"`)
     const sala = abrir(codigo)
+    console.info(`presença: sala de fundo de "${codigo}" aberta`)
     // Eu não entro nesta conta. Sou passivo lá, o que quer dizer que não estou
     // lá — e "3 online" precisa significar três OUTRAS pessoas, senão todo
     // grupo salvo pareceria ocupado.
     sala.aoEntrarPeer((peerId) => {
+      console.info(`presença: ENTROU ${peerId} em "${codigo}"`)
       // `Set` já deduplica, mas o aviso não pode sair sem mudança: o Trystero
       // reanuncia, e redesenhar a tela inicial a cada reanúncio seria piscar
       // de graça.
