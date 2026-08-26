@@ -579,6 +579,10 @@ Dura o tempo de um round-trip.
 - [ ] O áudio da tela continua tocando enquanto você está nos Ajustes
 - [ ] **Escolher foto pelos Ajustes funciona dentro da sala** — antes só
       funcionava na tela inicial
+- [ ] E a foto nova aparece **na hora** no seu círculo grande e na lista de
+      canais, sem precisar sair e voltar
+- [ ] A outra pessoa vê a sua foto nova sem recarregar
+- [ ] "Tirar foto" também atualiza os dois lugares
 - [ ] Digitar um nome novo não perde o texto no meio da digitação
 
 ## Trocar o chat com o miolo
