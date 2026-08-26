@@ -1,4 +1,5 @@
 import type { SalaTrystero } from './transport'
+import { avisarTodos } from './avisar'
 
 export interface SalaNomeada {
   /** `nostr`, `mqtt`, `torrent` — aparece no diagnóstico. */
@@ -72,7 +73,7 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
       // enquanto ninguém falar por ela.
       if (dono.has(peerId)) return
       dono.set(peerId, nomeada)
-      for (const cb of aoEntrar) cb(peerId)
+      avisarTodos(aoEntrar, peerId)
     }
 
     nomeada.sala.onPeerLeave = (peerId) => {
@@ -80,7 +81,7 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
       // e tratar como saída derrubaria alguém que continua conectado.
       if (dono.get(peerId) !== nomeada) return
       dono.delete(peerId)
-      for (const cb of aoSair) cb(peerId)
+      avisarTodos(aoSair, peerId)
     }
   }
 
@@ -101,7 +102,7 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
       // Mesma regra das ações: só a rede dona entrega. Sem isto, quem estiver
       // alcançável por duas redes apareceria com a tela duplicada.
       if (dono.get(peerId) !== nomeada) return
-      for (const cb of aoStream) cb(stream, peerId, metadata)
+      avisarTodos(aoStream, stream, peerId, metadata)
     }
   }
 
@@ -117,7 +118,7 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
           // Chegou pela rede que não é dona: é a cópia da conexão reserva.
           // Entregar as duas faria a ação ser aplicada em dobro.
           if (dono.get(contexto.peerId) !== nomeada) return
-          for (const cb of ouvintes) cb(dados as T, contexto.peerId)
+          avisarTodos(ouvintes, dados as T, contexto.peerId)
         }
       }
 

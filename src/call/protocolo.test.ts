@@ -434,3 +434,96 @@ describe('abrir e fechar canais', () => {
     expect(ids(a)).toEqual(ids(b))
   })
 })
+
+/**
+ * O tipo `MensagemCall` na assinatura de `receber` é uma promessa que ninguém
+ * do outro lado assinou: o que chega ali veio da rede. Quem manda pode ser uma
+ * versão futura, uma aba com código velho em cache, ou alguém curioso com o
+ * console aberto.
+ *
+ * O resto do projeto já parte desse princípio — `src/net/validar.ts` existe
+ * para o estado do jogo. O canal da call tinha ficado de fora.
+ */
+describe('mensagem torta da rede', () => {
+  /** Entrega direto no protocolo, sem passar pelo tipo. */
+  function comEntrega() {
+    let entregar: (msg: unknown, de: string) => void = () => {}
+    const canal: CanalCall = {
+      meuId: () => 'eu',
+      enviar: () => {},
+      aoReceber: (cb) => { entregar = cb as (m: unknown, d: string) => void },
+      aoEntrarPeer: () => {},
+      aoSairPeer: () => {},
+    }
+    return { p: new ProtocoloCall(canal), entregar: (m: unknown) => entregar(m, 'pa') }
+  }
+
+  it('tipo desconhecido não derruba a entrega', () => {
+    // Este era o defeito: sem `naCall` booleano, a guarda de anúncio repetido
+    // lia `anterior.compartilhando` com `anterior` indefinido.
+    const { entregar } = comEntrega()
+
+    expect(() => entregar({ tipo: 'de-outra-versao' })).not.toThrow()
+  })
+
+  it('tipo desconhecido não inventa alguém na call', () => {
+    const { p, entregar } = comEntrega()
+
+    entregar({ tipo: 'de-outra-versao' })
+
+    expect(p.estado().naCall).toEqual([])
+  })
+
+  it('estado sem os booleanos é descartado', () => {
+    const { p, entregar } = comEntrega()
+
+    entregar({ tipo: 'estado', naCall: 'sim', compartilhando: 0 })
+
+    expect(p.estado().naCall).toEqual([])
+  })
+
+  it('o que não é objeto é descartado', () => {
+    const { p, entregar } = comEntrega()
+
+    for (const lixo of [null, undefined, 'estado', 42, ['estado']]) {
+      expect(() => entregar(lixo)).not.toThrow()
+    }
+    expect(p.estado().naCall).toEqual([])
+  })
+
+  it('pedido de tela sem o booleano é descartado', () => {
+    const { p, entregar } = comEntrega()
+    p.entrar()
+    p.definirCompartilhando(true)
+
+    entregar({ tipo: 'quero-tela' })
+
+    expect(p.estado().assistidoPor).toEqual([])
+  })
+
+  it('estado SEM canal continua valendo, no principal', () => {
+    // Uma aba com o código anterior aos canais manda exatamente isto. Recusar
+    // seria quebrar a sala para quem ainda não recarregou.
+    const { p, entregar } = comEntrega()
+
+    entregar({ tipo: 'estado', naCall: true, compartilhando: false })
+
+    expect(p.estado().naCall).toEqual(['pa'])
+    expect(p.estado().comigo).toEqual(['pa'])
+  })
+})
+
+describe('ouvinte do protocolo que estoura', () => {
+  it('não impede os outros de serem avisados', () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { a } = doisPares()
+    const depois = vi.fn()
+    a.aoMudar(() => { throw new Error('falhei') })
+    a.aoMudar(depois)
+
+    a.entrar()
+
+    expect(depois).toHaveBeenCalled()
+    erro.mockRestore()
+  })
+})

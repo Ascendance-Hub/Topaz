@@ -43,6 +43,7 @@ import { AparelhosEmUso } from './call/aparelhos-em-uso'
 import { renderizar } from './ui/render'
 import { rngSemente } from './game/shoe'
 import { mesaEsperaPor } from './game/rules'
+import { faltaCripto, renderizarSemCripto } from './ui/components/sem-cripto'
 
 /** Quem falou antes de a mesa saber o nome dele. */
 export const APELIDO_DESCONHECIDO = 'Alguém'
@@ -693,6 +694,15 @@ export const MENSAGEM_ERRO_INICIAL = 'Não foi possível carregar o Topaz. Recar
  * de fallback, o suficiente para o usuário saber que algo falhou e recarregar.
  */
 export function iniciarApp(app: HTMLElement): void {
+  // Antes de tudo: sem `crypto.subtle` nenhuma sala se forma, porque o código
+  // da sala vira chave antes do primeiro anúncio. Falhar aqui, dizendo o que
+  // houve, é melhor que deixar a pessoa clicar em "entrar" e olhar para uma
+  // sala que nunca conecta.
+  if (faltaCripto({ isSecureContext: window.isSecureContext, subtle: crypto.subtle })) {
+    app.replaceChildren(renderizarSemCripto(window.location.href))
+    return
+  }
+
   try {
     // O teste de rede também mora na home, e não só dentro da sala: quem
     // recebeu um link e não consegue entrar nunca chega à sala para achá-lo.

@@ -1,5 +1,6 @@
 import type { Salas } from '../net/salas'
 import { escolherH264 } from './codec'
+import { avisarTodos } from '../net/avisar'
 
 /**
  * O supressor de ruído do próprio WebRTC, de graça. Não é Krisp, mas resolve
@@ -113,7 +114,7 @@ export class Midia {
    */
   constructor(private salas: Salas) {
     this.salas.aoReceberStream((stream, peerId, metadata) => {
-      for (const cb of this.aoMidia) cb(stream, peerId, metadata)
+      avisarTodos(this.aoMidia, stream, peerId, metadata)
     })
   }
 

@@ -56,6 +56,29 @@ export function canalConhecido(bruto: unknown): string {
   return CANAIS.some((c) => c.id === bruto) ? (bruto as string) : CANAL_PADRAO
 }
 
+/**
+ * Isto tem mesmo a cara de uma mensagem da call?
+ *
+ * O tipo na assinatura de `receber` é uma promessa que ninguém do outro lado
+ * assinou: o que chega ali veio da rede. Pode ser uma versão futura, uma aba
+ * com código velho em cache, ou alguém com o console aberto.
+ *
+ * O `canal` é opcional de propósito. Quem está com a versão anterior aos
+ * canais manda o estado sem ele, e recusar quebraria a sala de quem ainda não
+ * recarregou — `canalConhecido` já leva a ausência ao principal.
+ */
+export function ehMensagemCall(bruto: unknown): bruto is MensagemCall {
+  if (typeof bruto !== 'object' || bruto === null || Array.isArray(bruto)) return false
+  const m = bruto as Record<string, unknown>
+  if (m['tipo'] === 'quero-tela') return typeof m['quero'] === 'boolean'
+  if (m['tipo'] === 'estado') {
+    return typeof m['naCall'] === 'boolean'
+      && typeof m['compartilhando'] === 'boolean'
+      && (m['canal'] === undefined || typeof m['canal'] === 'string')
+  }
+  return false
+}
+
 export interface CanalCall {
   meuId(): string
   /** Sem `para`, vai para todos os peers da sala. */
@@ -122,7 +145,13 @@ export class ProtocoloCall {
     })
   }
 
-  private receber(msg: MensagemCall, de: string): void {
+  private receber(bruto: unknown, de: string): void {
+    // Confere ANTES de olhar qualquer campo. Sem isto, uma mensagem torta
+    // estoura aqui dentro — e o estouro sobe pelo laço que entrega a
+    // mensagem, levando junto quem ainda não tinha sido avisado.
+    if (!ehMensagemCall(bruto)) return
+    const msg = bruto
+
     if (msg.tipo === 'quero-tela') {
       // Só aceito espectador enquanto de fato compartilho: sem isso, um pedido
       // atrasado ligaria o codificador depois de eu já ter parado.
@@ -140,8 +169,8 @@ export class ProtocoloCall {
     const anterior = this.peers.get(de)
     if (
       anterior?.naCall === msg.naCall
-      && anterior.compartilhando === msg.compartilhando
-      && anterior.canal === canal
+      && anterior?.compartilhando === msg.compartilhando
+      && anterior?.canal === canal
     ) {
       return
     }
@@ -186,7 +215,16 @@ export class ProtocoloCall {
   }
 
   private notificar(): void {
-    for (const cb of this.ouvintes) cb()
+    // Mesma regra do `avisarTodos` da rede, escrita à mão: este arquivo não
+    // pode importar de fora de `src/call` — há um teste guardando isso, para
+    // a metade testável da call continuar testável sem navegador.
+    for (const cb of [...this.ouvintes]) {
+      try {
+        cb()
+      } catch (erro) {
+        console.error('um ouvinte da call estourou; os demais seguem avisados', erro)
+      }
+    }
   }
 
   entrar(): void {

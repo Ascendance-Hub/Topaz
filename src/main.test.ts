@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // `main.ts` importa o transporte real do Trystero; substituímos por uma
 // fábrica controlável para poder ligar duas "sessões" (uma delas simulando
@@ -158,6 +158,48 @@ describe('entrarNaSala — estado da conexão em vez de mesa travada', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+/**
+ * O happy-dom não implementa `isSecureContext` — ele fica `undefined`, e o
+ * guarda de criptografia leria isso como página insegura. Declarar o ambiente
+ * aqui é dizer a verdade sobre onde o teste roda; o `crypto.subtle`, esse o
+ * happy-dom tem de verdade.
+ */
+function contextoSeguro(valor: boolean): () => void {
+  const antes = Object.getOwnPropertyDescriptor(window, 'isSecureContext')
+  Object.defineProperty(window, 'isSecureContext', { value: valor, configurable: true })
+  return () => {
+    if (antes) Object.defineProperty(window, 'isSecureContext', antes)
+    else delete (window as { isSecureContext?: boolean }).isSecureContext
+  }
+}
+
+beforeEach(() => {
+  const desfazer = contextoSeguro(true)
+  return desfazer
+})
+
+describe('sem criptografia no navegador', () => {
+  it('a página diz o que houve, em vez de montar uma sala que nunca conecta', () => {
+    const desfazer = contextoSeguro(false)
+    const app = document.createElement('div')
+
+    iniciarApp(app)
+
+    expect(app.textContent).toContain('https')
+    desfazer()
+  })
+
+  it('e não monta o lobby por baixo do aviso', () => {
+    const desfazer = contextoSeguro(false)
+    const app = document.createElement('div')
+
+    iniciarApp(app)
+
+    expect(app.querySelector('input[placeholder="Seu apelido"]')).toBeNull()
+    desfazer()
   })
 })
 

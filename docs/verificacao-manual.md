@@ -529,6 +529,16 @@ Dura o tempo de um round-trip.
 
 **O painel nunca foi visto num navegador de verdade**, só em DOM de teste.
 
+## Contexto seguro
+
+- [ ] Abrir o site pelo IP da rede local (`http://192.168.x.x:5173`) mostra a
+      porta fechada explicando que falta https — e **não** o lobby
+- [ ] Pelo `localhost` e pelo site publicado, nada muda: o aviso não aparece
+
+Sem `crypto.subtle` o código da sala não vira chave, e nenhuma das três redes
+de descoberta chega a anunciar. Antes desse aviso a falha era muda: erro no
+console, sala montada, e ninguém nunca aparecia.
+
 ## Decisões em aberto
 
 Coisas deliberadamente não implementadas, para você decidir:

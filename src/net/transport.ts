@@ -6,6 +6,7 @@ import { joinRoom as entrarTorrent } from '@trystero-p2p/torrent'
 import { fundirSalas } from './salas'
 import type { Salas, SalaNomeada } from './salas'
 import type { Acao, EstadoJogo } from '../game/types'
+import { avisarTodos } from './avisar'
 
 export const APP_ID = 'topaz-ascendance-hub'
 
@@ -192,29 +193,29 @@ export function criarTransporte(salas: Salas): Transporte {
 
   // A fusão já entrega `de` desduplicado: só o que veio pela rede dona.
   acaoAction.onMessage((acao, de) => {
-    for (const cb of aoAcao) cb(acao, de)
+    avisarTodos(aoAcao, acao, de)
   })
   estadoAction.onMessage((estado, de) => {
-    for (const cb of aoEstado) cb(estado, de)
+    avisarTodos(aoEstado, estado, de)
   })
   identidadeAction.onMessage((mensagem, de) => {
-    for (const cb of aoIdentidade) cb(mensagem, de)
+    avisarTodos(aoIdentidade, mensagem, de)
   })
 
   fotoAction.onMessage((foto, de) => {
     // Entregue como `unknown`: a validação é de quem consome, que é quem sabe
     // o que serve como foto. Aqui só existe o transporte.
-    for (const cb of aoFoto) cb(foto, de)
+    avisarTodos(aoFoto, foto, de)
   })
 
   chatAction.onMessage((texto, de) => {
-    for (const cb of aoMensagem) cb(texto, de)
+    avisarTodos(aoMensagem, texto, de)
   })
   salas.aoEntrarPeer((peerId) => {
-    for (const cb of aoEntrar) cb(peerId)
+    avisarTodos(aoEntrar, peerId)
   })
   salas.aoSairPeer((peerId) => {
-    for (const cb of aoSair) cb(peerId)
+    avisarTodos(aoSair, peerId)
   })
 
   return {

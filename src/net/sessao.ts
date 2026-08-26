@@ -5,6 +5,7 @@ import { REGRAS } from '../game/rules'
 import type { Acao, EstadoJogo, Rng } from '../game/types'
 import type { Transporte } from './transport'
 import { ehEstadoPlausivel } from './validar'
+import { avisarTodos } from './avisar'
 
 /**
  * Quanto tempo esperamos, depois de entrar na sala (ou de ver um peer novo),
@@ -259,7 +260,7 @@ export class Sessao {
   }
 
   private notificar(): void {
-    for (const cb of this.ouvintes) cb()
+    avisarTodos(this.ouvintes)
   }
 
   souHost(): boolean {

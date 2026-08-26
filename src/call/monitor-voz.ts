@@ -1,5 +1,6 @@
 import { decidirFalando, rmsDe, TAMANHO_JANELA } from './nivel-voz'
 import type { EstadoFala } from './nivel-voz'
+import { avisarTodos } from '../net/avisar'
 
 /**
  * Quem está falando, medido no navegador.
@@ -152,6 +153,6 @@ export class MonitorDeVoz {
   }
 
   private avisar(id: string, falando: boolean): void {
-    for (const cb of this.ouvintes) cb(id, falando)
+    avisarTodos(this.ouvintes, id, falando)
   }
 }

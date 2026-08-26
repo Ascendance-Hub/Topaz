@@ -1987,3 +1987,49 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 }
 .canal-abrir:hover { color: var(--topazio); border-color: var(--topazio); }
 .canal[data-aqui='1'] .canal-quantos { color: var(--topazio-claro); }
+
+/* ---------------------------------------------------------------------------
+   PORTA FECHADA: NAVEGADOR SEM CRIPTOGRAFIA
+   ---------------------------------------------------------------------------
+   Ocupa a tela sozinha porque não há mais nada a fazer nela: sem
+   `crypto.subtle` nenhuma sala se forma. Uma faixa de aviso por cima do lobby
+   convidaria a tentar entrar, e entrar não vai funcionar.
+
+   Sóbrio de propósito. O latão fraco da borda é o mesmo de todo o resto do
+   site: isto é uma condição, não um acidente, e vermelho de erro faria parecer
+   que algo quebrou quando o navegador está apenas cumprindo a regra dele.
+   ------------------------------------------------------------------------ */
+.sem-cripto {
+  max-width: 46ch;
+  margin: auto;
+  padding: 28px;
+  border: 1px solid var(--latao-fraco);
+  border-radius: 4px;
+  text-align: center;
+}
+.sem-cripto h1 {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 24px;
+  line-height: 1.25;
+  color: var(--creme);
+  margin: 0 0 16px;
+}
+.sem-cripto p {
+  font-family: var(--corpo);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--creme-fraco);
+  margin: 0 0 12px;
+}
+.sem-cripto p:last-child { margin-bottom: 0; }
+
+/* O endereço aberto é a prova do que houve — quem entende de web lê esta
+   linha e resolve sozinho. Monoespaçado e quebrando em qualquer ponto, porque
+   endereço longo não pode estourar a caixa. */
+.sem-cripto-endereco {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--topazio);
+  word-break: break-all;
+}
