@@ -563,8 +563,10 @@ escreve uma linha `presença: CODIGO=N` a cada mudança, e é ela que separa
 - [ ] **Trocar de grupo continua rápido** — é o que mais quebrou nesta caçada.
       Trocar cinco vezes seguidas, sem recarregar, e conectar nas cinco
 - [ ] Trocando de grupo, você **não fica sozinho** numa sala onde há gente
-- [ ] A presença demora uns segundos para aparecer depois de entrar, e isso é
-      de propósito: ela espera a sala se formar antes de sair procurando
+- [ ] A presença só aparece **depois de a sala conectar**, e isso é de
+      propósito: enquanto conectar não acontece, nada é gasto procurando
+- [ ] Numa sala que não conecta, a presença **não** começa — a tela de falha
+      de conexão fica sozinha, sem nada disputando a rede por trás
 
 ## O palco da call
 

@@ -50,14 +50,6 @@ import { renderizarRoda } from './ui/components/roda'
 import { observarGrupos, PAUSA_ENTRE_SALAS_MS } from './presenca/presenca'
 import { abrirSalaDeFundo } from './presenca/sala-de-fundo'
 
-/**
- * Quanto a presença espera antes de começar a observar, dentro de uma sala.
- *
- * Tempo de sobra para a sala de verdade se formar e para a anterior terminar
- * de sair do registro do Trystero. Presença chegando quatro segundos depois
- * ninguém nota; ficar sozinho numa sala, sim.
- */
-const ATRASO_PRESENCA_MS = 4000
 
 /** Quem falou antes de a mesa saber o nome dele. */
 export const APELIDO_DESCONHECIDO = 'Alguém'
@@ -600,15 +592,30 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   /**
    * A presença só passa a observar depois disto virar verdadeiro.
    *
-   * Não basta agendar a primeira sincronização: `desenharSalasSalvas` é
-   * chamada por todo `desenhar()`, e o primeiro acontece na montagem. Sem esta
-   * tranca o adiamento não adiava nada — foi o teste que pegou.
+   * Não basta esperar: `desenharSalasSalvas` é chamada por todo `desenhar()`,
+   * e o primeiro acontece na montagem. Sem esta tranca o adiamento não adiava
+   * nada — foi o teste que pegou, não o navegador.
    */
   let presencaLiberada = false
-  const comecarPresenca = setTimeout(() => {
+
+  /**
+   * Sala primeiro, presença depois — e "depois" é uma CONDIÇÃO, não um relógio.
+   *
+   * A versão anterior esperava quatro segundos. Quatro segundos é chute: numa
+   * rede lenta a sala ainda está se formando, e a presença volta a competir
+   * com ela. Aqui a espera acaba quando a sala está de pé, e não antes.
+   *
+   * `conectado` vale mesmo sozinho — assumir como anfitrião já conta —, então
+   * quem abre uma sala vazia não fica esperando para sempre.
+   *
+   * Uma vez liberada, não volta atrás: uma reconexão momentânea fecharia e
+   * reabriria as salas de fundo à toa, e reabrir é justamente o que colide.
+   */
+  function liberarPresencaSeAConexaoDeuCerto(): void {
+    if (presencaLiberada) return
+    if (sessao.statusConexao() !== 'conectado') return
     presencaLiberada = true
-    desenharSalasSalvas()
-  }, ATRASO_PRESENCA_MS)
+  }
 
   let salasSalvas = renderizarSalasSalvas(
     grupos(), codigo, acoesDeSalas, presenca.quantos)
@@ -774,6 +781,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   }
 
   function desenhar(): void {
+    liberarPresencaSeAConexaoDeuCerto()
     // A roda e os vídeos são irmãos persistentes do palco: eles NÃO são
     // trocados quando a tela muda, e por isso continuavam aparecendo por baixo
     // dos Ajustes e da galeria. Quem some é o CSS, e não o DOM: desmontar o
@@ -1017,7 +1025,6 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   }
 
   encerrar = () => {
-    clearTimeout(comecarPresenca)
     // Sem esperar, de propósito: a sala nova é aberta logo em seguida, e
     // enquanto a velha ainda está registrada a piscina de relays sobrevive.
     void presenca.encerrar()
