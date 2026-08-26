@@ -1,6 +1,8 @@
 import {
   joinRoom as entrarNostr, selfId, getRelaySockets, defaultRelayUrls,
 } from '@trystero-p2p/nostr'
+import { observarGrupos } from '../src/presenca/presenca'
+import { abrirSalaDeFundo } from '../src/presenca/sala-de-fundo'
 
 /**
  * Sonda de presença — instrumento, não funcionalidade.
@@ -56,6 +58,7 @@ raiz.innerHTML = `
   <button id="ativo">Entrar (ativo)</button>
   <button id="passivo">Observar (passivo)</button>
   <button id="controle">Observar (ativo) — controle</button>
+  <button id="modulo">Observar pelo MÓDULO do app</button>
 </div>
 <div id="estado"></div>
 <div id="log"></div>
@@ -154,6 +157,41 @@ const clicar = (id: string, passivo: boolean, rotulo: string): void => {
   }
 }
 
+/**
+ * O quarto modo usa o MÓDULO de verdade, não uma reimplementação.
+ *
+ * A sonda passiva funciona entre duas sondas; a presença do app não vê
+ * ninguém. Uma das duas coisas explica isso: ou o app não é descoberto por um
+ * observador passivo, ou o meu módulo faz algo diferente do que eu escrevi
+ * aqui. Reimplementar de novo mediria uma terceira coisa — então este botão
+ * chama o código que está no ar.
+ */
+raiz.querySelector<HTMLButtonElement>('#modulo')!.onclick = () => {
+  const codigo = campo.value.trim()
+  if (!codigo) {
+    escrever('preencha o código da sala', 'no')
+    return
+  }
+  location.hash = `sala=${codigo}`
+  modo = 'módulo do app'
+  for (const b of botoes) b.disabled = true
+  escrever(`meu id: ${selfId}`)
+  escrever(`observando "${codigo}" pelo módulo real do app`)
+
+  const p = observarGrupos([codigo], abrirSalaDeFundo)
+  p.aoMudar(() => {
+    const n = p.quantos(codigo)
+    escrever(`MÓDULO diz: ${n} pessoa(s) em ${codigo}`, n > 0 ? 'ok' : 'no')
+  })
+  setInterval(() => {
+    const sockets = getRelaySockets() as unknown as Record<string, { readyState: number }>
+    const urls = Object.keys(sockets)
+    const abertos = urls.filter((u) => sockets[u]?.readyState === 1)
+    estado.textContent = `modo ${modo} · relays abertos ${abertos.length}`
+      + ` de ${urls.length} · módulo conta ${p.quantos(codigo)}`
+  }, 1000)
+}
+
 clicar('ativo', false, 'ativo')
 clicar('passivo', true, 'passivo')
 clicar('controle', false, 'observador ativo')
@@ -161,3 +199,5 @@ clicar('controle', false, 'observador ativo')
 escrever('pronto. cole o mesmo código nas duas máquinas.')
 escrever('uma clica "Entrar (ativo)"; a outra, "Observar (passivo)".')
 escrever('se o passivo não vir ninguém, repita com "controle" para comparar.')
+escrever('para testar contra o Topaz de verdade: abra a sala no site noutra')
+escrever('máquina e use aqui "Observar (passivo)" com o MESMO código.')
