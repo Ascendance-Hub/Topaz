@@ -17,7 +17,7 @@ export interface DependenciasDasAcoes {
   protocolo: {
     entrar(): void
     sair(): void
-    estado(): { assistindo: string[]; compartilhando: string[] }
+    estado(): { assistindo: string[]; compartilhando: string[]; comigo: string[] }
     assistir(peerId: string): void
     pararDeAssistir(peerId: string): void
     definirCompartilhando(sim: boolean): void
@@ -40,7 +40,7 @@ export interface DependenciasDasAcoes {
   area: {
     limpar(): void
     alternarSilenciarTodos(): boolean
-    ajustar(assistindo: string[], compartilhando: string[]): void
+    ajustar(assistindo: string[], compartilhando: string[], comigo: string[]): void
   }
   /** Fecha o contexto de áudio e esquece quem estava falando. */
   pararDeMedirVoz(): void
@@ -124,7 +124,7 @@ export function criarAcoesCall(dep: DependenciasDasAcoes): AcoesCall {
       const atual = dep.protocolo.estado()
       // O ajuste é imediato, e não só no próximo tique: meio segundo de som de
       // quem se acabou de silenciar é meio segundo a mais do que ninguém quer.
-      dep.area.ajustar(atual.assistindo, atual.compartilhando)
+      dep.area.ajustar(atual.assistindo, atual.compartilhando, atual.comigo)
       dep.desenhar()
     },
 

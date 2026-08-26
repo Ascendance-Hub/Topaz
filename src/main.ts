@@ -396,7 +396,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // último e o codificador desliga — que é o ponto de todo o desenho.
     midia.sincronizarTela(atual.assistidoPor)
 
-    area.ajustar(atual.assistindo, atual.compartilhando)
+    area.ajustar(atual.assistindo, atual.compartilhando, atual.comigo)
     area.previaDaMinhaTela(atual.euCompartilhando ? midia.telaLocal() : null)
     sincronizarMedidorDeVoz(atual.comigo, atual.euNaCall)
   }
@@ -509,6 +509,28 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     }
   }
 
+  /**
+   * Clicar num canal: entra na call ali, se ainda não estiver nela.
+   *
+   * Antes o clique só trocava de canal, e a lista nem aparecia fora da call.
+   * Mas ver quem está conversando é justamente o que faz alguém decidir
+   * entrar — esconder isso até a pessoa entrar invertia a ordem das coisas.
+   *
+   * Entrar e trocar na mesma ação, e não "entre primeiro, depois escolha":
+   * quem clicou no Canal 2 já disse para onde quer ir.
+   */
+  function entrarNoCanal(id: string): void {
+    if (protocolo.estado().euNaCall) {
+      protocolo.mudarCanal(id)
+      return
+    }
+    // A ordem importa: o canal é definido ANTES de anunciar presença, senão eu
+    // apareço um instante no principal para todo mundo — e nesse instante o
+    // microfone vai para lá.
+    protocolo.mudarCanal(id)
+    acoesCall.entrar()
+  }
+
   /** A assinatura da última lista desenhada, para não refazê-la à toa. */
   let assinaturaDosCanais = ''
 
@@ -522,25 +544,23 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // cada mudança de quem fala, e refazer os retratos nesse ritmo mandaria o
     // navegador redecodificar toda foto várias vezes por minuto — a mesma
     // preocupação que fez a fileira existir separada do resto.
-    const assinatura = atual.euNaCall
-      ? `${atual.meuCanal}|${atual.podeAbrirCanal}|`
-        + atual.porCanal.map((c) => `${c.id}:${c.quem.join(',')}`).join(';')
-      : ''
+    const assinatura = `${atual.euNaCall}|${atual.meuCanal}|${atual.podeAbrirCanal}|`
+      + atual.porCanal.map((c) => `${c.id}:${c.quem.join(',')}`).join(';')
     if (assinatura !== assinaturaDosCanais) {
       assinaturaDosCanais = assinatura
       const novosCanais = renderizarCanais(
-        atual.euNaCall
-          ? atual.porCanal.map((c) => ({
-            id: c.id,
-            nome: c.nome,
-            // O protocolo entrega peerIds; nome e foto vêm do jogo e das
-            // fotos recebidas. É aqui que os dois vocabulários se encontram.
-            gente: montarDoCanal(c.quem, transporte.meuId(), fonteDeParticipantes()),
-          }))
-          : [],
-        atual.meuCanal,
+        atual.porCanal.map((c) => ({
+          id: c.id,
+          nome: c.nome,
+          // O protocolo entrega peerIds; nome e foto vêm do jogo e das fotos
+          // recebidas. É aqui que os dois vocabulários se encontram.
+          gente: montarDoCanal(c.quem, transporte.meuId(), fonteDeParticipantes()),
+        })),
+        // Fora da call eu não estou em canal nenhum, e nenhum deve aparecer
+        // aceso: `meuCanal` guarda para onde eu iria, não onde eu estou.
+        atual.euNaCall ? atual.meuCanal : '',
         {
-          mudar: (id: string) => protocolo.mudarCanal(id),
+          mudar: entrarNoCanal,
           // O botão só existe quando há id livre: um "+" que não abre nada
           // seria um botão que engana.
           ...(atual.podeAbrirCanal ? { abrir: () => protocolo.abrirCanal() } : {}),

@@ -113,7 +113,7 @@ describe('ajustar as telas', () => {
     const { area } = montar()
     area.receber(tela(), 'pa', true)
 
-    area.ajustar([], [])
+    area.ajustar([], [], ['pa', 'pb', 'pc'])
 
     expect(area.videos.querySelectorAll('[data-de]')).toHaveLength(0)
   })
@@ -124,7 +124,7 @@ describe('ajustar as telas', () => {
     const { area } = montar()
     area.receber(tela(), 'pa', true)
 
-    area.ajustar([], ['pa'])
+    area.ajustar([], ['pa'], ['pa', 'pb', 'pc'])
 
     expect(area.videos.querySelectorAll('[data-de]')).toHaveLength(1)
   })
@@ -134,7 +134,7 @@ describe('ajustar as telas', () => {
     area.receber(voz(), 'pa', false)
 
     area.alternarSilenciarTodos()
-    area.ajustar([], [])
+    area.ajustar([], [], ['pa', 'pb', 'pc'])
 
     expect(area.audios.querySelector<HTMLAudioElement>('audio')!.muted).toBe(true)
   })
@@ -145,7 +145,7 @@ describe('ajustar as telas', () => {
     area.alternarSilenciarTodos()
 
     area.alternarSilenciarTodos()
-    area.ajustar([], [])
+    area.ajustar([], [], ['pa', 'pb', 'pc'])
 
     expect(area.audios.querySelector<HTMLAudioElement>('audio')!.muted).toBe(false)
     expect(area.silenciados()).toBe(false)
@@ -262,7 +262,7 @@ describe('a própria tela', () => {
     const { area } = montar()
     area.previaDaMinhaTela(tela())
 
-    area.ajustar([], [])
+    area.ajustar([], [], ['pa', 'pb', 'pc'])
 
     expect(area.videos.querySelector('.video-local')).not.toBeNull()
   })
@@ -321,5 +321,68 @@ describe('controles da própria tela', () => {
     area.previaDaMinhaTela(null)
 
     expect(area.videos.querySelector('[data-video="tela-cheia"]')).toBeNull()
+  })
+})
+
+/**
+ * A garantia de que canal separa mesmo.
+ *
+ * Quem troca de canal despublica o microfone, e isso deveria bastar. Não
+ * bastava: o elemento aqui segurava um stream que continuava vivo, e dava para
+ * se ouvir do outro canal. Aqui é onde a separação passa a valer de verdade,
+ * porque é o lado que eu controlo.
+ */
+describe('voz de fora do meu canal', () => {
+  it('quem não está comigo fica calado', () => {
+    const { area } = montar()
+    area.receber(voz(), 'pa', false)
+
+    area.ajustar([], [], [])
+
+    expect(area.audios.querySelector<HTMLAudioElement>('audio')!.muted).toBe(true)
+  })
+
+  it('quem está comigo continua audível', () => {
+    const { area } = montar()
+    area.receber(voz(), 'pa', false)
+
+    area.ajustar([], [], ['pa'])
+
+    expect(area.audios.querySelector<HTMLAudioElement>('audio')!.muted).toBe(false)
+  })
+
+  it('voltar para o meu canal devolve o som na hora', () => {
+    // Por isso cala em vez de remover: o áudio só voltaria se o outro lado
+    // publicasse de novo, e ele só republica quando percebe que eu saí da
+    // lista dele. Numa ida e volta rápida os dois se cruzam.
+    const { area } = montar()
+    area.receber(voz(), 'pa', false)
+    area.ajustar([], [], [])
+
+    area.ajustar([], [], ['pa'])
+
+    expect(area.audios.querySelector<HTMLAudioElement>('audio')!.muted).toBe(false)
+  })
+
+  it('fora da call eu não ouço ninguém', () => {
+    // `comigo` vem vazio quando não estou em call nenhuma.
+    const { area } = montar()
+    area.receber(voz(), 'pa', false)
+    area.receber(voz(), 'pb', false)
+
+    area.ajustar([], [], [])
+
+    const audios = [...area.audios.querySelectorAll<HTMLAudioElement>('audio')]
+    expect(audios.every((a) => a.muted)).toBe(true)
+  })
+
+  it('silenciar todos continua valendo por cima', () => {
+    const { area } = montar()
+    area.receber(voz(), 'pa', false)
+    area.alternarSilenciarTodos()
+
+    area.ajustar([], [], ['pa'])
+
+    expect(area.audios.querySelector<HTMLAudioElement>('audio')!.muted).toBe(true)
   })
 })

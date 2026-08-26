@@ -150,7 +150,7 @@ export class AreaDeMidia {
    * e parar só ligam e desligam o codificador do outro lado. Removê-lo faria a
    * tela não voltar, porque não haveria stream novo para recriá-la.
    */
-  ajustar(assistindo: string[], compartilhando: string[]): void {
+  ajustar(assistindo: string[], compartilhando: string[], comigo: string[]): void {
     for (const caixa of this.videos.querySelectorAll<HTMLElement>('[data-de]')) {
       const de = caixa.dataset['de'] ?? ''
       if (!compartilhando.includes(de)) {
@@ -160,9 +160,37 @@ export class AreaDeMidia {
       mostrarVideo(caixa, assistindo.includes(de) && !this.silenciouTodos)
     }
     for (const el of this.audios.querySelectorAll<HTMLAudioElement>('audio')) {
-      el.muted = this.silenciouTodos
+      const de = el.dataset['de']
+      // Fora do meu canal, calado — mesmo que o áudio continue chegando.
+      //
+      // Quem troca de canal despublica o microfone, e isso deveria bastar.
+      // Mas "deveria" não é garantia: o elemento aqui segura um stream que já
+      // existe, e nada do outro lado o desliga de verdade. Foi assim que dava
+      // para se ouvir do outro canal.
+      //
+      // A regra vale para quem chega também: um cliente modificado pode
+      // publicar para mim de qualquer canal, e a única defesa que eu controlo
+      // é esta. Reconciliação, como no resto da mídia — a mesma regra decide
+      // quem cala, seja por troca de canal, por saída da call ou por eu não
+      // estar em call nenhuma.
+      const foraDoMeuCanal = de !== undefined && !comigo.includes(de)
+      el.muted = this.silenciouTodos || foraDoMeuCanal
     }
   }
+
+  /**
+   * Por que calar e não remover.
+   *
+   * Remover soltaria o stream e economizaria a banda. Mas o áudio só voltaria
+   * se o outro lado PUBLICASSE de novo, e ele só republica quando percebe que
+   * eu saí da lista dele. Numa troca de canal de ida e volta rápida, os dois
+   * podem se cruzar: eu removo, ele nunca percebe, e o silêncio fica para
+   * sempre. Calar é reversível na hora.
+   *
+   * A banda quem resolve é o emissor, que despublica ao trocar de canal. Aqui
+   * a garantia é outra: som nenhum de fora do meu canal, aconteça o que
+   * acontecer do outro lado.
+   */
 
   /**
    * Aplica os volumes aos elementos que existem AGORA.

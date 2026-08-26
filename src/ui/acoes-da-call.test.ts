@@ -6,7 +6,7 @@ function montar(falhaAoAbrir = false) {
     protocolo: {
       entrar: vi.fn(),
       sair: vi.fn(),
-      estado: () => ({ assistindo: ['pa'], compartilhando: ['pa', 'pb'] }),
+      estado: () => ({ assistindo: ['pa'], compartilhando: ['pa', 'pb'], comigo: [] }),
       assistir: vi.fn(),
       pararDeAssistir: vi.fn(),
       definirCompartilhando: vi.fn(),
@@ -162,7 +162,7 @@ describe('silenciar todos', () => {
     acoes.alternarSilenciarTodos()
 
     expect(dep.area.alternarSilenciarTodos).toHaveBeenCalled()
-    expect(dep.area.ajustar).toHaveBeenCalledWith(['pa'], ['pa', 'pb'])
+    expect(dep.area.ajustar).toHaveBeenCalledWith(['pa'], ['pa', 'pb'], [])
   })
 })
 

@@ -333,6 +333,13 @@ jogo — cada jogo terá o seu.
 Precisa de duas pessoas (ou duas abas com fones, para não haver microfonia).
 
 - [ ] Fora da call **não** aparece lista de canais
+- [ ] Os canais aparecem **antes de você entrar na call** — basta alguém estar
+      num deles
+- [ ] Fora da call, nenhum canal aparece aceso
+- [ ] Clicar num canal fora da call **entra na call ali**, não no principal
+- [ ] Trocando de canal, você deixa de ouvir quem ficou no outro — teste com
+      duas máquinas suas, falando numa e ouvindo na outra
+- [ ] Voltando ao canal, o som volta na hora
 - [ ] Os canais estão na **coluna da esquerda**, não no rodapé
 - [ ] Cada canal lista **quem** está nele, com foto e nome
 - [ ] Dá para ver quem está num canal em que você NÃO está
