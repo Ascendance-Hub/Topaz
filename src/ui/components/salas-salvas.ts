@@ -33,6 +33,8 @@ function inicialDaSala(grupo: Grupo): string {
 
 export function renderizarSalasSalvas(
   lista: Grupo[], codigoAtual: string, acoes: AcoesDeSalas,
+  /** Quantas OUTRAS pessoas estão em cada grupo agora. */
+  quantosEm: (codigo: string) => number = () => 0,
 ): HTMLElement {
   const area = document.createElement('nav')
   area.className = 'salas-salvas'
@@ -60,6 +62,17 @@ export function renderizarSalasSalvas(
     // botão da ordem de tabulação, e quem navega por teclado perderia a
     // referência de onde está.
     botao.onclick = () => { if (!aqui) acoes.ir(grupo.codigo) }
+
+    // Um ponto no canto quando há gente lá. Número não cabe num ícone de
+    // 34px, e a pergunta que ele responde — "vale a pena ir?" — se responde
+    // com sim ou não.
+    const quantos = quantosEm(grupo.codigo)
+    if (quantos > 0 && !aqui) {
+      botao.dataset['temGente'] = '1'
+      botao.setAttribute(
+        'aria-label',
+        `${grupo.nome} — ${quantos} ${quantos === 1 ? 'pessoa' : 'pessoas'} online`)
+    }
 
     area.append(botao)
   }
