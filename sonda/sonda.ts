@@ -59,6 +59,7 @@ raiz.innerHTML = `
   <button id="passivo">Observar (passivo)</button>
   <button id="controle">Observar (ativo) — controle</button>
   <button id="modulo">Observar pelo MÓDULO do app</button>
+  <button id="fundo">Observar pela SALA DE FUNDO (sem o módulo)</button>
 </div>
 <div id="estado"></div>
 <div id="log"></div>
@@ -189,6 +190,54 @@ raiz.querySelector<HTMLButtonElement>('#modulo')!.onclick = () => {
     const abertos = urls.filter((u) => sockets[u]?.readyState === 1)
     estado.textContent = `modo ${modo} · relays abertos ${abertos.length}`
       + ` de ${urls.length} · módulo conta ${p.quantos(codigo)}`
+  }, 1000)
+}
+
+/**
+ * O quinto modo bissecta o quarto.
+ *
+ * O módulo do app não vê ninguém, enquanto a sonda passiva vê — mesma máquina,
+ * mesmo código, mesmo minuto. O módulo tem duas peças: `abrirSalaDeFundo`, que
+ * chama o Trystero, e `observarGrupos`, que conta. Este botão usa SÓ a
+ * primeira, com os ouvintes ligados aqui.
+ *
+ * Se este vir e o módulo não, o defeito está em `observarGrupos`. Se nem este
+ * vir, está em `abrirSalaDeFundo` — e como ela é idêntica ao que a sonda faz
+ * na mão, sobraria o `import` de `net/transport` que ela carrega junto.
+ */
+raiz.querySelector<HTMLButtonElement>('#fundo')!.onclick = () => {
+  const codigo = campo.value.trim()
+  if (!codigo) {
+    escrever('preencha o código da sala', 'no')
+    return
+  }
+  location.hash = `sala=${codigo}`
+  modo = 'sala de fundo direta'
+  for (const b of botoes) b.disabled = true
+  escrever(`meu id: ${selfId}`)
+  escrever(`observando "${codigo}" pela sala de fundo, sem o módulo`)
+
+  try {
+    const fundo = abrirSalaDeFundo(codigo)
+    fundo.aoEntrarPeer((peerId) => {
+      vistos.add(peerId)
+      escrever(`ENTROU ${peerId}`, 'ok')
+    })
+    fundo.aoSairPeer((peerId) => {
+      vistos.delete(peerId)
+      escrever(`SAIU ${peerId}`, 'no')
+    })
+    escrever('sala de fundo aberta sem estourar')
+  } catch (erro) {
+    escrever(`ESTOUROU ao abrir: ${String(erro)}`, 'no')
+  }
+
+  setInterval(() => {
+    const sockets = getRelaySockets() as unknown as Record<string, { readyState: number }>
+    const urls = Object.keys(sockets)
+    const abertos = urls.filter((u) => sockets[u]?.readyState === 1)
+    estado.textContent = `modo ${modo} · relays abertos ${abertos.length}`
+      + ` de ${urls.length} · vistos ${vistos.size}`
   }, 1000)
 }
 
