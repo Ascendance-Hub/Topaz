@@ -82,11 +82,21 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   // DAQUI. A presença é só nostr; se o app estiver conectado por mqtt ou
   // torrent e o nostr estiver morto nesta máquina, ninguém observando por
   // nostr encontraria esta sala — e tudo o mais que investiguei seria ruído.
-  setTimeout(() => {
-    console.info(
-      `sala: relays nostr abertos ${relaysConectados()}`
-      + ` · peers conectados ${transporte.peers().length}`)
-  }, 8000)
+  // Repetido, e não uma vez só: na primeira versão saía uma linha aos 8s, e
+  // ela simplesmente não apareceu — sem eu poder distinguir "o temporizador
+  // não disparou" de "ninguém estava olhando naquele segundo". Um retrato que
+  // aparece uma vez só não é retrato.
+  for (const segundos of [2, 6, 15, 40]) {
+    setTimeout(() => {
+      try {
+        console.info(
+          `sala (${segundos}s): relays nostr abertos ${relaysConectados()}`
+          + ` · peers conectados ${transporte.peers().length}`)
+      } catch (erro) {
+        console.error('sala: o próprio diagnóstico estourou', erro)
+      }
+    }, segundos * 1000)
+  }
   const transporte = criarTransporte(salas)
   const sessao = new Sessao(transporte, rngDaSessao)
 
