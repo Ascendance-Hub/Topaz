@@ -274,3 +274,87 @@ describe('fecharUm', () => {
     await expect(p.fecharUm('aaa')).resolves.toBeUndefined()
   })
 })
+
+/**
+ * A mesma pessoa, achada por duas redes.
+ *
+ * A sala de fundo observa nostr E mqtt, e as duas chamam o mesmo ouvinte —
+ * porque foi só assim que a presença passou a enxergar alguém: o diagnóstico
+ * do app mostrou `nostr=0 mqtt=1`, ou seja, as máquinas se acham por mqtt e o
+ * observador de nostr esperava numa rede vazia.
+ *
+ * O preço disso é o anúncio em dobro, e quem conta tem de aguentar.
+ */
+describe('duas redes, uma pessoa', () => {
+  it('achada nas duas redes, conta uma vez', () => {
+    const { abrir, abertas } = fabrica()
+    const p = observarGrupos(['aaa'], abrir)
+
+    // Duas entregas do mesmo peerId, como se viessem de redes diferentes.
+    abertas.get('aaa')!.chega('pa')
+    abertas.get('aaa')!.chega('pa')
+
+    expect(p.quantos('aaa')).toBe(1)
+  })
+
+  it('e avisa quem desenha uma vez só', () => {
+    const { abrir, abertas } = fabrica()
+    const p = observarGrupos(['aaa'], abrir)
+    const mudou = vi.fn()
+    p.aoMudar(mudou)
+
+    abertas.get('aaa')!.chega('pa')
+    abertas.get('aaa')!.chega('pa')
+
+    expect(mudou).toHaveBeenCalledTimes(1)
+  })
+
+  it('saindo de uma rede, some da conta', () => {
+    // Presença é melhor-esforço: se a pessoa continuar visível pela outra
+    // rede, o próximo anúncio a traz de volta. Errar para menos é melhor que
+    // mostrar gente que já foi embora.
+    const { abrir, abertas } = fabrica()
+    const p = observarGrupos(['aaa'], abrir)
+    abertas.get('aaa')!.chega('pa')
+
+    abertas.get('aaa')!.vaiEmbora('pa')
+
+    expect(p.quantos('aaa')).toBe(0)
+  })
+})
+
+/**
+ * A saída precisa ser esperável DE VERDADE.
+ *
+ * `fecharUm` existe para fechar a observação de um grupo antes de entrar nele,
+ * porque o Trystero devolve a MESMA sala num id já aberto. Isso só funciona se
+ * a promessa esperar mesmo — e houve uma versão em que `sair` devolvia `void`,
+ * o `await` resolvia na hora, e a proteção não protegia nada.
+ *
+ * Com três redes por grupo, uma só delas demorando basta para o defeito voltar.
+ */
+describe('a espera do fecharUm não pode ser de mentira', () => {
+  it('espera a rede mais LENTA das que a sala abriu', async () => {
+    let soltarLenta = (): void => {}
+    const abrir = (): SalaDeFundo => ({
+      aoEntrarPeer: () => {},
+      aoSairPeer: () => {},
+      // Como a sala de fundo real: várias redes, e a promessa só fecha quando
+      // todas fecharem.
+      sair: () => Promise.all([
+        Promise.resolve(),
+        new Promise<void>((res) => { soltarLenta = res }),
+      ]).then(() => undefined),
+    })
+    const p = observarGrupos(['aaa'], abrir)
+    let terminou = false
+
+    const fim = p.fecharUm('aaa').then(() => { terminou = true })
+    for (let i = 0; i < 5; i++) await Promise.resolve()
+
+    expect(terminou).toBe(false)
+    soltarLenta()
+    await fim
+    expect(terminou).toBe(true)
+  })
+})

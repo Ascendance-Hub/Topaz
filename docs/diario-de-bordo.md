@@ -420,6 +420,81 @@ chat, com o `<details>` da conexão e com a roda de conversa.
 
 ---
 
+## Capítulo 13 — A presença, e três dias medindo a coisa errada
+
+Este capítulo é sobre método, não sobre código. O defeito era pequeno; o que
+custou foi eu ter passado dias corrigindo causas que não eram a causa.
+
+**O sintoma.** A presença entre grupos salvos não via ninguém. Nunca.
+
+**O que eu "consertei" pelo caminho**, e nada disso era o problema:
+
+1. Menos relays na sala de fundo (4 em vez de 20). Era um erro de desenho — a
+   economia não existia, porque os sockets são compartilhados por estratégia.
+   Corrigi. Continuou sem funcionar.
+2. A colisão de salas do Trystero (`joinRoom` num id já aberto devolve o mesmo
+   objeto). Era um defeito de verdade, e sério. Corrigi. Continuou sem
+   funcionar — e a minha correção **quebrou a troca de sala**, porque esperar
+   todas as salas fecharem faz o Trystero destruir a piscina de relays.
+3. Reverti tudo. Recomecei.
+
+**A virada foi parar de construir e medir.** Uma sonda fora do aplicativo, com
+um modo de CONTROLE, e depois um botão que bissectava o meu próprio módulo. Os
+resultados, em ordem:
+
+| Observador | Contra a sonda | Contra o app |
+|---|---|---|
+| Sonda passiva | vê | não vê |
+| Sonda ativa | vê | não vê |
+| Módulo do app | vê | não vê |
+
+Tudo enxergava a sonda; nada enxergava o app. Isso derrubou de uma vez as três
+explicações que eu tinha construído.
+
+**A causa.** Uma linha de diagnóstico no app:
+
+```
+sala (15s): relays nostr abertos 16 · peers 1 · por rede: nostr=0 mqtt=1 torrent=0
+```
+
+A presença era **só nostr**. As máquinas do teste se acham por **mqtt**. O
+observador esperava numa rede em que aquelas pessoas não aparecem.
+
+**A correção.** A sala de fundo passa a observar **as três redes**, e quem
+conta desduplica por peerId. É a ideia que o Alexandre tinha proposto rodadas
+antes — "usa todas as redes e depois reduz" —, e eu tinha respondido que o
+problema era outro. O diagnóstico dele estava certo e o meu não.
+
+A metade que NÃO foi adotada é a redução, e ele mesmo apontou o motivo ao
+perguntar como eu a faria: uma rede desligada por estar quieta é uma rede que
+não vê quem chegar depois. Presença é justamente sobre quem chega depois.
+
+Ele também corrigiu a minha primeira versão da correção, que deixava o torrent
+de fora porque o diagnóstico dizia `torrent=0`. Zero ali significa "não chegou
+primeiro" — quem acha antes fica dono do peer e o outro nem aparece na conta.
+A rede que conecta uma pessoa não é a mesma que conecta outra.
+
+**O que continua sem explicação.** Entre as mesmas duas máquinas, o nostr acha
+uma sonda e não acha o app. Isso não foi resolvido: foi contornado. Fica
+registrado como pergunta em aberto, não como coisa entendida.
+
+### O erro de método, que é a lição
+
+Eu instrumentei **três vezes** antes de instrumentar direito:
+
+- A primeira sonda só media sonda contra sonda — nunca contra o app, que era a
+  pergunta.
+- O primeiro diagnóstico só falava quando alguém entrava. "Nada no console" não
+  distinguia "não achou ninguém" de "nem abriu sala nenhuma".
+- O segundo saía uma vez só, aos 8 segundos. Não apareceu, e eu não sabia dizer
+  se não disparou ou se ninguém estava olhando.
+
+Toda vez o instrumento não separava as hipóteses que ele deveria separar — o
+mesmo erro do Capítulo 5, com a sonda de codificador que media a coisa errada.
+**Antes de medir, perguntar: quais respostas este instrumento NÃO distingue?**
+
+---
+
 ## As ideias que vieram de fora do código
 
 Boa parte do que ficou bom aqui não saiu de mim. Vale registrar o que
@@ -473,6 +548,11 @@ que são as mais fáceis de esquecer.
 
 ### Correções dele que consertaram diagnósticos meus
 
+- **"E se usarmos todas as redes primeiro e depois reduzirmos?"** Ele estava
+  certo, e eu respondi que o problema era outro. Era exatamente isso: a
+  presença ouvia só o nostr, e as máquinas dele se acham por mqtt. Levei três
+  dias, três implementações e uma regressão para chegar onde a frase dele já
+  apontava.
 - **"A tela se ajeita em 10 ou 15 segundos."** Eu tinha trocado o
   `contentHint` para `detail` achando que resolveria a tela borrada. O que eu
   fiz foi trocar um ajuste temporário por uma perda de fluidez permanente.

@@ -544,6 +544,11 @@ Dura o tempo de um round-trip.
 
 ## Presença entre grupos salvos
 
+A presença observa **as três redes**, porque só nostr não achava ninguém: o
+diagnóstico mostrou `por rede: nostr=0 mqtt=1` — estas máquinas se acham por
+mqtt, e o observador esperava numa rede vazia. O torrent entra junto porque
+`torrent=0` quer dizer "não chegou primeiro", não "não conectaria".
+
 Precisa de duas máquinas. **Abra o console (F12) nas duas** — a presença
 escreve uma linha `presença: CODIGO=N` a cada mudança, e é ela que separa
 "não achou ninguém" de "achou e não desenhou".
