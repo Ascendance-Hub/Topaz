@@ -539,6 +539,11 @@ que são as mais fáceis de esquecer.
 
 ### Correções dele que consertaram diagnósticos meus
 
+- **"E se usarmos todas as redes primeiro e depois reduzirmos?"** Ele estava
+  certo, e eu respondi que o problema era outro. Era exatamente isso: a
+  presença ouvia só o nostr, e as máquinas dele se acham por mqtt. Levei três
+  dias, três implementações e uma regressão para chegar onde a frase dele já
+  apontava.
 - **"A tela se ajeita em 10 ou 15 segundos."** Eu tinha trocado o
   `contentHint` para `detail` achando que resolveria a tela borrada. O que eu
   fiz foi trocar um ajuste temporário por uma perda de fluidez permanente.
