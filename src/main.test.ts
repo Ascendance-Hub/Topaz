@@ -1288,32 +1288,64 @@ describe('entrarNaSala — trocar o chat com o miolo', () => {
   })
 })
 
-describe('entrarNaSala — a presença sai do caminho', () => {
-  it('não observa nada nos primeiros segundos da sala', () => {
-    // Entrar e procurar gente noutros grupos ao mesmo tempo era competir com
-    // o que importa — e a sala que se acabou de deixar ainda está saindo do
-    // registro do Trystero, então observá-la agora devolveria ELA.
+describe('entrarNaSala — sala primeiro, presença depois', () => {
+  function comGrupoSalvo(): void {
+    localStorage.setItem('topaz:grupos', JSON.stringify([
+      { codigo: 'AAAABBBBCCCCDDDD', nome: 'Outro' },
+    ]))
+  }
+
+  function observando(): string[] {
+    const abertas: string[] = []
+    vi.mocked(abrirSalaDeFundo).mockImplementation((codigo: string) => {
+      abertas.push(codigo)
+      return { aoEntrarPeer: () => {}, aoSairPeer: () => {}, sair: () => {} }
+    })
+    return abertas
+  }
+
+  it('a sala que NUNCA conecta nunca sai procurando gente noutros grupos', () => {
+    // O pedido do Alexandre, e a razão dele: enquanto conectar não acontecer,
+    // não se gasta nada procurando. A espera é uma CONDIÇÃO, não um relógio —
+    // quatro segundos era chute, e numa rede lenta a sala ainda estaria se
+    // formando quando a presença voltasse a competir com ela.
     vi.useFakeTimers()
     try {
-      localStorage.setItem('topaz:grupos', JSON.stringify([
-        { codigo: 'AAAABBBBCCCCDDDD', nome: 'Outro' },
-      ]))
-      const abertas: string[] = []
-      vi.mocked(abrirSalaDeFundo).mockImplementation((codigo: string) => {
-        abertas.push(codigo)
-        return { aoEntrarPeer: () => {}, aoSairPeer: () => {}, sair: () => {} }
-      })
+      comGrupoSalvo()
+      const abertas = observando()
+      const rede = criarRedeFalsa({ conexaoDiferida: true })
+      // 'pa' existe, ordena antes na eleição e nunca publica: a sala nunca
+      // resolve quem manda.
+      rede.conectar('pa')
+      vi.mocked(criarSalasTrystero).mockImplementation(() => criarSalasFalsas([]).salas)
+      vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
 
+      entrarNaSala(document.createElement('div'), 'Bruno', 'CODIGO01')
+      rede.bombear()
+      vi.advanceTimersByTime(MS_SEM_CONEXAO + 60_000)
+
+      expect(abertas).toEqual([])
+    } finally {
+      localStorage.clear()
+      vi.useRealTimers()
+    }
+  })
+
+  it('conectando, ela começa — e uma sala de cada vez', () => {
+    vi.useFakeTimers()
+    try {
+      comGrupoSalvo()
+      const abertas = observando()
       const rede = criarRedeFalsa({ conexaoDiferida: true })
       vi.mocked(criarSalasTrystero).mockImplementation(() => criarSalasFalsas([]).salas)
       vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('pb'))
+
       entrarNaSala(document.createElement('div'), 'Bruno', 'CODIGO01')
+      rede.bombear()
+      // Sozinho, assumir como anfitrião já conta como conectado — quem abre
+      // uma sala vazia não pode ficar esperando para sempre.
+      vi.advanceTimersByTime(MS_DESCOBERTA + 5000)
 
-      vi.advanceTimersByTime(1000)
-      expect(abertas).toEqual([])
-
-      // E depois da espera ela começa, uma sala de cada vez.
-      vi.advanceTimersByTime(6000)
       expect(abertas).toEqual(['AAAABBBBCCCCDDDD'])
     } finally {
       localStorage.clear()
