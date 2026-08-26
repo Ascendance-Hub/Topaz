@@ -72,7 +72,21 @@ function rngDaSessao() {
  * de fato na página, nunca um órfão de uma rodada anterior.
  */
 export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string): void {
+  // Diagnóstico da caçada da presença. Um observador externo entrou nesta
+  // mesma sala e não viu ninguém — nem em modo passivo, nem ativo. Ou o id não
+  // é o que a gente supõe, ou o nostr não está anunciando. Esta linha responde
+  // a primeira metade sem depender de eu transcrever o código certo.
+  console.info(`sala: entrando em "${codigo}" (${codigo.length} caracteres)`)
   const salas = criarSalasTrystero(codigo)
+  // E esta responde a segunda: quantos relays nostr estão de fato abertos
+  // DAQUI. A presença é só nostr; se o app estiver conectado por mqtt ou
+  // torrent e o nostr estiver morto nesta máquina, ninguém observando por
+  // nostr encontraria esta sala — e tudo o mais que investiguei seria ruído.
+  setTimeout(() => {
+    console.info(
+      `sala: relays nostr abertos ${relaysConectados()}`
+      + ` · peers conectados ${transporte.peers().length}`)
+  }, 8000)
   const transporte = criarTransporte(salas)
   const sessao = new Sessao(transporte, rngDaSessao)
 
