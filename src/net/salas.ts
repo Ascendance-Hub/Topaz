@@ -31,6 +31,16 @@ export interface Salas {
   donoDe(peerId: string): SalaTrystero | undefined
   /** Os peers de cada rede, para publicar mídia sem duplicar. */
   porRede(): { sala: SalaTrystero; peers: string[] }[]
+  /**
+   * Quantos peers cada rede de descoberta trouxe, por NOME.
+   *
+   * Existe para uma pergunta só, e ela é a que a caçada da presença não
+   * conseguia responder: o app está conectado por qual rede? A presença é só
+   * nostr — se as pessoas chegam por mqtt ou torrent e o nostr está mudo,
+   * ninguém observando por nostr acharia esta sala, e todo o resto da
+   * investigação seria ruído.
+   */
+  quemPorRede(): Record<string, number>
   aoEntrarPeer(cb: (peerId: string) => void): void
   aoSairPeer(cb: (peerId: string) => void): void
   /** Mídia que chega, já sem a cópia da conexão reserva. */
@@ -143,6 +153,15 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
     peers: () => [...dono.keys()],
     donoDe: (peerId) => dono.get(peerId)?.sala,
     porRede: () => [...agrupar()].map(([nomeada, peers]) => ({ sala: nomeada.sala, peers })),
+    quemPorRede: () => {
+      // Todas as redes aparecem, inclusive com zero: uma rede ausente da lista
+      // não se distingue de uma rede sem ninguém, e é justamente essa a
+      // distinção que interessa.
+      const conta: Record<string, number> = {}
+      for (const nomeada of salas) conta[nomeada.nome] = 0
+      for (const [, nomeada] of dono) conta[nomeada.nome] = (conta[nomeada.nome] ?? 0) + 1
+      return conta
+    },
     aoEntrarPeer: (cb) => { aoEntrar.push(cb) },
     aoSairPeer: (cb) => { aoSair.push(cb) },
     aoReceberStream: (cb) => { aoStream.push(cb) },

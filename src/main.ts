@@ -89,9 +89,11 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   for (const segundos of [2, 6, 15, 40]) {
     setTimeout(() => {
       try {
+        const porRede = Object.entries(salas.quemPorRede())
+          .map(([nome, n]) => `${nome}=${n}`).join(' ')
         console.info(
           `sala (${segundos}s): relays nostr abertos ${relaysConectados()}`
-          + ` · peers conectados ${transporte.peers().length}`)
+          + ` · peers ${transporte.peers().length} · por rede: ${porRede}`)
       } catch (erro) {
         console.error('sala: o próprio diagnóstico estourou', erro)
       }
