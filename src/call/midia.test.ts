@@ -762,3 +762,85 @@ describe('Midia — peer que ainda não terminou de conectar', () => {
     expect(publicados).toHaveLength(1)
   })
 })
+
+/**
+ * A assinatura explícita é o coração do desenho da tela: o codificador só
+ * trabalha por quem está de fato assistindo. Estes casos guardam as duas
+ * frestas por onde ele voltava a ligar sozinho para quem já tinha saído.
+ *
+ * As duas fecham em até 500 ms, porque o tique de `main.ts` reconcilia logo
+ * em seguida — o que as torna invisíveis a olho nu e é justamente por isso que
+ * elas precisam de teste.
+ */
+describe('Midia — o codificador não acorda por quem não está assistindo', () => {
+  function senderFalso() {
+    const params: { encodings: Record<string, unknown>[] } = { encodings: [{}] }
+    const sender = {
+      track: { kind: 'video' },
+      getParameters: () => params,
+      setParameters: vi.fn().mockResolvedValue(undefined),
+    }
+    return { sender, params }
+  }
+
+  async function comTelaEDoisSenders() {
+    const contexto = criarSalaFalsa()
+    const midia = new Midia(contexto.sala)
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getDisplayMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [],
+          getVideoTracks: () => [
+            { contentHint: '', onended: null, getSettings: () => ({ height: 1080 }) },
+          ],
+          getAudioTracks: () => [],
+        }),
+      },
+      configurable: true,
+    })
+    await midia.compartilharTela(() => {})
+
+    const pa = senderFalso()
+    const pb = senderFalso()
+    contexto.ctx.definirSenders({
+      pa: { getSenders: () => [pa.sender] },
+      pb: { getSenders: () => [pb.sender] },
+    })
+    return { midia, pa, pb }
+  }
+
+  it('trocar a qualidade não liga o envio de quem parou de assistir', async () => {
+    const { midia, pa, pb } = await comTelaEDoisSenders()
+
+    // Os dois pediram, e o pb desistiu. O envio para ele continua
+    // ESTABELECIDO de propósito — desmontar faria o `ontrack` do outro lado
+    // nunca mais disparar —, e quem desliga é o `encoding.active`.
+    midia.sincronizarTela(['pa', 'pb'])
+    midia.sincronizarTela(['pa'])
+    expect(pb.params.encodings[0]!['active']).toBe(false)
+
+    midia.definirQualidade(720)
+
+    expect(pb.params.encodings[0]!['active']).toBe(false)
+    expect(pa.params.encodings[0]!['active']).toBe(true)
+  })
+
+  it('o ajuste adiado usa quem assiste AGORA, não quem assistia quando ele foi agendado', async () => {
+    vi.useFakeTimers()
+    try {
+      const { midia, pb } = await comTelaEDoisSenders()
+
+      // O primeiro pedido de um peer espera o sender existir (1500 ms). Se a
+      // pessoa desistir dentro dessa janela, o temporizador disparava com o
+      // valor velho e acendia o codificador por um pedido já retirado.
+      midia.sincronizarTela(['pb'])
+      midia.sincronizarTela([])
+
+      vi.advanceTimersByTime(2_000)
+
+      expect(pb.params.encodings[0]!['active']).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

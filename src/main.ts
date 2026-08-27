@@ -364,11 +364,17 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     },
   }
 
+  /**
+   * Um fone plugado ou arrancado no meio da conversa deixaria a lista velha.
+   *
+   * Guardado numa constante para poder ser REMOVIDO no `encerrar`. Trocar de
+   * sala desmonta esta e monta outra, e um ouvinte esquecido continua chamando
+   * `desenhar()` numa sala morta — um por troca, para sempre. Foi por esse
+   * caminho que o anúncio órfão da presença nascia.
+   */
+  const aoTrocarAparelho = (): void => { void aparelhos.reler().then(desenhar) }
   try {
-    // Um fone plugado ou arrancado no meio da conversa deixaria a lista velha.
-    navigator.mediaDevices.addEventListener(
-      'devicechange', () => void aparelhos.reler().then(desenhar),
-    )
+    navigator.mediaDevices.addEventListener('devicechange', aoTrocarAparelho)
   } catch {
     // Navegador sem `mediaDevices`: a call não vai funcionar mesmo, e a sala
     // não pode quebrar por causa disso.
@@ -1013,6 +1019,11 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   encerrar = () => {
     clearInterval(tique)
     clearInterval(tiqueVoz)
+    try {
+      navigator.mediaDevices.removeEventListener('devicechange', aoTrocarAparelho)
+    } catch {
+      // Mesmo motivo do registro: navegador sem `mediaDevices`.
+    }
     for (const t of tiquesDeDiagnostico) clearInterval(t)
     // Sem esperar, de propósito: a sala nova é aberta logo em seguida, e nada
     // do que ela faz depende destas fecharem. São salas de id próprio — não

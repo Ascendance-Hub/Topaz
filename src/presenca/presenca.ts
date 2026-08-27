@@ -80,6 +80,28 @@ export const MAX_OBSERVADOS = 8
  */
 export const PAUSA_ENTRE_SALAS_MS = 900
 
+/**
+ * O diagnóstico fala? Ligado por `?diag=presenca` na URL.
+ *
+ * Ele nasceu na caçada do Capítulo 13 — foi ele que revelou que a presença
+ * ouvia só o nostr enquanto as máquinas do teste se achavam por mqtt — e ficou
+ * ligado depois dela, imprimindo um retrato a cada 10 s, para sempre, no
+ * console de quem só quer jogar.
+ *
+ * O instrumento continua valendo, e por isso não é apagado: é desligado por
+ * padrão, no mesmo formato que a sonda de voz do `main.ts` já usa (`?diag=voz`).
+ *
+ * Lido uma vez por observação, e não a cada linha: `location` pode não existir
+ * fora do navegador, e um `try` por log seria mais caro que o log.
+ */
+function diagnosticoLigado(): boolean {
+  try {
+    return new URLSearchParams(location.search).get('diag') === 'presenca'
+  } catch {
+    return false
+  }
+}
+
 export function observarGrupos(
   codigos: readonly string[],
   abrir: (codigo: string) => SalaDeFundo,
@@ -95,6 +117,9 @@ export function observarGrupos(
   const agendadas = new Set<string>()
   let ultimaLista: string[] = []
   let viva = true
+  const falando = diagnosticoLigado()
+  /** Os grupos que ficaram fora do teto na última vez que avisamos. */
+  let ultimoTetoAvisado = ''
 
   function avisar(): void {
     if (!viva) return
@@ -119,6 +144,7 @@ export function observarGrupos(
    * Agora ele diz sempre: quantas salas, quais, e quanta gente em cada.
    */
   function relatar(porque: string): void {
+    if (!falando) return
     const retrato = salas.size === 0
       ? 'NENHUMA sala de fundo aberta'
       : [...salas].map(([c, s]) => `${c}=${s.gente.size}`).join(' ')
@@ -152,12 +178,27 @@ export function observarGrupos(
     const querer = novos.slice(0, MAX_OBSERVADOS)
     ultimaLista = [...querer]
     // Sem silêncio sobre o que ficou de fora: um teto invisível faria a pessoa
-    // achar que o grupo está vazio quando ele só não está sendo olhado.
-    if (novos.length > MAX_OBSERVADOS) {
-      console.info(
-        `presença: observando ${MAX_OBSERVADOS} de ${novos.length} grupos salvos;`
-        + ` fora: ${novos.slice(MAX_OBSERVADOS).join(', ')}`,
-      )
+    // achar que o grupo está vazio quando ele só não está sendo olhado. Este
+    // aviso NÃO entra na tranca do `?diag=presenca` de propósito — ele fala de
+    // uma limitação que afeta o que a pessoa vê, e não do funcionamento
+    // interno.
+    //
+    // Mas ele falava DEMAIS: `sincronizar` é chamada por todo `desenhar()`,
+    // muitas vezes por minuto, então quem tivesse mais de oito grupos salvos
+    // via a mesma linha repetida sem parar. Agora ele só fala quando a
+    // resposta muda — dizer uma vez é avisar, dizer sempre é ruído, e ruído é
+    // como um aviso deixa de ser lido.
+    const foraAgora = novos.length > MAX_OBSERVADOS
+      ? novos.slice(MAX_OBSERVADOS).join(', ')
+      : ''
+    if (foraAgora !== ultimoTetoAvisado) {
+      ultimoTetoAvisado = foraAgora
+      if (foraAgora) {
+        console.info(
+          `presença: observando ${MAX_OBSERVADOS} de ${novos.length} grupos salvos;`
+          + ` fora: ${foraAgora}`,
+        )
+      }
     }
 
     for (const [codigo, aberta] of [...salas]) {
@@ -204,7 +245,9 @@ export function observarGrupos(
 
   // Um retrato periódico: sem ele, "o console não disse nada" pode significar
   // tanto silêncio da rede quanto código que nunca rodou.
-  const tique = setInterval(() => relatar('a cada 10s'), 10_000)
+  const tique = falando
+    ? setInterval(() => relatar('a cada 10s'), 10_000)
+    : null
 
   return {
     quantos: (codigo) => salas.get(codigo)?.gente.size ?? 0,
@@ -227,7 +270,7 @@ export function observarGrupos(
       for (const quando of pendentes) clearTimeout(quando)
       pendentes.clear()
       agendadas.clear()
-      clearInterval(tique)
+      if (tique !== null) clearInterval(tique)
       for (const { sala } of salas.values()) void sala.sair()
       salas.clear()
     },
