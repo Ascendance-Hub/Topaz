@@ -2358,3 +2358,45 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 }
 .chat-aba[hidden] { display: none; }
 .chat-log[hidden] { display: none; }
+
+/* ---------------------------------------------------------------------------
+   PRESENÇA NOS GRUPOS SALVOS
+   ---------------------------------------------------------------------------
+   Verde e não topázio, e é a única coisa verde da interface. O topázio já é de
+   quem fala e da sala em que você está; um terceiro uso o gastaria. Verde diz
+   "tem gente" em toda parte, e aqui ele aparece pequeno o bastante para não
+   competir com nada.
+   ------------------------------------------------------------------------ */
+.grupo-online {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-family: var(--corpo);
+  font-size: 11.5px;
+  color: #7FC8A0;
+}
+.grupo-online::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #7FC8A0;
+  box-shadow: 0 0 8px rgba(127, 200, 160, 0.6);
+}
+
+/* No ícone da coluna não cabe número: um ponto no canto responde a pergunta
+   que importa ali, que é "vale a pena ir?". */
+.sala-icone { position: relative; }
+.sala-icone[data-tem-gente='1']::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #7FC8A0;
+  /* A borda da cor do fundo separa o ponto do ícone sem desenhar um anel. */
+  box-shadow: 0 0 0 2px var(--noite, #061511);
+}

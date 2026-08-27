@@ -1,13 +1,9 @@
-import { joinRoom as entrarNostr } from '@trystero-p2p/nostr'
-import { joinRoom as entrarMqtt } from '@trystero-p2p/mqtt'
-import { joinRoom as entrarTorrent } from '@trystero-p2p/torrent'
-import { APP_ID, REDUNDANCIA } from '../net/transport'
-import type { SalaDeFundo } from './presenca'
-
 /**
- * A sala de um grupo que você NÃO abriu.
+ * A sala de presença de um grupo.
  *
- * **As três redes**, e essa é a correção que fechou a caçada.
+ * **O id é próprio, e é ele o conserto** — ver `idDePresenca`.
+ *
+ * **As três redes**, e essa foi a outra correção — a que fechou a caçada.
  *
  * A presença era só nostr, por uma decisão de custo que parecia sensata. O
  * diagnóstico do app mostrou por que ela nunca funcionou:
@@ -40,16 +36,60 @@ import type { SalaDeFundo } from './presenca'
  * nenhuma conexão.
  */
 
+
+import { joinRoom as entrarNostr } from '@trystero-p2p/nostr'
+import { joinRoom as entrarMqtt } from '@trystero-p2p/mqtt'
+import { joinRoom as entrarTorrent } from '@trystero-p2p/torrent'
+import { APP_ID, REDUNDANCIA } from '../net/transport'
+import type { SalaDeFundo } from './presenca'
+import { idDePresenca } from './id'
+
+interface CanalCru {
+  send: (dados: unknown, para?: string[]) => unknown
+  onMessage: ((dados: unknown, contexto: { peerId: string }) => void) | null
+}
+
 interface SalaCrua {
   onPeerJoin: ((peerId: string) => void) | null
   onPeerLeave: ((peerId: string) => void) | null
+  makeAction(nome: string): CanalCru
   leave(): Promise<void> | void
 }
 
+/**
+ * O anúncio de que você está MESMO no grupo.
+ *
+ * Curto de propósito: o Trystero limita o nome da ação a 12 bytes.
+ */
+const ACAO_AQUI = 'aqui'
+
+/**
+ * Observar um grupo que você NÃO abriu: passivo, e por isso quase de graça.
+ *
+ * Passivo não anuncia, não pré-fabrica conexões, e dois passivos nunca se
+ * conectam — um grupo em que ninguém está custa conexão nenhuma.
+ */
 export function abrirSalaDeFundo(codigo: string): SalaDeFundo {
+  return entrarNaPresenca(codigo, true)
+}
+
+/**
+ * Anunciar que VOCÊ está neste grupo: ativo.
+ *
+ * É a metade que faz a presença existir — sem alguém ativo, os observadores
+ * passivos ficam se olhando e ninguém aparece para ninguém.
+ *
+ * Vale para o grupo que você abriu, e só para ele: o app entra aqui **depois**
+ * de a sala de verdade estar de pé, nunca junto. Ver `main.ts`.
+ */
+export function anunciarPresenca(codigo: string): SalaDeFundo {
+  return entrarNaPresenca(codigo, false)
+}
+
+function entrarNaPresenca(codigo: string, passivo: boolean): SalaDeFundo {
   const config = {
     appId: APP_ID,
-    passive: true,
+    ...(passivo ? { passive: true } : {}),
     relayConfig: { redundancy: REDUNDANCIA },
   }
 
@@ -60,21 +100,60 @@ export function abrirSalaDeFundo(codigo: string): SalaDeFundo {
   const nova = (): Parameters<typeof entrarNostr>[0] =>
     ({ ...config, relayConfig: { ...config.relayConfig } }) as Parameters<typeof entrarNostr>[0]
 
+  const id = idDePresenca(codigo)
   const salas: SalaCrua[] = [
-    entrarNostr(nova(), codigo) as unknown as SalaCrua,
-    entrarMqtt(nova(), codigo) as unknown as SalaCrua,
-    entrarTorrent(nova(), codigo) as unknown as SalaCrua,
+    entrarNostr(nova(), id) as unknown as SalaCrua,
+    entrarMqtt(nova(), id) as unknown as SalaCrua,
+    entrarTorrent(nova(), id) as unknown as SalaCrua,
   ]
 
+  /**
+   * Contar quem DECLAROU estar no grupo, e não quem apenas conectou.
+   *
+   * Foi assim que "1 pessoa online" aparecia num grupo vazio, e a causa é da
+   * biblioteca: uma sala passiva **se ativa** ao receber um anúncio
+   * (`signal-handler.ts:807` → `requeueAnnounce`) e, a partir daí, **também
+   * anuncia**. Dois observadores do mesmo grupo passam a se enxergar, e a
+   * conta vira "quantos estão OLHANDO o grupo" em vez de "quantos estão NELE".
+   *
+   * Inferir presença de conexão não tem conserto: a conexão existe nos dois
+   * casos. Então a gente pergunta. Quem está de verdade no grupo manda `aqui`;
+   * quem só observa nunca manda, e some da conta de todo mundo.
+   *
+   * O anúncio é reenviado a cada pessoa que chega, e não uma vez só: quem
+   * conecta depois não tem como pedir, e um anúncio completo repetido é o
+   * mesmo padrão que o resto do projeto usa para se consertar sozinho.
+   */
+  const canais = salas.map((s) => s.makeAction(ACAO_AQUI))
+  const declararam = new Set<string>()
+  let aoEntrar: ((peerId: string) => void) | null = null
+  let aoSair: ((peerId: string) => void) | null = null
+
+  salas.forEach((sala, i) => {
+    sala.onPeerJoin = (peerId) => {
+      // Só quem está no grupo declara. O observador fica calado — é isso que
+      // impede dois observadores de contarem um ao outro.
+      if (!passivo) canais[i]?.send(1, [peerId])
+    }
+    sala.onPeerLeave = (peerId) => {
+      if (!declararam.delete(peerId)) return
+      aoSair?.(peerId)
+    }
+    const canal = canais[i]
+    if (canal) {
+      canal.onMessage = (_dados, { peerId }) => {
+        // `Set` já deduplica: a mesma pessoa achada por duas redes, ou o
+        // reenvio periódico, não podem virar duas.
+        if (declararam.has(peerId)) return
+        declararam.add(peerId)
+        aoEntrar?.(peerId)
+      }
+    }
+  })
+
   return {
-    // As três redes chamam o MESMO ouvinte, e quem conta desduplica por
-    // peerId: a mesma pessoa achada em duas não pode virar duas.
-    //
-    // Atribuição, e não chamada: nesta versão do Trystero `onPeerJoin` é uma
-    // propriedade. Um handler só por sala, e aqui basta — ninguém mais usa a
-    // sala de fundo.
-    aoEntrarPeer: (cb) => { for (const s of salas) s.onPeerJoin = cb },
-    aoSairPeer: (cb) => { for (const s of salas) s.onPeerLeave = cb },
+    aoEntrarPeer: (cb) => { aoEntrar = cb },
+    aoSairPeer: (cb) => { aoSair = cb },
     // Devolve promessa, e isso NÃO é detalhe: `fecharUm` espera esta saída
     // antes de entrar no grupo de verdade, porque o Trystero devolve a mesma
     // sala num id já aberto. Antes o `sair` devolvia `void`, o `await`
