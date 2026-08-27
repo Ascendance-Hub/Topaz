@@ -37,7 +37,7 @@ export const MS_SEM_CONEXAO = 15000
  * Espaçado o bastante para não virar tráfego constante, e curto o bastante
  * para a pessoa não ficar minutos sem aparecer.
  */
-export const MS_REANUNCIO = 3000
+const MS_REANUNCIO = 3000
 
 export type StatusConexao = 'conectando' | 'conectado' | 'sem-conexao'
 

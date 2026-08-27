@@ -6,7 +6,7 @@ import { avisarTodos } from '../net/avisar'
  * O supressor de ruído do próprio WebRTC, de graça. Não é Krisp, mas resolve
  * ventilador e teclado sem nenhuma dependência.
  */
-export const RESTRICOES_MICROFONE: MediaStreamConstraints = {
+const RESTRICOES_MICROFONE: MediaStreamConstraints = {
   audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true },
   video: false,
 }
@@ -32,7 +32,7 @@ export const ALTURA_PADRAO = 1080
  * Bitrate por altura. Um teto único servia mal aos dois casos: 3 Mbps aperta
  * 1080p (a tela chega borrada, que foi o relato) e sobra em 720p.
  */
-export const BITRATE_POR_ALTURA: Record<number, number> = {
+const BITRATE_POR_ALTURA: Record<number, number> = {
   720: 2_500_000,
   1080: 6_000_000,
 }
@@ -44,9 +44,9 @@ const BITRATE_FALLBACK = 4_000_000
  * relato. Este teto, somado ao `contentHint = 'music'` na faixa, é o que faz o
  * codificador parar de tratar aquilo como fala.
  */
-export const BITRATE_AUDIO_TELA = 192_000
+const BITRATE_AUDIO_TELA = 192_000
 
-export const RESTRICOES_TELA: DisplayMediaStreamOptions = {
+const RESTRICOES_TELA: DisplayMediaStreamOptions = {
   video: { frameRate: { ideal: 30 } },
   /**
    * Pede o áudio do que está sendo compartilhado. O navegador decide se

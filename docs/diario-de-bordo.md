@@ -709,6 +709,16 @@ Não são erros de código; são de método, e custaram tempo real.
   IP da rede local, onde `crypto.subtle` não existe. Uma sessão inteira de
   confusão por erro meu de montagem — e foi ela que revelou a porta fechada
   sem HTTPS, que agora é funcionalidade.
+- **Quase apaguei CSS em uso por confiar numa varredura.** Procurando classes
+  órfãs para limpar, o levantamento acusou `.home-ponto` e `.home-linha`. Elas
+  são montadas por template literal — `` parte.className = `home-${papel}` `` —
+  e a busca por string literal não enxerga nome composto em tempo de execução.
+  Apagá-las teria matado a assinatura da tela inicial, e nenhum teste pegaria.
+  É o mesmo erro de sempre, na roupa de sempre: **quais respostas este
+  instrumento NÃO distingue?** Este não distinguia "não usada" de "montada em
+  tempo de execução". A varredura seguinte procurou por `className = \``  antes
+  de apagar qualquer coisa.
+
 - **Reescrevi CSS com expressão regular** e quebrei o arquivo. Regex não sabe
   contar chaves aninhadas. Consertado à mão, com uma conferência de chaves
   balanceadas depois.

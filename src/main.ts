@@ -51,7 +51,7 @@ import { montarDoCanal, type FonteDeParticipantes } from './ui/components/partic
 import { renderizarRoda } from './ui/components/roda'
 
 /** Quem falou antes de a mesa saber o nome dele. */
-export const APELIDO_DESCONHECIDO = 'Alguém'
+const APELIDO_DESCONHECIDO = 'Alguém'
 
 
 function rngDaSessao() {

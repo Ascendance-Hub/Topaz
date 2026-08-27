@@ -14,11 +14,12 @@ export type MensagemCall =
  * apenas para quem está no mesmo. Uma sala do Trystero por canal seria pior em
  * tudo: novo handshake a cada troca, e ninguém enxergaria quem está nos outros.
  *
- * A lista é FIXA e não viaja pela rede. Deixar criar canais exigiria
- * sincronizar nomes entre navegadores, resolver quem criou primeiro e limpar
- * os vazios — muita máquina para um grupo de amigos que precisa de "um canto
- * para conversar sem atrapalhar". Canais com nome ficam registrados como
- * evolução possível.
+ * A lista de **ids e nomes** é fixa e não viaja pela rede. O que foi descartado
+ * não foi criar canais — isso existe, ver abaixo — e sim deixar cada um
+ * ESCOLHER o nome do seu: isso exigiria sincronizar nomes entre navegadores,
+ * resolver quem criou primeiro e limpar os vazios. Muita máquina para um grupo
+ * de amigos que precisa de "um canto para conversar sem atrapalhar". Canais com
+ * nome escolhido ficam registrados como evolução possível.
  *
  * **Só existem os canais que têm gente.** Um canal custa zero — é um campo de
  * texto, não uma conexão —, então nada impede sete deles; o que os cria é
@@ -52,7 +53,7 @@ export const CANAL_PADRAO = CANAIS[0].id
  * Jogar a pessoa no principal a mantém visível e audível — descartá-la a
  * deixaria num canal fantasma, presente para si mesma e invisível para todos.
  */
-export function canalConhecido(bruto: unknown): string {
+function canalConhecido(bruto: unknown): string {
   return CANAIS.some((c) => c.id === bruto) ? (bruto as string) : CANAL_PADRAO
 }
 
@@ -67,7 +68,7 @@ export function canalConhecido(bruto: unknown): string {
  * canais manda o estado sem ele, e recusar quebraria a sala de quem ainda não
  * recarregou — `canalConhecido` já leva a ausência ao principal.
  */
-export function ehMensagemCall(bruto: unknown): bruto is MensagemCall {
+function ehMensagemCall(bruto: unknown): bruto is MensagemCall {
   if (typeof bruto !== 'object' || bruto === null || Array.isArray(bruto)) return false
   const m = bruto as Record<string, unknown>
   if (m['tipo'] === 'quero-tela') return typeof m['quero'] === 'boolean'
@@ -338,15 +339,15 @@ export class ProtocoloCall {
   }
 
   /**
-   * Os canais que valem aparecer: os que têm gente, mais o primeiro vago.
+   * Quem está neste canal.
    *
-   * A ordem é sempre a de `CANAIS`, e não "usados primeiro, vago no fim": o
-   * vago pode ser o Principal, quando todo mundo migrou para outro lugar, e
-   * jogá-lo para o fim faria as pílulas trocarem de posição conforme as
-   * pessoas andam — clicar num canal e acertar outro é o pior desfecho.
+   * Eu entro na lista do MEU canal, e na frente: ela descreve onde as pessoas
+   * estão, e eu sou uma delas — um canal em que se está aparecer vazio seria
+   * absurdo, e é de onde o olho parte para se localizar.
    *
-   * Todo mundo calcula isto a partir do MESMO estado, então a lista é a mesma
-   * em todas as telas sem nada precisar ser combinado.
+   * (Este bloco descrevia `canaisVisiveis`, logo abaixo, e por isso também
+   * dizia "mais o primeiro vago" — coisa que deixou de valer quando o canal
+   * vago de reserva saiu.)
    */
   private quemEm(
     comFiltro: (teste: (p: Peer) => boolean) => string[], id: string,
