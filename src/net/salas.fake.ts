@@ -40,7 +40,6 @@ export function criarSalasFalsas(peers: string[] = ['pa', 'pb']) {
       (ativos.includes(peerId)
         ? ({ getPeers: () => senders } as unknown as SalaTrystero)
         : undefined),
-    quemPorRede: () => ({}),
     porRede: () => [],
     aoEntrarPeer: () => {},
     aoSairPeer: () => {},
