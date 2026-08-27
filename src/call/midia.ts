@@ -94,8 +94,8 @@ export class Midia {
    * e nunca mais tentado — e como os dois lados costumam clicar "Entrar na
    * call" ao mesmo tempo, o caso comum virava ninguém ouvir ninguém.
    */
-  private micPara = new Set<string>()
-  private telaPara = new Set<string>()
+  private micPara = new Map<string, MediaStream>()
+  private telaPara = new Map<string, MediaStream>()
   private altura: number = ALTURA_PADRAO
   /**
    * `motion` por padrão.
@@ -240,7 +240,7 @@ export class Midia {
 
   desligarMicrofone(): void {
     if (!this.microfone) return
-    this.salas.despublicarStream(this.microfone)
+    this.despublicarInvolucros(this.micPara, [...this.micPara.keys()])
     this.micPara.clear()
     // Parar as faixas também: sem isso o indicador de microfone do navegador
     // fica aceso depois de sair da call, o que assusta com razão.
@@ -253,10 +253,10 @@ export class Midia {
    * quem sobra, e não faz nada quando já está igual.
    */
   private reconciliar(
-    stream: MediaStream | null, publicado: Set<string>, alvos: string[], tipo: string,
+    stream: MediaStream | null, publicado: Map<string, MediaStream>, alvos: string[], tipo: string,
   ): void {
-    const sobrando = [...publicado].filter((id) => !alvos.includes(id))
-    if (stream && sobrando.length > 0) this.salas.despublicarStream(stream, sobrando)
+    const sobrando = [...publicado.keys()].filter((id) => !alvos.includes(id))
+    if (sobrando.length > 0) this.despublicarInvolucros(publicado, sobrando)
     // Esquece mesmo sem stream: se ele voltar, precisa ser publicado de novo.
     for (const id of sobrando) publicado.delete(id)
 
@@ -283,10 +283,52 @@ export class Midia {
     // assimétrica: quem saía criava captura nova (chave nova, funcionava),
     // quem ficava republicava o mesmo objeto (chave repetida, morria).
     //
-    // Remover continua usando o stream original: o Trystero casa os senders
-    // pelas FAIXAS, não pelo objeto.
-    this.salas.publicarStream(new MediaStream(stream.getTracks()), faltando, { tipo })
-    for (const id of faltando) publicado.add(id)
+    // E o invólucro fica GUARDADO, porque remover também é pelo objeto desde
+    // a 0.25 — ver `despublicarInvolucros`. O comentário que existia aqui
+    // dizia o contrário, e estava certo na versão anterior.
+    const involucro = new MediaStream(stream.getTracks())
+    this.salas.publicarStream(involucro, faltando, { tipo })
+    // Guardado POR PEER, e não uma vez só: publicações diferentes usam
+    // invólucros diferentes, e quem despublica precisa saber qual foi o de
+    // cada um. Ver `despublicarInvolucros`.
+    for (const id of faltando) publicado.set(id, involucro)
+  }
+
+  /**
+   * Despublica de cada peer exatamente o invólucro que ELE recebeu.
+   *
+   * O Trystero 0.25.3 embrulha todo peer num proxy que multiplexa várias salas
+   * numa conexão só (`shared-peer.ts`). Esse proxy guarda o que foi publicado
+   * num `Map` indexado pelo OBJETO do stream (`streamOwners`) — então
+   * `removeStream` com qualquer outro objeto, ainda que com as mesmas faixas,
+   * simplesmente não acha nada e retorna sem fazer nada.
+   *
+   * Isto mudou sem aviso: até a versão anterior a remoção casava os senders
+   * pelas FAIXAS, e passar a captura original funcionava. Medido com duas abas
+   * de verdade em 2026-08-26: depois de `removeStream(captura)`, o
+   * `getSenders()` continuava com o sender no ar; a republicação seguinte
+   * estourava `InvalidAccessError: a sender already exists for the track`
+   * dentro de uma promessa que ninguém escuta, e o metadado já tinha sido
+   * enviado. O receptor ficava com um metadado órfão na fila FIFO por peer, e
+   * dali em diante toda mídia daquela pessoa chegava com o rótulo da anterior
+   * — a última simplesmente sumia. Era o "ninguém se escuta" intermitente.
+   */
+  private despublicarInvolucros(
+    publicado: Map<string, MediaStream>, ids: string[],
+  ): void {
+    // Agrupado por invólucro: um objeto pode ter ido para vários peers de uma
+    // vez, e o `despublicarStream` aceita a lista inteira.
+    const porInvolucro = new Map<MediaStream, string[]>()
+    for (const id of ids) {
+      const involucro = publicado.get(id)
+      if (!involucro) continue
+      const atual = porInvolucro.get(involucro)
+      if (atual) atual.push(id)
+      else porInvolucro.set(involucro, [id])
+    }
+    for (const [involucro, alvos] of porInvolucro) {
+      this.salas.despublicarStream(involucro, alvos)
+    }
   }
 
   /**
@@ -331,11 +373,11 @@ export class Midia {
     const ativos = this.peersAtivos()
     const novos = alvos.filter((id) => !this.telaPara.has(id) && ativos.has(id))
     if (novos.length > 0) {
-      this.salas.publicarStream(
-        new MediaStream(this.tela.getTracks()), novos, { tipo: 'tela' })
-      for (const id of novos) this.telaPara.add(id)
+      const involucro = new MediaStream(this.tela.getTracks())
+      this.salas.publicarStream(involucro, novos, { tipo: 'tela' })
+      for (const id of novos) this.telaPara.set(id, involucro)
     }
-    for (const id of this.telaPara) {
+    for (const id of this.telaPara.keys()) {
       const ativo = alvos.includes(id)
       // Quem acabou de ser publicado precisa esperar o sender existir; quem já
       // estava é imediato.
@@ -346,7 +388,7 @@ export class Midia {
 
   pararTela(): void {
     if (!this.tela) return
-    this.salas.despublicarStream(this.tela)
+    this.despublicarInvolucros(this.telaPara, [...this.telaPara.keys()])
     this.telaPara.clear()
     for (const faixa of this.tela.getTracks()) faixa.stop()
     this.tela = null
@@ -442,7 +484,7 @@ export class Midia {
    */
   definirQualidade(altura: number): void {
     this.altura = altura
-    for (const peerId of this.telaPara) this.ajustarEnvio(peerId, true)
+    for (const peerId of this.telaPara.keys()) this.ajustarEnvio(peerId, true)
   }
 
   /** Quem já completou o handshake — o mesmo critério que o Trystero usa. */

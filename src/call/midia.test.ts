@@ -215,6 +215,69 @@ describe('Midia — republicar depois de sair e voltar', () => {
   })
 })
 
+describe('Midia — despublicar o que foi publicado', () => {
+  /**
+   * O invólucro publicado É a chave.
+   *
+   * Na 0.25.3 o Trystero embrulha cada peer num proxy cujo `removeStream`
+   * procura o stream num `Map` indexado pelo OBJETO (`streamOwners`, em
+   * `shared-peer.ts`). Não acha, não faz nada — e o `sender` fica no ar.
+   *
+   * O comentário antigo deste módulo dizia que remover casava pelas FAIXAS.
+   * Isso valia na versão anterior e deixou de valer, sem aviso: medido com
+   * duas abas de verdade, `removeStream(original)` devolveu `getSenders()`
+   * inalterado, e a republicação seguinte estourou `InvalidAccessError` numa
+   * promessa que ninguém escuta.
+   */
+  it('despublica o MESMO objeto que publicou, não a captura original', async () => {
+    const { sala, ctx, publicados } = criarSalaFalsa()
+    const midia = new Midia(sala)
+    const mic = fingirMicrofone()
+    await midia.ligarMicrofone()
+
+    midia.sincronizarMicrofone(['pa'])
+    midia.sincronizarMicrofone([])
+
+    expect(ctx.despublicados).toHaveLength(1)
+    expect(ctx.despublicados[0]!.stream).toBe(publicados[0]!.stream)
+    expect(ctx.despublicados[0]!.stream).not.toBe(mic)
+  })
+
+  it('despublica de cada peer o invólucro que aquele peer recebeu', async () => {
+    const { sala, ctx, publicados } = criarSalaFalsa()
+    const midia = new Midia(sala)
+    fingirMicrofone()
+    await midia.ligarMicrofone()
+
+    // Duas publicações separadas: cada peer recebeu um objeto diferente.
+    midia.sincronizarMicrofone(['pa'])
+    midia.sincronizarMicrofone(['pa', 'pb'])
+    expect(publicados).toHaveLength(2)
+    expect(publicados[0]!.stream).not.toBe(publicados[1]!.stream)
+
+    midia.sincronizarMicrofone([])
+
+    const paraPa = ctx.despublicados.find((d) => d.alvos?.includes('pa'))
+    const paraPb = ctx.despublicados.find((d) => d.alvos?.includes('pb'))
+    expect(paraPa!.stream).toBe(publicados[0]!.stream)
+    expect(paraPb!.stream).toBe(publicados[1]!.stream)
+  })
+
+  it('desligar o microfone despublica os invólucros, não a captura', async () => {
+    const { sala, ctx, publicados } = criarSalaFalsa()
+    const midia = new Midia(sala)
+    const mic = fingirMicrofone()
+    await midia.ligarMicrofone()
+    midia.sincronizarMicrofone(['pa'])
+
+    midia.desligarMicrofone()
+
+    expect(ctx.despublicados).toHaveLength(1)
+    expect(ctx.despublicados[0]!.stream).toBe(publicados[0]!.stream)
+    expect(ctx.despublicados[0]!.stream).not.toBe(mic)
+  })
+})
+
 describe('Midia — qualidade', () => {
   it('começa em 1080p, que é onde a tela fica boa de ler', () => {
     // Escolha deliberada contra o que o probe recomendaria: 1080p custa ~3×
