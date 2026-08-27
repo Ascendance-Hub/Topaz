@@ -74,16 +74,67 @@ getPeers(): Record<string, RTCPeerConnection>
 É por aí que dá para mexer em codec, bitrate e resolução. O Trystero não
 esconde o WebRTC.
 
-### `removeStream` casa os senders pelas FAIXAS, não pelo objeto
+### ⚠️ `removeStream` passou a casar pelo OBJETO — e isso mudou sem aviso
+
+**Até a 0.24, o casamento era pelas FAIXAS**, e por isso dava para remover
+passando qualquer `MediaStream` que contivesse as mesmas faixas:
 
 ```js
+// continua existindo, no fundo da pilha
 removeStream: (stream) => pc.getSenders()
   .filter((s) => s.track && stream.getTracks().includes(s.track))
   .forEach((s) => pc.removeTrack(s))
 ```
 
-Ou seja: dá para remover passando **qualquer** `MediaStream` que contenha as
-mesmas faixas. Útil quando se publica invólucros diferentes (ver abaixo).
+**Na 0.25 esse código deixou de ser alcançado direto.** Todo peer agora é
+embrulhado num proxy que multiplexa várias salas numa conexão só
+(`shared-peer.ts`), e o proxy guarda o que cada sala publicou num `Map`
+indexado pelo **objeto** do stream:
+
+```js
+removeStream: stream => {
+  const owners = shared.streamOwners.get(stream)   // ← pelo OBJETO
+  if (!owners) return                              // ← não achou: não faz nada
+  owners.delete(roomId)
+  if (owners.size === 0) shared.peer.removeStream(stream)
+}
+```
+
+**Sintoma:** intermitente, e cruel — as pessoas continuam na sala, o chat e o
+jogo funcionam, e **ninguém se escuta**. Às vezes funciona perfeitamente.
+
+**A cadeia inteira**, medida com duas abas de verdade em 2026-08-26:
+
+1. Publicamos um invólucro novo a cada publicação (conserto de outro bug, logo
+   abaixo) e despublicávamos passando a **captura original**.
+2. `streamOwners.get(captura)` não acha nada → **remoção silenciosa e nula**.
+   Medido: `getSenders()` continuou com o sender depois do `removeStream`.
+3. O nosso lado marca como despublicado assim mesmo.
+4. Na volta (trocar de canal, trocar de grupo, sair e voltar da call),
+   republicamos as **mesmas faixas** → `pc.addTrack` estoura
+   `InvalidAccessError: a sender already exists for the track`.
+5. E o estouro acontece **depois** do metadado ter sido enviado, porque
+   `applyMediaOp` faz `await sendMeta(...)` e só então `peer.addStream(...)`.
+   O erro cai numa promessa que ninguém escuta.
+6. O receptor fica com um metadado **órfão** na fila FIFO por peer. Dali em
+   diante toda mídia daquela pessoa chega com o rótulo da anterior, e a última
+   some. A fila **nunca se realinha sozinha**.
+
+**Conserto:** guardar o invólucro publicado **por peer** e despublicar
+exatamente aquele objeto.
+
+```js
+const involucro = new MediaStream(stream.getTracks())
+sala.addStream(involucro, { target, metadata })
+publicado.set(peerId, involucro)      // ← a chave é o objeto
+// ...
+sala.removeStream(publicado.get(peerId), { target: [peerId] })
+```
+
+**A lição que sobra:** o que a biblioteca casa por objeto e o que ela casa por
+faixa não é detalhe de implementação — é contrato, e mudou numa versão menor
+sem nota. Depois de subir de versão, vale reler este arquivo inteiro
+perguntando "isto ainda é verdade?".
 
 ### Publicar para um peer que ainda não conectou é DESCARTADO em silêncio
 
