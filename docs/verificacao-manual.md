@@ -544,6 +544,18 @@ Dura o tempo de um round-trip.
 
 ## Presença entre grupos salvos
 
+Refeita em **2026-08-27**, na quinta tentativa. Duas coisas do desenho mudaram,
+e as duas por medição:
+
+**A sala de presença tem id próprio: `codigo#presenca`.** O Trystero indexa as
+salas só pelo `roomId` e devolve a que já existe — com o mesmo código nas duas,
+entrar no grupo devolvia a sala de fundo **passiva**, e a pessoa entrava
+invisível. Era o "trocar de grupo está lento e inconstante".
+
+**A presença é DECLARADA, não inferida.** Uma sala passiva se ativa ao ser
+tocada e passa a anunciar, então dois observadores do mesmo grupo se enxergam.
+Quem está no grupo manda uma ação `aqui`; quem só observa fica calado.
+
 A presença observa **as três redes**, porque só nostr não achava ninguém: o
 diagnóstico mostrou `por rede: nostr=0 mqtt=1` — estas máquinas se acham por
 mqtt, e o observador esperava numa rede vazia. O torrent entra junto porque
@@ -567,6 +579,31 @@ escreve uma linha `presença: CODIGO=N` a cada mudança, e é ela que separa
       propósito: enquanto conectar não acontece, nada é gasto procurando
 - [ ] Numa sala que não conecta, a presença **não** começa — a tela de falha
       de conexão fica sozinha, sem nada disputando a rede por trás
+
+### O que a quinta tentativa acrescentou à lista
+
+Os dois primeiros só apareceram rodando o app de verdade, com duas abas.
+Nenhum teste os pegaria, e é por isso que estão aqui.
+
+- [ ] **Um grupo VAZIO não marca ninguém online.** Este era o defeito da
+      contagem por conexão: dois observadores do mesmo grupo se contavam. Com
+      as duas máquinas fora de um grupo salvo, ele não pode mostrar nada
+- [ ] **Saindo de um grupo, o selo dele some para todo mundo.** Sair do grupo Y
+      e ir para o X tem de zerar o Y **nos dois lados**. Se ficar marcando "1
+      pessoa online" para sempre, é anúncio órfão: recarregar a página limpa, e
+      essa é a assinatura
+- [ ] Depois de trocar de grupo **cinco vezes**, o grupo que você deixou por
+      último continua zerado
+- [ ] Com as duas máquinas no **mesmo** grupo, a call funciona normalmente — a
+      presença não pode encostar nela
+- [ ] Entrar e sair da call várias vezes com a presença ligada, e continuar se
+      escutando
+
+### O que NÃO é a presença
+
+- [ ] Se às vezes as duas máquinas simplesmente **não se acharem** numa sala
+      nova, isso não é a presença. Medido com e sem ela: mesma taxa de falha.
+      É descoberta, e está na lista de defeitos do roteiro
 
 ## O palco da call
 

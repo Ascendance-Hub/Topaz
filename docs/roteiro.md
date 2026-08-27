@@ -61,6 +61,11 @@ duas exceções marcadas 🕓, escritas em 2026-08-24 e ainda não vistas com ge
   apresentação, porque o trabalho da página é deixar entrar.
 - 🕓 **Quem está falando** — anel de topázio em volta de quem fala, medido
   localmente sobre o áudio que já chega. Nada disso trafega.
+- 🕓 **Presença entre grupos** — quantas OUTRAS pessoas estão em cada grupo
+  salvo, na tela inicial e na coluna da sala. Sala de id próprio
+  (`codigo#presenca`), ativa no grupo aberto e passiva nos outros. Conta só
+  quem **declara** estar lá, e não quem apenas conectou — ver o porquê nos
+  aprendizados. Conta *quantos*, nunca *quem*: o quem é a feature de amigos.
 - **Descoberta por três redes** — nostr, MQTT e BitTorrent ao mesmo tempo,
   deduplicando por pessoa. Foi o que destravou os amigos que não se achavam.
 - **Privacidade e guardas de rede** — fontes locais, CSP, código de sala de 16
@@ -211,11 +216,18 @@ O estado atual, o que está pendente e como trabalhamos ficam em
 
 ### Defeitos conhecidos
 
+- **A descoberta é intermitente — e NÃO é a presença.** Medido em 2026-08-27:
+  2 de 4 trocas de sala não acharam o par em 44 s, **com e sem presença**,
+  mesma taxa. Nesta máquina o app reporta 4 de 20 relays respondendo. É o
+  candidato mais forte para explicar o "às vezes não conecta, tenho que apertar
+  Reconectar", e ainda não foi investigado.
 - **`Reconectar` reentra na conexão velha.** `joinRoom` num id já registrado
-  devolve a MESMA sala, e a saída do Trystero só desregistra ~100ms depois.
-  Esperar essa saída conserta — e destrói a piscina de relays, deixando a
-  reconexão lenta e às vezes falha. Ficou sem conserto, e ninguém nunca
-  percebeu o defeito.
+  devolve a MESMA sala, e a saída do Trystero só desregistra ~99ms depois.
+  Confirmado na fonte e medido. O quadro mudou depois do PR 60, que passou a
+  fechar as conexões ao sair — vale **remedir antes de consertar**.
+- **O ouvinte de `devicechange` nunca é removido.** Cada sala desmontada deixa
+  um pendurado, e ele chama `desenhar()` numa sala morta. Foi por esse caminho
+  que o anúncio órfão da presença nascia. Pequeno, e real.
 - **A conexão reserva não é adotada.** Quando a rede dona de um peer cai, a
   duplicata das outras redes não é promovida — o `onPeerJoin` dela já tinha
   sido ignorado. Ela custa memória e não serve para nada. Fechá-la não é a
@@ -223,9 +235,13 @@ O estado atual, o que está pendente e como trabalhamos ficam em
 
 ### Decisão em aberto
 
-- **Manter o MQTT?** Custa 368 kB de bundle e 20 conexões ociosas do pool
-  (o Trystero mantém um pool de 20 por estratégia). Em troca, é uma terceira
-  via de descoberta. Depende de mais rodadas de teste com o antivírus ligado.
+- **Manter o MQTT?** Agora com número. Medido em 2026-08-27, app rodando
+  sozinho numa sala vazia: **60 `RTCPeerConnection` ociosas** (20 por
+  estratégia × 3), ~26 websockets vivos, heap ~23 MB, e **nenhum vazamento**.
+  As 60 são a piscina do Trystero (`poolSize = 20`, constante da lib), então o
+  único botão real é o **número de estratégias**. O MQTT é justamente a rede
+  que conecta as máquinas do Alexandre — quem estaria no banco dos réus é o
+  **torrent**. Uma medição só, e a decisão é dele.
 
 ### Ciclo em andamento — identidade, grupos e a reforma da sala
 
@@ -236,7 +252,7 @@ Desenho completo em
 |---|---|---|
 | 1 | Identidade estável | **feito** |
 | 2 | Barra lateral + grupos persistentes | **feito** |
-| 3 | Presença entre grupos + mensagem direta | a fazer |
+| 3 | Presença entre grupos | **feito** |
 | 4 | Galeria de jogos + configuração da partida | **feito** |
 | 5 | Canais de voz | **feito** |
 | 6 | Amigos | a fazer |

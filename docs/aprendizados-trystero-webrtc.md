@@ -10,6 +10,170 @@ propósito: é por ele que a gente vai reconhecer o problema da próxima vez.
 
 ---
 
+## Antes de tudo: como ler a fonte do Trystero
+
+O `node_modules/trystero` só traz `dist`. Mas **a fonte TypeScript inteira está
+nos sourcemaps** — dá para extraí-la lendo `sourcesContent` dos arquivos
+`.mjs.map`:
+
+```js
+const m = JSON.parse(fs.readFileSync('node_modules/@trystero-p2p/core/dist/strategy.mjs.map'))
+m.sources.forEach((s, i) => fs.writeFileSync(basename(s), m.sourcesContent[i]))
+```
+
+São ~6.800 linhas em `@trystero-p2p/{core,nostr,mqtt,torrent}`. **Faça isso
+antes de investigar qualquer coisa de rede ou mídia.** Duas caçadas longas
+deste projeto se resolveram em minutos depois de ler `strategy.ts`,
+`room.ts`, `peer.ts` e `shared-peer.ts` — e as duas tinham sido perseguidas
+por dias a partir do comportamento observado.
+
+Os arquivos que mais respondem:
+
+| arquivo | o que decide |
+|---|---|
+| `strategy.ts` | registro de salas, piscina de ofertas, modo passivo |
+| `room.ts` | `leave`, handshake, roteamento de sinal |
+| `peer.ts` | negociação, glare, ICE |
+| `shared-peer.ts` | multiplexação de salas numa conexão só |
+| `media.ts` | a fila FIFO de metadados |
+
+---
+
+## ⚠️ A 0.25 mudou a arquitetura, e sem nota de release
+
+Este bloco é o mais caro do arquivo. **Três defeitos sérios em uso real** —
+áudio sumindo, troca de grupo travando, presença nunca funcionando — foram
+consequências diretas de mudanças que nenhuma documentação anuncia.
+
+### Uma conexão, várias salas: o `SharedPeerManager`
+
+Toda `RTCPeerConnection` agora é embrulhada num proxy que **multiplexa salas**.
+Cada quadro de dados vai embrulhado com um `roomToken`, e a mesma conexão serve
+N salas (`shared-peer.ts`).
+
+Entrar numa segunda sala com alguém que você já conhece custa **zero**: não há
+handshake novo. Há até um protocolo de presença de sala embutido —
+`advertiseRoomPresence` anuncia "estou na sala X" pela conexão que já existe, e
+o outro lado encaixa sozinho.
+
+**Parece só economia. Não é.** Ver os dois itens abaixo.
+
+### A renegociação de mídia é descartada enquanto o peer não está ATIVO na sala
+
+**Sintoma:** depois de trocar de sala, os dois lados ficam `connected`, o chat e
+o jogo funcionam, e **ninguém se escuta**. Para sempre, não até reconectar. É
+intermitente, e pior na máquina ou rede mais lenta.
+
+**Causa:** a conexão é HERDADA da sala anterior. O `removeTrack` do desmonte
+dispara uma renegociação, e a SDP dela cai na janela em que o peer ainda não
+está ativo na sala nova. O `room.ts` descarta SDP de renegociação nos **dois**
+sentidos enquanto isso:
+
+```js
+signal: sdp => { if (!activePeerMap[id]) return; ... }              // no envio
+signalAction.onMessage((sdp, id) => { if (!activePeerMap[id]) return })  // na chegada
+```
+
+Como `onnegotiationneeded` não dispara de novo, a conexão fica presa em
+**`have-local-offer` para sempre**. O canal de dados não depende de SDP nova —
+por isso tudo o mais continua funcionando.
+
+Medido, sem entrar na call nova e sem publicar nada:
+
+```
+200 ms depois da troca: stable
+400 ms depois da troca: have-local-offer   (e fica)
+```
+
+E o transceiver do microfone com `mid: null` — nunca negociado, faixa viva
+esperando.
+
+**Conserto:** **fechar** as `RTCPeerConnection` ao sair da sala, em vez de
+herdá-las. O A/B, mesmo roteiro nas duas abas:
+
+```
+herdando a conexão → silêncio dos dois lados, receivers: 2
+fechando a conexão → ouvindo e sendo ouvido, receivers: 1
+```
+
+**Um candidato testado e REJEITADO:** despublicar e esperar a renegociação
+voltar a `stable` antes de sair. Saiu com `stable` e mesmo assim travou 700 ms
+depois. Não tente de novo.
+
+### `occupiedRooms` é indexado SÓ pelo `roomId` — a config é ignorada
+
+```js
+if (occupiedRooms[appId]?.[roomId]) return occupiedRooms[appId][roomId]
+```
+`strategy.ts:213`
+
+**Sintoma:** entrar numa sala devolve uma sala com configuração de OUTRA. No
+Topaz isso significava entrar num grupo e receber a sala de fundo **passiva**,
+que não anuncia e não pré-fabrica ofertas — a pessoa entrava invisível.
+
+Medido, com o grupo observado no fundo e aberto em seguida:
+
+```
+mesmoObjeto: true · isPassive: true · conexões pré-fabricadas: 0
+```
+
+**Conserto:** id diferente para propósito diferente (`codigo` para a sala,
+`codigo#presenca` para a presença). Com id próprio: `mesmoObjeto: false`.
+
+**Corolário:** `leave()` espera um envio e mais **99 ms** antes de
+desregistrar (`room.ts:160`). Reentrar no mesmo id nesse intervalo devolve a
+sala que está morrendo. É por isso que um "Reconectar" que faz
+`leave(); joinRoom(mesmoId)` recebe de volta a sala condenada.
+
+### Uma sala PASSIVA se ativa ao ser tocada — e passa a anunciar
+
+**Sintoma:** um grupo **vazio** aparece com "1 pessoa online", nos dois lados,
+sem nunca limpar.
+
+**Causa:** o modo passivo não é só-leitura para sempre. Ao receber um anúncio
+de alguém não-passivo, a sala passiva **se ativa**:
+
+```js
+if (ctx.isPassive && !ctx.isActive && !answer && !candidate) {
+  ctx.isActive = true
+  ctx.requeueAnnounce?.()     // ← e agora ela ANUNCIA
+}
+```
+`signal-handler.ts:807`
+
+A partir daí dois observadores do mesmo tópico passam a se enxergar. Uma
+contagem baseada em `onPeerJoin` vira "quantos estão OLHANDO" em vez de
+"quantos estão AQUI".
+
+**Conserto:** não inferir presença de conexão — a conexão existe nos dois
+casos. **Perguntar.** Quem está de verdade no lugar manda uma ação
+(`makeAction('aqui')`); quem só observa fica calado, e só a declaração conta.
+
+### A piscina de ofertas morre quando a ÚLTIMA sala fecha
+
+`strategy.ts:694`. Fechar a última sala de qualquer `appId` faz `didInit =
+false`, `pool.destroy()` e a reinicialização dos relays. `poolSize = 20`,
+constante da lib, **uma piscina por estratégia** — com três estratégias são
+**60 `RTCPeerConnection` ociosas**, e é o piso de memória de qualquer app que
+use três redes.
+
+Medido:
+
+```
+sem âncora:  leave → pcVivas 0    → voltar refabrica 20
+com âncora:  leave → pcVivas 20   → voltar custa 0
+```
+
+"Âncora" é qualquer sala mantida aberta durante a troca. Na prática, entrar na
+sala nova **antes** de a velha desregistrar já basta.
+
+### O que continua sem explicação
+
+Entre as mesmas duas máquinas, o nostr achava uma sonda e não achava o app.
+Foi **contornado** (ouvindo as três redes), nunca entendido.
+
+---
+
 ## Trystero
 
 ### `onPeerJoin` é propriedade, não método
