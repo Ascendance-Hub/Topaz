@@ -5,6 +5,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // fábrica controlável para poder ligar duas "sessões" (uma delas simulando
 // outra aba/navegador) na mesma rede em memória usada pelos testes de
 // `Sessao`. `vi.mock` é hoisted para antes dos imports abaixo.
+/**
+ * As salas de presença abrem conexão de verdade com relays. Nenhum teste aqui
+ * é sobre presença — e um teste que abre socket é lento quando funciona e
+ * intermitente quando não.
+ */
+/** Cada anúncio criado, com o `sair` dele — é assim que se prova órfão. */
+const anuncios: { codigo: string; sair: ReturnType<typeof vi.fn> }[] = []
+
+vi.mock('./presenca/sala-de-fundo', () => ({
+  abrirSalaDeFundo: vi.fn(() => ({
+    aoEntrarPeer: () => {}, aoSairPeer: () => {}, sair: () => {},
+  })),
+  anunciarPresenca: vi.fn((codigo: string) => {
+    const sair = vi.fn()
+    anuncios.push({ codigo, sair })
+    return { aoEntrarPeer: () => {}, aoSairPeer: () => {}, sair }
+  }),
+}))
+
 vi.mock('./net/transport', () => ({
   criarSalasTrystero: vi.fn(),
   criarTransporte: vi.fn(),
@@ -1268,6 +1287,75 @@ describe('entrarNaSala — trocar o chat com o miolo', () => {
 
       expect(app.querySelector('.conteudo')).toBe(conteudo)
       expect(app.querySelector('.lateral')).toBe(lateral)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('entrarNaSala — a presença não deixa anúncio órfão', () => {
+  /**
+   * Medido com duas abas antes de existir este teste: sair de um grupo e ir
+   * para outro deixava o primeiro marcando "1 pessoa online" **para sempre**,
+   * para todo mundo. Recarregar a página limpava — assinatura de sala órfã, e
+   * não de contagem errada.
+   *
+   * A causa era o `encerrar()` baixar a tranca da presença (`presencaLiberada
+   * = false`) em vez de trancá-la de vez. `desenhar()` é chamado de vários
+   * lugares, e um que chegue DEPOIS do desmonte reabria o anúncio do grupo que
+   * a pessoa acabou de deixar — sem ninguém para fechá-lo, porque o `encerrar`
+   * que o fecharia já tinha rodado.
+   *
+   * A regra que este teste guarda: todo anúncio que nasce tem de morrer no
+   * `encerrar`. Um `sair` não chamado é uma sala viva anunciando você num
+   * lugar onde você não está.
+   */
+  it('todo anúncio criado é fechado ao sair da sala', () => {
+    vi.useFakeTimers()
+    try {
+      anuncios.length = 0
+      // `mediaDevices` de verdade como alvo de evento: é por ele que o desenho
+      // atrasado chega.
+      const aparelhos = new EventTarget()
+      Object.defineProperty(navigator, 'mediaDevices', {
+        value: aparelhos, configurable: true,
+      })
+      const rede = criarRedeFalsa()
+      vi.mocked(criarSalasTrystero).mockImplementation(() => criarSalasFalsas([]).salas)
+      vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('eu'))
+
+      const app = document.createElement('div')
+      entrarNaSala(app, 'Alex', 'CODIGO01')
+      rede.bombear()
+      vi.advanceTimersByTime(MS_DESCOBERTA + 2_000)
+      rede.bombear()
+
+      // Sozinho e anfitrião já conta como conectado, então o anúncio saiu.
+      expect(anuncios.length).toBeGreaterThan(0)
+
+      // Sair pelo mesmo caminho que trocar de grupo usa. (Fechar a aba não
+      // serve de gatilho aqui: lá quem tira as salas do ar é o próprio
+      // Trystero, que registra a saída delas no `beforeunload`.)
+      app.querySelector<HTMLButtonElement>('button[data-sala="outra"]')!.click()
+      const criadosAteAqui = anuncios.length
+
+      // Um desenho atrasado, pelo ouvinte de `devicechange` que a sala
+      // desmontada deixa registrado (ninguém o remove).
+      //
+      // Honestidade sobre o alcance deste teste: com a rede falsa, a sessão já
+      // reporta desconectada aqui, então ele NÃO reproduz a corrida — quem a
+      // pegou foi o navegador, com duas abas. O que ele guarda é a invariante:
+      // todo anúncio que nasce é fechado, e nenhum nasce depois do desmonte.
+      aparelhos.dispatchEvent(new Event('devicechange'))
+      vi.advanceTimersByTime(5_000)
+      rede.bombear()
+
+      // Nada de anúncio NOVO depois do desmonte: um anúncio que nasce aqui
+      // não tem mais nenhum `encerrar` para fechá-lo, e fica anunciando você
+      // num grupo que você já deixou até a aba ser fechada.
+      expect(anuncios.length).toBe(criadosAteAqui)
+
+      for (const a of anuncios) expect(a.sair).toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }

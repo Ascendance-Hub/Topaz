@@ -94,9 +94,36 @@ dois passivos nunca se conectam. Então:
   "está no site em algum lugar".
 
 O custo que sobra é assinatura em relay: cada grupo assina relays em cada rede.
-Por isso os grupos de fundo entram **só no nostr e com menos relays**. Presença
-é melhor-esforço; a sala em que a pessoa está não é. Relay foi a peça que mais
-custou para funcionar, e ela não pode ser ameaçada por um enfeite.
+Presença é melhor-esforço; a sala em que a pessoa está não é. Relay foi a peça
+que mais custou para funcionar, e ela não pode ser ameaçada por um enfeite.
+
+### ⚠️ Emendas de 2026-08-27, todas por medição
+
+Três coisas que este desenho dizia deixaram de valer. Ficam registradas em vez
+de reescritas, porque o motivo de cada uma custou caro.
+
+**1. Não é "só no nostr e com menos relays". São as três redes, redundância
+normal.** Era a economia que parecia sensata e foi o que fez a presença nunca
+ver ninguém: as máquinas do teste se acham por **mqtt**. O diagnóstico que
+provou está no Capítulo 13 do diário. E "menos relays" era economia falsa — os
+sockets são compartilhados por estratégia.
+
+**2. A sala de presença tem id PRÓPRIO: `codigo#presenca`.** O desenho original
+não dizia nada sobre isso, e é a peça que faltava. O Trystero indexa
+`occupiedRooms` só pelo `roomId` e devolve a sala já aberta ignorando a config
+(`strategy.ts:213`): com o mesmo código nas duas salas, entrar no grupo
+devolvia a sala de fundo **passiva**, que não anuncia nem pré-fabrica ofertas.
+Medido: `mesmoObjeto: true`, `isPassive: true`, zero conexões. Era o "trocar de
+grupo está lento e inconstante" — e não era a presença atrapalhando de fora,
+era o app entrando na sala errada.
+
+**3. Presença não se infere de conexão: se declara.** O modo passivo tem uma
+propriedade que o desenho não previa — uma sala passiva **se ativa** ao receber
+um anúncio (`signal-handler.ts:807` → `requeueAnnounce`) e, a partir daí,
+**também anuncia**. Dois observadores do mesmo grupo passam a se enxergar, e a
+conta vira "quantos estão OLHANDO o grupo". Medido: grupo vazio marcando
+"1 pessoa online". Quem está no grupo agora manda uma ação `aqui`; quem só
+observa fica calado, e só a declaração conta.
 
 ## 4. Canais de voz: uma sala, não várias
 
