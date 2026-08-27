@@ -1339,8 +1339,10 @@ describe('entrarNaSala — a presença não deixa anúncio órfão', () => {
       app.querySelector<HTMLButtonElement>('button[data-sala="outra"]')!.click()
       const criadosAteAqui = anuncios.length
 
-      // Um desenho atrasado, pelo ouvinte de `devicechange` que a sala
-      // desmontada deixa registrado (ninguém o remove).
+      // Um desenho atrasado, pelo ouvinte de `devicechange`. Ele passou a ser
+      // removido no `encerrar`, então este disparo não chega mais à sala
+      // desmontada — a invariante que este teste guarda (nenhum anúncio nasce
+      // depois do desmonte) continua valendo, agora por dois motivos.
       //
       // Honestidade sobre o alcance deste teste: com a rede falsa, a sessão já
       // reporta desconectada aqui, então ele NÃO reproduz a corrida — quem a
@@ -1356,6 +1358,49 @@ describe('entrarNaSala — a presença não deixa anúncio órfão', () => {
       expect(anuncios.length).toBe(criadosAteAqui)
 
       for (const a of anuncios) expect(a.sair).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('entrarNaSala — o ouvinte de aparelhos não fica pendurado', () => {
+  /**
+   * Cada sala desmontada deixava um ouvinte de `devicechange` vivo, chamando
+   * `desenhar()` numa sala morta — um por troca de sala, para sempre. Foi por
+   * esse caminho que o anúncio órfão da presença nascia, e é o defeito que o
+   * roteiro já listava.
+   *
+   * `entrarNaSala` devolve `void`: o desmonte acontece pelo mesmo caminho que
+   * trocar de sala usa, o botão `[data-sala="outra"]`. A home que sobe em
+   * seguida não registra `devicechange` nenhum, então o que sobrar é da sala.
+   */
+  it('sair da sala remove o devicechange que ela registrou', () => {
+    vi.useFakeTimers()
+    try {
+      const registrados: unknown[] = []
+      const removidos: unknown[] = []
+      Object.defineProperty(navigator, 'mediaDevices', {
+        value: {
+          addEventListener: (_evento: string, cb: unknown) => { registrados.push(cb) },
+          removeEventListener: (_evento: string, cb: unknown) => { removidos.push(cb) },
+        },
+        configurable: true,
+      })
+
+      const rede = criarRedeFalsa()
+      vi.mocked(criarSalasTrystero).mockImplementation(() => criarSalasFalsas([]).salas)
+      vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('eu'))
+
+      const app = document.createElement('div')
+      entrarNaSala(app, 'Alex', 'CODIGO01')
+      rede.bombear()
+
+      expect(registrados).toHaveLength(1)
+
+      app.querySelector<HTMLButtonElement>('button[data-sala="outra"]')!.click()
+
+      expect(removidos).toEqual(registrados)
     } finally {
       vi.useRealTimers()
     }

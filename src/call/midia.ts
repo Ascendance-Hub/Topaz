@@ -96,6 +96,19 @@ export class Midia {
    */
   private micPara = new Map<string, MediaStream>()
   private telaPara = new Map<string, MediaStream>()
+  /**
+   * Quem pediu a minha tela na última sincronização.
+   *
+   * `telaPara` responde outra pergunta — "para quem o envio já foi
+   * ESTABELECIDO" —, e as duas divergem de propósito: o envio é estabelecido
+   * uma vez e nunca desmontado (`removeTrack` não encerra o transceiver, e o
+   * `ontrack` do outro lado não dispararia de novo), então quem para de
+   * assistir continua em `telaPara` com o codificador desligado.
+   *
+   * Sem este segundo conjunto não há como reaplicar qualidade — nem resolver
+   * um ajuste adiado — sem reacender todo mundo que um dia assistiu.
+   */
+  private assistindoAgora = new Set<string>()
   private altura: number = ALTURA_PADRAO
   /**
    * `motion` por padrão.
@@ -390,6 +403,9 @@ export class Midia {
    */
   sincronizarTela(alvos: string[]): void {
     if (!this.tela) return
+    // Antes de qualquer publicação: é esta lista que o ajuste adiado e o
+    // `definirQualidade` consultam para saber quem quer a tela AGORA.
+    this.assistindoAgora = new Set(alvos)
     const ativos = this.peersAtivos()
     const novos = alvos.filter((id) => !this.telaPara.has(id) && ativos.has(id))
     if (novos.length > 0) {
@@ -408,7 +424,13 @@ export class Midia {
       // estava é imediato.
       if (novos.includes(id)) {
         setTimeout(() => {
-          if (this.ajustarEnvio(id, ativo)) this.envioAplicado.set(id, desejado)
+          // Lido AGORA, e não capturado lá atrás: em 1500 ms a pessoa pode ter
+          // desistido de assistir, e acender o codificador por um pedido já
+          // retirado é o mesmo defeito que o `definirQualidade` tinha.
+          const querAgora = this.assistindoAgora.has(id)
+          if (this.ajustarEnvio(id, querAgora)) {
+            this.envioAplicado.set(id, `${querAgora}|${comum}`)
+          }
         }, MS_ATE_O_SENDER_EXISTIR)
         continue
       }
@@ -422,6 +444,7 @@ export class Midia {
     this.despublicarInvolucros(this.telaPara, [...this.telaPara.keys()])
     this.telaPara.clear()
     this.envioAplicado.clear()
+    this.assistindoAgora.clear()
     for (const faixa of this.tela.getTracks()) faixa.stop()
     this.tela = null
   }
@@ -534,7 +557,18 @@ export class Midia {
    */
   definirQualidade(altura: number): void {
     this.altura = altura
-    for (const peerId of this.telaPara.keys()) this.ajustarEnvio(peerId, true)
+    // `envioAplicado` guarda a altura junto do `ativo`, então limpar aqui faz
+    // a reaplicação valer para todo mundo — e cada um com o `ativo` CERTO.
+    //
+    // A versão anterior passava `true` para todo peer já publicado, inclusive
+    // quem tinha parado de assistir. O tique de 500 ms corrigia logo depois,
+    // mas nessa janela o codificador voltava a trabalhar por quem não pediu
+    // nada — que é exatamente o que a assinatura explícita existe para
+    // impedir.
+    this.envioAplicado.clear()
+    for (const peerId of this.telaPara.keys()) {
+      this.ajustarEnvio(peerId, this.assistindoAgora.has(peerId))
+    }
   }
 
   /** Quem já completou o handshake — o mesmo critério que o Trystero usa. */

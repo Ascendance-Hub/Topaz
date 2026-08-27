@@ -41,6 +41,7 @@ import { joinRoom as entrarNostr } from '@trystero-p2p/nostr'
 import { joinRoom as entrarMqtt } from '@trystero-p2p/mqtt'
 import { joinRoom as entrarTorrent } from '@trystero-p2p/torrent'
 import { APP_ID, REDUNDANCIA } from '../net/transport'
+import { avisarTodos } from '../net/avisar'
 import type { SalaDeFundo } from './presenca'
 import { idDePresenca } from './id'
 
@@ -126,8 +127,24 @@ function entrarNaPresenca(codigo: string, passivo: boolean): SalaDeFundo {
    */
   const canais = salas.map((s) => s.makeAction(ACAO_AQUI))
   const declararam = new Set<string>()
-  let aoEntrar: ((peerId: string) => void) | null = null
-  let aoSair: ((peerId: string) => void) | null = null
+  /**
+   * Listas, e não um slot só — como `net/salas.ts` já faz.
+   *
+   * `onPeerJoin` do Trystero guarda um handler único, e copiar esse formato
+   * aqui era copiar a armadilha junto: atribuir de novo apaga o anterior, em
+   * silêncio, sem erro no console.
+   *
+   * Hoje há um consumidor só (a contagem), então lista e slot fazem o mesmo.
+   * A feature de amigos põe um segundo — a `Apresentacao`, que prova quem é
+   * quem para a presença poder dizer *quem* e não só *quantos* —, e aí o
+   * segundo inscrito apagaria o primeiro sem nenhuma pista.
+   *
+   * `avisarTodos` ainda isola o estouro de um ouvinte para que ele não leve os
+   * outros junto: uma entrada de peer alimentaria a contagem E a prova de
+   * identidade, e um `for` cru entrega só até o primeiro erro.
+   */
+  const aoEntrar: ((peerId: string) => void)[] = []
+  const aoSair: ((peerId: string) => void)[] = []
 
   salas.forEach((sala, i) => {
     sala.onPeerJoin = (peerId) => {
@@ -137,7 +154,7 @@ function entrarNaPresenca(codigo: string, passivo: boolean): SalaDeFundo {
     }
     sala.onPeerLeave = (peerId) => {
       if (!declararam.delete(peerId)) return
-      aoSair?.(peerId)
+      avisarTodos(aoSair, peerId)
     }
     const canal = canais[i]
     if (canal) {
@@ -146,14 +163,14 @@ function entrarNaPresenca(codigo: string, passivo: boolean): SalaDeFundo {
         // reenvio periódico, não podem virar duas.
         if (declararam.has(peerId)) return
         declararam.add(peerId)
-        aoEntrar?.(peerId)
+        avisarTodos(aoEntrar, peerId)
       }
     }
   })
 
   return {
-    aoEntrarPeer: (cb) => { aoEntrar = cb },
-    aoSairPeer: (cb) => { aoSair = cb },
+    aoEntrarPeer: (cb) => { aoEntrar.push(cb) },
+    aoSairPeer: (cb) => { aoSair.push(cb) },
     // Devolve promessa, e isso NÃO é detalhe: `fecharUm` espera esta saída
     // antes de entrar no grupo de verdade, porque o Trystero devolve a mesma
     // sala num id já aberto. Antes o `sair` devolvia `void`, o `await`

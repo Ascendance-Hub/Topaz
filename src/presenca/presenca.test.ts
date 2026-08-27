@@ -458,3 +458,43 @@ describe('as salas de fundo entram espaçadas', () => {
     expect(abertas.size).toBe(1)
   })
 })
+
+/**
+ * O diagnóstico nasceu na caçada do Capítulo 13 — foi ele que revelou que a
+ * presença ouvia só o nostr enquanto as máquinas se achavam por mqtt — e ficou
+ * ligado depois dela. Um retrato a cada 10 s, para sempre, no console de quem
+ * só quer jogar.
+ *
+ * O instrumento continua valendo, então ele não é apagado: é desligado por
+ * padrão e volta com `?diag=presenca` na URL, do mesmo jeito que a sonda de
+ * voz já fazia com `?diag=voz`.
+ */
+describe('o diagnóstico da presença não fala sozinho', () => {
+  it('sem ?diag=presenca, observar um grupo não imprime nada', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const { abrir } = fabrica()
+
+    const p = observarGrupos(['aaa'], abrir)
+
+    expect(info).not.toHaveBeenCalled()
+    p.encerrar()
+    info.mockRestore()
+  })
+
+  it('e o retrato periódico também não é agendado', () => {
+    vi.useFakeTimers()
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    try {
+      const { abrir } = fabrica()
+      const p = observarGrupos(['aaa'], abrir)
+
+      vi.advanceTimersByTime(60_000)
+
+      expect(info).not.toHaveBeenCalled()
+      p.encerrar()
+    } finally {
+      info.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+})
