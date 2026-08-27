@@ -519,6 +519,101 @@ mesmo erro do Capítulo 5, com a sonda de codificador que media a coisa errada.
 
 ---
 
+## Capítulo 14 — A sessão em que a gente parou de supor sobre a biblioteca
+
+Este capítulo é curto no código e longo no método. Quatro defeitos sérios caíram
+numa sessão só, e nenhum deles foi resolvido pensando: todos foram resolvidos
+**lendo a fonte da biblioteca** e **rodando o app com duas abas**.
+
+**O que destravou tudo foi banal:** o `node_modules/trystero` só traz `dist`,
+mas a fonte TypeScript inteira está nos *sourcemaps*. Extraí as ~6.800 linhas e
+li `strategy.ts`, `room.ts`, `peer.ts` e `shared-peer.ts`. Coisas que a gente
+perseguia por dias apareceram em minutos — porque a **0.25 mudou a arquitetura
+sem nota de release**, e metade do que este diário afirmava sobre o Trystero
+tinha deixado de ser verdade.
+
+### O que caiu
+
+**1. "Trocar de grupo está lento e inconstante."** Não era a presença
+atrapalhando de fora. O Trystero indexa as salas **só pelo `roomId`**, e a sala
+de fundo usava o mesmo código da sala de verdade — então entrar no grupo
+devolvia a sala **passiva**, que não anuncia e não pré-fabrica ofertas. A
+pessoa entrava invisível. Um sufixo no id resolveu a família inteira.
+
+**2. "Ninguém se escuta, mesmo conectado."** O `removeStream` passou a casar
+pelo **objeto** do stream, não pelas faixas. A gente publicava um invólucro
+novo e despublicava a captura original — que a biblioteca nunca tinha visto.
+Remoção silenciosa e nula, republicação estourando `InvalidAccessError` numa
+promessa que ninguém escuta, e um metadado órfão desalinhando a fila FIFO do
+receptor **para sempre**.
+
+**3. "O notebook troca de grupo e ninguém se escuta; o PC troca e funciona."**
+A conexão é herdada entre salas, e a renegociação disparada pelo desmonte cai
+numa janela em que a SDP é descartada nos dois sentidos. A conexão fica presa
+em `have-local-offer` para sempre. A janela é de tempo — por isso a máquina
+mais lenta caía e a mais rápida escapava. Fechar a conexão ao sair resolveu.
+
+**4. "Grupo vazio marcando 1 pessoa online."** Uma sala passiva **se ativa** ao
+ser tocada e passa a anunciar. Dois observadores se enxergam. A conta virava
+"quantos estão olhando". Presença deixou de ser inferida e passou a ser
+**declarada**.
+
+### Os erros de método, que são a lição
+
+**Instrumento que não distingue as hipóteses.** De novo. A primeira maratona de
+trocas de grupo deixava cada aba correr no próprio ritmo; com uma delas
+estrangulada elas dessincronizam, e o "não conectou" que apareceu significava
+**"não estavam no mesmo grupo na mesma hora"**. Defeito do instrumento se
+disfarçando de defeito do app. Refiz sincronizando por relógio.
+
+**Medir os dois lados antes de acusar.** Mesmo sincronizado, 2 de 4 trocas não
+achavam o par em 44 s. Parecia a presença. Rodei o controle **sem presença
+nenhuma**: falhou 2 de 4 também. Não era a presença — era descoberta. Sem o
+controle, teria "consertado" a coisa errada pela quinta vez.
+
+**Perseguir um fantasma que não existia.** A suíte de testes passou de 18 s
+para 32 s e eu fui investigar. Medi na `main`: já eram **31,75 s**. Os 18 s
+tinham sido cache quente. Uma medição do baseline no começo teria poupado a
+investigação inteira.
+
+**Um teste que não falha não vale nada.** Escrevi um teste de regressão para o
+anúncio órfão, sabotei o código e ele **passou assim mesmo**. Reescrevi. A
+segunda versão também passou sabotada — com a rede falsa, a sessão já reporta
+desconectada no ponto da corrida. Deixei o teste (a invariante que ele guarda é
+real) e **escrevi dentro dele** que não reproduz a corrida, para ninguém
+confiar nele mais do que deve.
+
+**A honestidade de retirar um trunfo.** Cheguei a apresentar a multiplexação de
+salas como "custo zero, a ferramenta certa". Depois descobri que ela era
+exatamente a causa do defeito nº 3. Retirar a afirmação — em voz alta, antes de
+desenhar em cima dela — valeu mais que qualquer coisa que eu tivesse
+construído com ela.
+
+**O medo que não se confirmou, e por que valeu testar.** Levantei que uma sala
+de presença poderia virar o "control room" de uma conexão que carrega áudio e
+matar a call. Rodei um spike antes de desenhar: **não acontece** — a sala de
+presença do grupo aberto é ativa, e o caso passivo nunca divide conexão com uma
+call. Um medo bem fundamentado e falso, derrubado em vinte minutos em vez de
+virar arquitetura defensiva.
+
+### O que mudou no método
+
+Esta foi a primeira sessão com **navegador controlável**, e a diferença é de
+natureza, não de grau:
+
+- **Reproduzir antes de pedir.** Todos os quatro defeitos foram reproduzidos
+  aqui, com duas abas, antes de qualquer teste do Alexandre.
+- **Dois defeitos só apareceram rodando o app de verdade** — o anúncio órfão e
+  a contagem de observadores. Nenhum teste os pegaria, e nenhuma leitura de
+  código os sugeriria.
+- **Estrangular uma aba** (4× de CPU, Slow 4G) imita a máquina mais lenta e
+  torna a corrida reproduzível de propósito.
+- **O que o navegador NÃO substitui:** NAT diferente, wifi de verdade, relays
+  alcançáveis diferentes por máquina. Duas abas conectam por candidato de host.
+  O Alexandre continua sendo o teste final — só parou de ser o primeiro.
+
+---
+
 ## As ideias que vieram de fora do código
 
 Boa parte do que ficou bom aqui não saiu de mim. Vale registrar o que
