@@ -404,6 +404,64 @@ describe('Midia — assistir, parar e assistir de novo', () => {
     expect(params.encodings[0]!['active']).toBe(true)
   })
 
+  it('não reaplica setParameters quando nada mudou', async () => {
+    const { midia, comSender } = await comTelaCompartilhada()
+    const { sender } = comSender('pa')
+    midia.sincronizarTela(['pa'])
+    midia.sincronizarTela([])
+    const depoisDaPrimeira = sender.setParameters.mock.calls.length
+
+    // O tique roda duas vezes por segundo. Sem guarda, cada passagem refazia
+    // `getSenders` + `getParameters` + `setParameters` para cada espectador,
+    // sem nada ter mudado — e `setParameters` pode remexer no codificador.
+    midia.sincronizarTela([])
+    midia.sincronizarTela([])
+    midia.sincronizarTela([])
+
+    expect(sender.setParameters.mock.calls.length).toBe(depoisDaPrimeira)
+  })
+
+  it('reaplica quando a qualidade muda, porque aí mudou', async () => {
+    const { midia, comSender } = await comTelaCompartilhada()
+    const { sender } = comSender('pa')
+    midia.sincronizarTela(['pa'])
+    midia.sincronizarTela([])
+    const antes = sender.setParameters.mock.calls.length
+
+    midia.definirQualidade(720)
+    midia.sincronizarTela([])
+
+    expect(sender.setParameters.mock.calls.length).toBeGreaterThan(antes)
+  })
+
+  it('reaplica quando o tipo de conteúdo muda', async () => {
+    const { midia, comSender } = await comTelaCompartilhada()
+    const { sender } = comSender('pa')
+    midia.sincronizarTela(['pa'])
+    midia.sincronizarTela([])
+    const antes = sender.setParameters.mock.calls.length
+
+    midia.definirTipoConteudo('detail')
+    midia.sincronizarTela([])
+
+    expect(sender.setParameters.mock.calls.length).toBeGreaterThan(antes)
+  })
+
+  it('tenta de novo enquanto o sender ainda não existe', async () => {
+    const { midia, ctx, comSender } = await comTelaCompartilhada()
+    // Sem sender: a renegociação ainda não terminou.
+    ctx.definirSenders({})
+    midia.sincronizarTela(['pa'])
+    midia.sincronizarTela([])
+
+    // Agora o sender aparece. A guarda não pode ter marcado como aplicado o
+    // que nunca foi aplicado — senão o ajuste se perderia para sempre.
+    const { sender } = comSender('pa')
+    midia.sincronizarTela([])
+
+    expect(sender.setParameters).toHaveBeenCalled()
+  })
+
   it('parar de compartilhar de vez desmonta o envio', async () => {
     const { midia, ctx, comSender } = await comTelaCompartilhada()
     comSender('pa')
