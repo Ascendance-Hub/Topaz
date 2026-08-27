@@ -1,0 +1,27 @@
+name: Verificar
+
+# Existe porque o `deploy.yml` só roda em push para a `main` — ou seja, DEPOIS
+# do merge. Um linter que só fala quando o código já está publicado não protege
+# nada.
+#
+# Arquivo separado de propósito: acrescentar `pull_request` ao workflow de
+# deploy faria ele tentar publicar a partir de um PR.
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # A MESMA versão exata do deploy.yml. Duas versões diferentes fariam
+          # o PR passar e o merge quebrar, que é o pior desfecho possível.
+          node-version: '22.12.0'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

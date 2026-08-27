@@ -156,8 +156,9 @@ essa defesa inteira do zero, e nenhum teste acusaria a falta dela.
 ### 4.3 Linter: focado, não recomendado-completo
 
 ESLint + typescript-eslint com um conjunto pequeno e escolhido: proibir `any`,
-`@ts-ignore`, `!` não-nulo, promessa não tratada (`no-floating-promises`) e
-variável/import morto. **Nada de estilo, nada de formatação.**
+`@ts-ignore`, promessa não tratada e mal usada (`no-floating-promises` e
+`no-misused-promises`) e variável/import morto. **Nada de estilo, nada de
+formatação.**
 
 O preset `strict-type-checked` foi descartado: acusaria dezenas de pontos hoje
 legítimos, e cada um viraria decisão ou `eslint-disable`. Ruído antes de valor.
@@ -166,6 +167,28 @@ O conjunto escolhido passa limpo no código atual — ele **documenta o padrão 
 já existe** em vez de criar trabalho. `no-floating-promises` merece destaque:
 vários dos bugs de mídia deste projeto moraram exatamente numa promessa que
 ninguém escutava.
+
+**Duas emendas de 2026-08-27, as duas por medição.**
+
+**1. A regra do `!` não-nulo saiu antes de entrar.** A versão original desta
+seção também a prometia. Medido: 155 usos em `src`, sendo 9 em produção — e
+todos são o idioma que o `noUncheckedIndexedAccess` obriga depois de uma guarda
+(`lideres.length === 1 ? lideres[0]!.peerId`). Aqui o `!` é **consequência de
+uma configuração mais estrita**, não descuido, e proibi-lo pioraria o código.
+
+**2. O PR 1 não ficou sem mudança de produção, e a exceção é declarada.** Ao
+rodar pela primeira vez, o `no-floating-promises` acusou três promessas soltas
+— e duas delas são `addStream` e `replaceTrack` em `net/salas.ts`, que é
+**exatamente a linha onde o erro do defeito de 2026-08-26 sumia**: o
+`applyMediaOp` do Trystero faz `await sendMeta(...)` antes de mexer na conexão,
+então o `InvalidAccessError` do `addTrack` cai numa promessa que ninguém
+escuta, depois de o metadado já ter viajado.
+
+Escrever `void` ali seria registrar aquele silêncio como intencional. As três
+foram tratadas no próprio PR 1 — as duas de mídia com log do estouro, e a
+terceira (`sala.sair()` em `presenca.ts`) com `void`, que é o que o `encerrar`
+do mesmo arquivo já fazia. É mudança de comportamento só no caminho de falha,
+que hoje é mudo.
 
 ### 4.4 Os defeitos pequenos: PR próprio
 
