@@ -42,7 +42,6 @@ function fabricarSala(roomId?: string, config?: { passive?: boolean }) {
       removeStream: vi.fn(),
       getPeers: () => ({}),
       leave: vi.fn(),
-      // eslint-disable-next-line
       makeAction: (nome: string) => {
         const canal = { send: vi.fn(), onMessage: null }
         canais.set(nome, canal)

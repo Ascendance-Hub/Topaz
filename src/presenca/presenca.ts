@@ -162,7 +162,11 @@ export function observarGrupos(
 
     for (const [codigo, aberta] of [...salas]) {
       if (querer.includes(codigo)) continue
-      aberta.sala.sair()
+      // `void`, como o `encerrar` logo abaixo: `sair` pode devolver promessa
+      // (a sala de fundo real fecha três redes), e ninguém espera por ela aqui
+      // de propósito — o grupo já saiu da lista, e a saída acontece no seu
+      // tempo. Sem o `void`, uma rejeição viraria rejeição não tratada.
+      void aberta.sala.sair()
       salas.delete(codigo)
     }
     // Quem continua NÃO é reaberto: reabrir custa handshake e zeraria a

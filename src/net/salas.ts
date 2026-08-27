@@ -44,6 +44,32 @@ export interface Salas {
 }
 
 /**
+ * As promessas de publicação de mídia, com o estouro registrado.
+ *
+ * `addStream` e `replaceTrack` do Trystero devolvem **uma promessa por peer**,
+ * e dentro de cada uma o `applyMediaOp` faz `await sendMeta(...)` ANTES de
+ * mexer na conexão (`media.ts:228`). Quando o `pc.addTrack` estoura — foi o
+ * `InvalidAccessError: a sender already exists for the track` do defeito de
+ * 2026-08-26 — o metadado **já foi enviado** e o erro cai numa promessa que
+ * ninguém escuta. O receptor fica com um metadado órfão na fila FIFO por peer
+ * e, dali em diante, toda mídia daquela pessoa chega com o rótulo da anterior.
+ *
+ * Registrar não conserta o defeito. Tira dele o silêncio, que é o que fez ele
+ * durar — e neste projeto a assinatura de quase todo bug de mídia foi "nada no
+ * console, só uma funcionalidade que não acontece".
+ *
+ * Uma falha não pode derrubar as outras: cada promessa é tratada sozinha, e o
+ * `catch` devolve `undefined` em vez de propagar.
+ */
+function registrarFalhas(promessas: Promise<void>[], oQue: string): void {
+  for (const promessa of promessas) {
+    promessa.catch((erro: unknown) => {
+      console.error(`${oQue}: falhou para um peer`, erro)
+    })
+  }
+}
+
+/**
  * Junta várias redes de descoberta numa só, deduplicando por pessoa.
  *
  * O motivo é redundância de INFRAESTRUTURA, não de servidor: antivírus e
@@ -159,7 +185,10 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
         else grupos.set(nomeada, [alvo])
       }
       for (const [nomeada, peers] of grupos) {
-        nomeada.sala.addStream(stream, { target: peers, metadata: metadata as never })
+        registrarFalhas(
+          nomeada.sala.addStream(stream, { target: peers, metadata: metadata as never }),
+          'publicar mídia',
+        )
       }
     },
 
@@ -173,8 +202,13 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
       }
     },
     substituirFaixa: (velha, nova) => {
-      // Sem alvo: a rede que não tem esse sender simplesmente não faz nada.
-      for (const nomeada of salas) nomeada.sala.replaceTrack(velha, nova)
+      // Sem alvo: a rede que não tem esse sender simplesmente não faz nada —
+      // `peer.ts:588` devolve `undefined` em vez de rejeitar, então registrar
+      // a falha aqui não vira ruído; só fala quando o `replaceTrack` do sender
+      // falhou de verdade.
+      for (const nomeada of salas) {
+        registrarFalhas(nomeada.sala.replaceTrack(velha, nova), 'trocar a faixa')
+      }
     },
     sair: () => {
       // FECHAR antes de sair, e não só sair.
