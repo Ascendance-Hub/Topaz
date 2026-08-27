@@ -111,6 +111,26 @@ export class Midia {
   private conteudo: TipoConteudo = 'motion'
   private mudo = false
   private idMicrofone: string | null = null
+  /**
+   * O ajuste de envio que JÁ está valendo em cada peer.
+   *
+   * O tique de `main.ts` chama a sincronização duas vezes por segundo. Sem
+   * esta guarda, cada passagem refazia `getSenders()` + `getParameters()` +
+   * `setParameters()` para cada espectador com nada tendo mudado — e
+   * `setParameters` não é leitura: é a API que remexe no codificador.
+   *
+   * Só é gravado quando o ajuste ENCOSTOU num sender de verdade. Marcar sem
+   * aplicar seria pior que não ter guarda: o sender só existe depois da
+   * renegociação, e uma marca prematura faria a qualidade nunca ser aplicada.
+   */
+  private envioAplicado = new Map<string, string>()
+  /**
+   * As capacidades do navegador não mudam durante a sessão, e
+   * `getCapabilities` devolve uma lista nova a cada chamada. Por instância, e
+   * não por módulo, para que um teste não veja o cache de outro.
+   */
+  private h264: RTCRtpCodec | undefined
+  private perguntouH264 = false
 
   /**
    * `onPeerStream` e NÃO `onPeerTrack`: em `media.mjs` do Trystero, quem
@@ -377,12 +397,23 @@ export class Midia {
       this.salas.publicarStream(involucro, novos, { tipo: 'tela' })
       for (const id of novos) this.telaPara.set(id, involucro)
     }
+    // Calculada uma vez, e não por espectador: a fonte é a mesma para todos.
+    const alturaFonte = this.tela.getVideoTracks()[0]?.getSettings().height
+    const comum = `${this.altura}|${this.conteudo}|${alturaFonte ?? ''}`
+
     for (const id of this.telaPara.keys()) {
       const ativo = alvos.includes(id)
+      const desejado = `${ativo}|${comum}`
       // Quem acabou de ser publicado precisa esperar o sender existir; quem já
       // estava é imediato.
-      if (novos.includes(id)) setTimeout(() => this.ajustarEnvio(id, ativo), MS_ATE_O_SENDER_EXISTIR)
-      else this.ajustarEnvio(id, ativo)
+      if (novos.includes(id)) {
+        setTimeout(() => {
+          if (this.ajustarEnvio(id, ativo)) this.envioAplicado.set(id, desejado)
+        }, MS_ATE_O_SENDER_EXISTIR)
+        continue
+      }
+      if (this.envioAplicado.get(id) === desejado) continue
+      if (this.ajustarEnvio(id, ativo)) this.envioAplicado.set(id, desejado)
     }
   }
 
@@ -390,6 +421,7 @@ export class Midia {
     if (!this.tela) return
     this.despublicarInvolucros(this.telaPara, [...this.telaPara.keys()])
     this.telaPara.clear()
+    this.envioAplicado.clear()
     for (const faixa of this.tela.getTracks()) faixa.stop()
     this.tela = null
   }
@@ -403,14 +435,11 @@ export class Midia {
    * só escolhe entre o que já foi negociado — e o H.264 entra no SDP por
    * padrão mesmo sem ser o preferido. É ele que aciona o encoder de hardware.
    */
-  private ajustarEnvio(peerId: string, ativo: boolean): void {
+  private ajustarEnvio(peerId: string, ativo: boolean): boolean {
     const pc = this.salas.donoDe(peerId)?.getPeers()[peerId]
-    if (!pc) return
-    // `RTCRtpSender` pode não existir (navegador antigo), e uma exceção aqui
-    // derrubaria o compartilhamento inteiro por causa de um ajuste opcional.
-    const h264 = typeof RTCRtpSender === 'undefined'
-      ? undefined
-      : escolherH264(RTCRtpSender.getCapabilities?.('video')?.codecs ?? [])
+    if (!pc) return false
+    const h264 = this.codecH264()
+    let aplicou = false
 
     for (const sender of pc.getSenders()) {
       if (sender.track?.kind === 'audio') {
@@ -423,6 +452,7 @@ export class Midia {
         encoding.active = ativo
         encoding.maxBitrate = BITRATE_AUDIO_TELA
         void sender.setParameters(params).catch(() => {})
+        aplicou = true
         continue
       }
       if (sender.track?.kind !== 'video') continue
@@ -449,11 +479,31 @@ export class Midia {
       // "mesmo em 1080p não parece boa".
       const alturaFonte = this.tela?.getVideoTracks()[0]?.getSettings().height
       encoding.scaleResolutionDownBy = Math.max(1, (alturaFonte ?? this.altura) / this.altura)
+      // (a leitura fica aqui de propósito: `ajustarEnvio` também é chamado
+      // fora do laço de sincronização, e não pode depender do valor de lá)
       if (h264) encoding.codec = h264
       // Falhar aqui degrada a qualidade, não a conversa: um ajuste de
       // codificação nunca deve derrubar uma call que já está de pé.
       void sender.setParameters(params).catch(() => {})
+      aplicou = true
     }
+
+    return aplicou
+  }
+
+  /**
+   * O H.264 do navegador, perguntado uma vez só.
+   *
+   * `RTCRtpSender` pode não existir (navegador antigo), e uma exceção aqui
+   * derrubaria o compartilhamento inteiro por causa de um ajuste opcional.
+   */
+  private codecH264(): RTCRtpCodec | undefined {
+    if (this.perguntouH264) return this.h264
+    this.perguntouH264 = true
+    this.h264 = typeof RTCRtpSender === 'undefined'
+      ? undefined
+      : escolherH264(RTCRtpSender.getCapabilities?.('video')?.codecs ?? [])
+    return this.h264
   }
 
   qualidade(): number {

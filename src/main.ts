@@ -894,9 +894,13 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   // Reporta o PICO desde a última linha, além do nível instantâneo: falar é
   // intermitente, e uma amostra tirada no meio de uma sílaba fechada mede
   // silêncio. É o pico que diz qual limiar serviria.
+  // Guardados para serem desligados no `encerrar`: trocar de sala desmonta a
+  // sala e monta outra, e um intervalo esquecido continua medindo um monitor
+  // morto — um por troca, para sempre.
+  const tiquesDeDiagnostico: ReturnType<typeof setInterval>[] = []
   if (new URLSearchParams(location.search).get('diag') === 'voz') {
     const picos = new Map<string, number>()
-    setInterval(() => {
+    tiquesDeDiagnostico.push(setInterval(() => {
       const lidos = monitorVoz.niveis()
       if (lidos.length === 0) {
         console.log('[voz] ninguém sendo medido — o microfone não chegou ao analisador')
@@ -908,19 +912,20 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
         return `${l.id}: agora=${l.nivel.toFixed(4)} pico=${pico.toFixed(4)}`
           + (l.falando ? ' FALANDO' : '')
       }).join('   '))
-    }, 900)
+    }, 900))
     // Amostra mais fina que a linha impressa, senão o pico seria só uma
     // fotografia a cada 0,9 s — que é justamente o que perde a sílaba.
-    setInterval(() => {
+    tiquesDeDiagnostico.push(setInterval(() => {
       for (const l of monitorVoz.niveis()) {
         picos.set(l.id, Math.max(picos.get(l.id) ?? 0, l.nivel))
       }
-    }, MS_AMOSTRAGEM)
+    }, MS_AMOSTRAGEM))
   }
 
   encerrar = () => {
     clearInterval(tique)
     clearInterval(tiqueVoz)
+    for (const t of tiquesDeDiagnostico) clearInterval(t)
     monitorVoz.encerrar()
     midia.desligarMicrofone()
     midia.pararTela()
