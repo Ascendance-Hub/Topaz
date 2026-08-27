@@ -177,6 +177,40 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
       for (const nomeada of salas) nomeada.sala.replaceTrack(velha, nova)
     },
     sair: () => {
+      // FECHAR antes de sair, e não só sair.
+      //
+      // A Trystero 0.25 compartilha a `RTCPeerConnection` entre salas: sair de
+      // uma e entrar em outra HERDA a conexão. Parece economia — e é o defeito
+      // do "ninguém se escuta" depois de trocar de grupo.
+      //
+      // O que acontece ao herdar: o `removeTrack` do desmonte dispara uma
+      // renegociação, e a SDF dela cai na janela em que o peer ainda não está
+      // ATIVO na sala nova. O `room.ts` descarta SDP de renegociação nos dois
+      // sentidos enquanto isso (`if (!activePeerMap[id]) return`), e como
+      // `onnegotiationneeded` não dispara de novo, a conexão fica presa em
+      // `have-local-offer` PARA SEMPRE. O canal de dados não depende de SDP
+      // nova, então sala, chat e jogo continuam funcionando — só a mídia nunca
+      // negocia. É por isso que o sintoma é "conectado, e ninguém se escuta".
+      //
+      // Medido com duas abas em 2026-08-27, mesmo roteiro nas duas:
+      //
+      //   herdando a conexão → silêncio dos dois lados, receivers: 2
+      //   fechando a conexão → ouvindo e sendo ouvido, receivers: 1
+      //
+      // A janela é de tempo, e por isso o defeito é intermitente e pior na
+      // máquina mais lenta ou na rede mais lenta: é ela que demora mais para o
+      // peer ficar ativo na sala nova.
+      //
+      // O custo é um handshake novo por troca de grupo. A descoberta pelos
+      // relays acontece de qualquer jeito, e a piscina de ofertas já está
+      // quente — então o que se paga é ICE e DTLS, não a espera de achar a
+      // pessoa.
+      for (const nomeada of salas) {
+        for (const conexao of Object.values(nomeada.sala.getPeers())) {
+          // Uma conexão já morta não pode impedir as outras de fecharem.
+          try { conexao.close() } catch { /* já estava fechada */ }
+        }
+      }
       for (const nomeada of salas) void nomeada.sala.leave()
     },
   }

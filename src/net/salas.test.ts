@@ -5,18 +5,19 @@ import type { SalaNomeada } from './salas'
 /** Sala do Trystero de mentira, com os ganchos que a fusão usa. */
 function salaFalsa(nome: string) {
   const canais = new Map<string, { send: ReturnType<typeof vi.fn>; onMessage: unknown }>()
+  const conexoes: Record<string, { close: ReturnType<typeof vi.fn> }> = {}
   const bruta = {
     makeAction: (n: string) => {
       const canal = { send: vi.fn(), onMessage: null }
       canais.set(n, canal)
       return canal
     },
-    getPeers: () => ({}),
+    getPeers: () => conexoes,
     leave: vi.fn(),
     onPeerJoin: null as ((id: string) => void) | null,
     onPeerLeave: null as ((id: string) => void) | null,
   }
-  return { nomeada: { nome, sala: bruta } as unknown as SalaNomeada, bruta, canais }
+  return { nomeada: { nome, sala: bruta } as unknown as SalaNomeada, bruta, canais, conexoes }
 }
 
 function tresRedes() {
@@ -155,5 +156,57 @@ describe('fundirSalas — recebimento sem duplicata', () => {
     // A mesma mensagem chegaria duas vezes, e a `Sessao` aplicaria a ação em
     // dobro — apostar duas vezes, sentar duas vezes.
     expect(recebido).not.toHaveBeenCalled()
+  })
+})
+
+describe('fundirSalas — sair fecha a conexão em vez de herdá-la', () => {
+  /**
+   * Medido com duas abas em 2026-08-27, e é a causa do "ninguém se escuta"
+   * depois de trocar de grupo.
+   *
+   * A Trystero 0.25 compartilha a `RTCPeerConnection` entre salas: sair de uma
+   * e entrar em outra herda a conexão. O `removeTrack` do desmonte dispara uma
+   * renegociação cuja SDP cai na janela em que o peer ainda não está ATIVO na
+   * sala nova — e `room.ts` descarta SDP de renegociação nos dois sentidos
+   * enquanto isso (`if (!activePeerMap[id]) return`). A conexão fica presa em
+   * `have-local-offer` para sempre: o canal de dados continua vivo, então
+   * chat e jogo funcionam, e só a mídia nunca negocia.
+   *
+   * O A/B, com o mesmo roteiro nas duas abas:
+   *
+   *   herdando a conexão → silêncio dos dois lados, receivers: 2
+   *   fechando a conexão → ouvindo e sendo ouvido, receivers: 1
+   */
+  it('fecha as conexões de todas as redes ao sair', () => {
+    const { a, b, salas } = tresRedes()
+    a.conexoes['p1'] = { close: vi.fn() }
+    b.conexoes['p2'] = { close: vi.fn() }
+
+    salas.sair()
+
+    expect(a.conexoes['p1']!.close).toHaveBeenCalled()
+    expect(b.conexoes['p2']!.close).toHaveBeenCalled()
+  })
+
+  it('fecha ANTES de sair da sala, e não depois', () => {
+    const { a, salas } = tresRedes()
+    const ordem: string[] = []
+    a.conexoes['p1'] = { close: vi.fn(() => { ordem.push('fechou') }) }
+    a.bruta.leave.mockImplementation(() => { ordem.push('saiu') })
+
+    salas.sair()
+
+    // Herdar a conexão é o defeito; fechar depois de sair deixaria a janela
+    // aberta do mesmo jeito.
+    expect(ordem).toEqual(['fechou', 'saiu'])
+  })
+
+  it('uma conexão que já morreu não impede as outras de fecharem', () => {
+    const { a, salas } = tresRedes()
+    a.conexoes['ruim'] = { close: vi.fn(() => { throw new Error('já fechada') }) }
+    a.conexoes['boa'] = { close: vi.fn() }
+
+    expect(() => salas.sair()).not.toThrow()
+    expect(a.conexoes['boa']!.close).toHaveBeenCalled()
   })
 })
