@@ -378,7 +378,6 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 .botao,
 .call-botao,
 .video-botao,
-.nav-sala-item,
 .ajuda-gatilho,
 .chat-enviar,
 .chat-gatilho {
@@ -399,7 +398,6 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 .botao:hover,
 .call-botao:hover,
 .video-botao:hover,
-.nav-sala-item:hover,
 .chat-enviar:hover,
 .chat-gatilho:hover,
 .ajuda-gatilho:hover {
@@ -425,36 +423,6 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 .botao.fantasma:hover { color: var(--creme); border-color: rgba(244, 235, 215, 0.4); }
 
 :focus-visible { outline: 2px solid var(--topazio); outline-offset: 2px; }
-
-/* ---------------------------------------------------------------------------
-   Navegação entre a sala e a mesa.
-   ------------------------------------------------------------------------ */
-.nav-sala {
-  max-width: 940px;
-  margin: 0 auto 18px;
-  display: flex;
-  gap: 8px;
-}
-.nav-sala-item { padding: 9px 22px; font-size: 13px; }
-.nav-sala-item[aria-current='page'] {
-  color: var(--noite);
-  background: var(--topazio);
-  border-color: var(--topazio);
-  font-weight: 600;
-}
-.nav-sala-item[data-espera='1'] { position: relative; }
-.nav-sala-marca {
-  position: absolute;
-  top: -3px; right: -3px;
-  width: 10px; height: 10px;
-  border-radius: 999px;
-  background: var(--topazio-claro);
-  box-shadow: 0 0 0 2px var(--noite), 0 0 10px var(--topazio);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .nav-sala-marca { animation: marca-pulsa 1.6s ease-in-out infinite; }
-}
-@keyframes marca-pulsa { 50% { transform: scale(1.35); } }
 
 /* ---------------------------------------------------------------------------
    A SALA PARADA — quem está aqui, como fichas na mesa.

@@ -1,5 +1,5 @@
 export const CHAVE_MICROFONE = 'topazMicrofone'
-export const CHAVE_SAIDA = 'topazSaidaAudio'
+const CHAVE_SAIDA = 'topazSaidaAudio'
 
 export interface Dispositivo {
   id: string

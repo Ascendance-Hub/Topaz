@@ -216,6 +216,25 @@ O estado atual, o que está pendente e como trabalhamos ficam em
 
 ### Defeitos conhecidos
 
+- **`Presenca.fecharUm` existe, tem 6 testes e ninguém a chama.** Quem sai da
+  tela inicial para uma sala chama `presencaHome.encerrar()`, que fecha
+  **todas** as salas de fundo — e fechar a última sala de um `appId` faz o
+  Trystero destruir a piscina de 20 ofertas e reinicializar os relays
+  (`strategy.ts:698`). O `fecharUm` foi escrito justamente para fechar só uma e
+  manter a âncora de pé. Nunca foi ligado.
+
+  Em 2026-08-28 o Alexandre relatou o sintoma que isso explicaria: **trocar de
+  grupo no notebook às vezes demora de 10 a 20 s, e no PC não** — máquina mais
+  fraca, no wifi, contra máquina mais forte, no cabo. Refabricar 60
+  `RTCPeerConnection` é trabalho de CPU e de rede.
+
+  **Mas ele testou de novo e não achou padrão:** às vezes é instantâneo na
+  mesma máquina. Custo fixo não é intermitente, então isso tem sorte no meio —
+  a assinatura de relay e descoberta, não a de refazer piscina. Fica como
+  **medição pendente**, e o instrumento certo não é cronômetro na mão: é o app
+  registrar sozinho, atrás de `?diag=`, o tempo até achar o primeiro par a cada
+  entrada em sala, para a gente olhar 30 amostras em vez de 6.
+
 - **A descoberta é intermitente — e NÃO é a presença.** Medido em 2026-08-27:
   2 de 4 trocas de sala não acharam o par em 44 s, **com e sem presença**,
   mesma taxa. Nesta máquina o app reporta 4 de 20 relays respondendo. É o

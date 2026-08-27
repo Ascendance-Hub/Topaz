@@ -42,7 +42,7 @@ export interface ContextoCall {
  * codificação quase não se mexe, e em 1080p ele salta cerca de 3×. Oferecer um
  * meio-termo aqui seria escolha sem consequência medida.
  */
-export const ALTURAS = [720, 1080] as const
+const ALTURAS = [720, 1080] as const
 
 export const AVISO_SEM_ESPECTADOR =
   'ninguém está assistindo — sua tela não está sendo codificada'

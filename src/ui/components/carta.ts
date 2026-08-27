@@ -4,7 +4,7 @@ const SIMBOLOS: Record<Naipe, string> = {
   copas: '♥', ouros: '♦', paus: '♣', espadas: '♠',
 }
 
-export function simboloNaipe(naipe: Naipe): string {
+function simboloNaipe(naipe: Naipe): string {
   return SIMBOLOS[naipe]
 }
 
