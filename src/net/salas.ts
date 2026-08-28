@@ -1,5 +1,5 @@
 import type { SalaTrystero } from './transport'
-import { avisarTodos } from './avisar'
+import { criarEmissor } from './avisar'
 
 export interface SalaNomeada {
   /** `nostr`, `mqtt`, `torrent` — aparece no diagnóstico. */
@@ -89,8 +89,8 @@ function registrarFalhas(promessas: Promise<void>[], oQue: string): void {
 export function fundirSalas(salas: SalaNomeada[]): Salas {
   /** peerId → a rede que o trouxe primeiro. */
   const dono = new Map<string, SalaNomeada>()
-  const aoEntrar: ((peerId: string) => void)[] = []
-  const aoSair: ((peerId: string) => void)[] = []
+  const aoEntrar = criarEmissor<[peerId: string]>()
+  const aoSair = criarEmissor<[peerId: string]>()
 
   for (const nomeada of salas) {
     nomeada.sala.onPeerJoin = (peerId) => {
@@ -99,7 +99,7 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
       // enquanto ninguém falar por ela.
       if (dono.has(peerId)) return
       dono.set(peerId, nomeada)
-      avisarTodos(aoEntrar, peerId)
+      aoEntrar.avisar(peerId)
     }
 
     nomeada.sala.onPeerLeave = (peerId) => {
@@ -107,7 +107,7 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
       // e tratar como saída derrubaria alguém que continua conectado.
       if (dono.get(peerId) !== nomeada) return
       dono.delete(peerId)
-      avisarTodos(aoSair, peerId)
+      aoSair.avisar(peerId)
     }
   }
 
@@ -122,20 +122,20 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
     return grupos
   }
 
-  const aoStream: ((stream: MediaStream, de: string, meta?: unknown) => void)[] = []
+  const aoStream = criarEmissor<[stream: MediaStream, de: string, meta?: unknown]>()
   for (const nomeada of salas) {
     nomeada.sala.onPeerStream = (stream, peerId, metadata) => {
       // Mesma regra das ações: só a rede dona entrega. Sem isto, quem estiver
       // alcançável por duas redes apareceria com a tela duplicada.
       if (dono.get(peerId) !== nomeada) return
-      avisarTodos(aoStream, stream, peerId, metadata)
+      aoStream.avisar(stream, peerId, metadata)
     }
   }
 
   return {
     criarAcao<T>(nome: string): AcaoMulti<T> {
       const canais = new Map<SalaNomeada, CanalDaSala>()
-      const ouvintes: ((dados: T, de: string) => void)[] = []
+      const ouvintes = criarEmissor<[dados: T, de: string]>()
 
       for (const nomeada of salas) {
         const canal = nomeada.sala.makeAction(nome) as unknown as CanalDaSala
@@ -144,7 +144,7 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
           // Chegou pela rede que não é dona: é a cópia da conexão reserva.
           // Entregar as duas faria a ação ser aplicada em dobro.
           if (dono.get(contexto.peerId) !== nomeada) return
-          avisarTodos(ouvintes, dados as T, contexto.peerId)
+          ouvintes.avisar(dados as T, contexto.peerId)
         }
       }
 
@@ -161,7 +161,7 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
           }
         },
         onMessage: (cb) => {
-          ouvintes.push(cb)
+          ouvintes.ouvir(cb)
         },
       }
     },
@@ -169,9 +169,9 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
     peers: () => [...dono.keys()],
     donoDe: (peerId) => dono.get(peerId)?.sala,
     porRede: () => [...agrupar()].map(([nomeada, peers]) => ({ sala: nomeada.sala, peers })),
-    aoEntrarPeer: (cb) => { aoEntrar.push(cb) },
-    aoSairPeer: (cb) => { aoSair.push(cb) },
-    aoReceberStream: (cb) => { aoStream.push(cb) },
+    aoEntrarPeer: (cb) => { aoEntrar.ouvir(cb) },
+    aoSairPeer: (cb) => { aoSair.ouvir(cb) },
+    aoReceberStream: (cb) => { aoStream.ouvir(cb) },
 
     publicarStream: (stream, alvos, metadata) => {
       // Agrupa por rede: publicar a lista inteira em todas mandaria a mesma

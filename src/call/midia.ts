@@ -1,6 +1,6 @@
 import type { Salas } from '../net/salas'
 import { escolherH264 } from './codec'
-import { avisarTodos } from '../net/avisar'
+import { criarEmissor } from '../net/avisar'
 
 /**
  * O supressor de ruído do próprio WebRTC, de graça. Não é Krisp, mas resolve
@@ -84,7 +84,7 @@ type EncodingComCodec = RTCRtpEncodingParameters & { codec?: RTCRtpCodec }
 export class Midia {
   private microfone: MediaStream | null = null
   private tela: MediaStream | null = null
-  private aoMidia: ((stream: MediaStream, de: string, meta?: unknown) => void)[] = []
+  private readonly aoMidia = criarEmissor<[stream: MediaStream, de: string, meta?: unknown]>()
   /**
    * Para quem cada mídia já foi publicada.
    *
@@ -158,7 +158,7 @@ export class Midia {
    */
   constructor(private salas: Salas) {
     this.salas.aoReceberStream((stream, peerId, metadata) => {
-      avisarTodos(this.aoMidia, stream, peerId, metadata)
+      this.aoMidia.avisar(stream, peerId, metadata)
     })
   }
 
@@ -585,6 +585,6 @@ export class Midia {
   }
 
   aoReceberMidia(cb: (stream: MediaStream, de: string, meta?: unknown) => void): void {
-    this.aoMidia.push(cb)
+    this.aoMidia.ouvir(cb)
   }
 }

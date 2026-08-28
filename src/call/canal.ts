@@ -2,7 +2,7 @@ import { selfId } from 'trystero/nostr'
 import type { Transporte } from '../net/transport'
 import type { Salas } from '../net/salas'
 import type { CanalCall, MensagemCall } from './protocolo'
-import { avisarTodos } from '../net/avisar'
+import { criarEmissor } from '../net/avisar'
 
 /**
  * O canal da call por cima da mesma conexão que o jogo usa.
@@ -21,10 +21,10 @@ import { avisarTodos } from '../net/avisar'
  */
 export function criarCanalCall(salas: Salas, transporte: Transporte): CanalCall {
   const callAction = salas.criarAcao<MensagemCall>('call')
-  const aoReceber: ((msg: MensagemCall, de: string) => void)[] = []
+  const aoReceber = criarEmissor<[msg: MensagemCall, de: string]>()
 
   callAction.onMessage((msg, de) => {
-    avisarTodos(aoReceber, msg, de)
+    aoReceber.avisar(msg, de)
   })
 
   return {
@@ -33,7 +33,7 @@ export function criarCanalCall(salas: Salas, transporte: Transporte): CanalCall 
       callAction.send(msg, para)
     },
     aoReceber: (cb) => {
-      aoReceber.push(cb)
+      aoReceber.ouvir(cb)
     },
     aoEntrarPeer: (cb) => transporte.aoEntrarPeer(cb),
     aoSairPeer: (cb) => transporte.aoSairPeer(cb),

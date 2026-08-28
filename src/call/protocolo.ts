@@ -230,9 +230,14 @@ export class ProtocoloCall {
   }
 
   private notificar(): void {
-    // Mesma regra do `avisarTodos` da rede, escrita à mão: este arquivo não
-    // pode importar de fora de `src/call` — há um teste guardando isso, para
-    // a metade testável da call continuar testável sem navegador.
+    // Mesma regra do `criarEmissor` da rede, escrita à mão: este arquivo não
+    // pode importar de fora de `src/call` — `isolamento.test.ts` guarda isso,
+    // para a metade testável da call continuar testável sem navegador.
+    //
+    // O guarda está certo e não vai ser afrouxado por causa de dez linhas. O
+    // que a cópia precisa espelhar é o que `net/avisar.test.ts` fixa: isolar o
+    // estouro e percorrer uma CÓPIA da lista, porque um ouvinte pode se
+    // inscrever enquanto está sendo avisado.
     for (const cb of [...this.ouvintes]) {
       try {
         cb()

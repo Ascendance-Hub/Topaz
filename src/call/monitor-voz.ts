@@ -1,6 +1,6 @@
 import { decidirFalando, rmsDe, TAMANHO_JANELA } from './nivel-voz'
 import type { EstadoFala } from './nivel-voz'
-import { avisarTodos } from '../net/avisar'
+import { criarEmissor } from '../net/avisar'
 
 /**
  * Quem está falando, medido no navegador.
@@ -42,14 +42,14 @@ export class MonitorDeVoz {
   private readonly criarContexto: () => AudioContext
   private contexto: AudioContext | null = null
   private readonly observados = new Map<string, Observado>()
-  private readonly ouvintes: ((id: string, falando: boolean) => void)[] = []
+  private readonly ouvintes = criarEmissor<[id: string, falando: boolean]>()
 
   constructor(criarContexto: () => AudioContext = () => new AudioContext()) {
     this.criarContexto = criarContexto
   }
 
   aoMudar(cb: (id: string, falando: boolean) => void): void {
-    this.ouvintes.push(cb)
+    this.ouvintes.ouvir(cb)
   }
 
   /**
@@ -153,6 +153,6 @@ export class MonitorDeVoz {
   }
 
   private avisar(id: string, falando: boolean): void {
-    avisarTodos(this.ouvintes, id, falando)
+    this.ouvintes.avisar(id, falando)
   }
 }

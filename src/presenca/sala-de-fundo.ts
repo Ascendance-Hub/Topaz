@@ -41,7 +41,7 @@ import { joinRoom as entrarNostr } from '@trystero-p2p/nostr'
 import { joinRoom as entrarMqtt } from '@trystero-p2p/mqtt'
 import { joinRoom as entrarTorrent } from '@trystero-p2p/torrent'
 import { APP_ID, REDUNDANCIA } from '../net/transport'
-import { avisarTodos } from '../net/avisar'
+import { criarEmissor } from '../net/avisar'
 import type { SalaDeFundo } from './presenca'
 import { idDePresenca } from './id'
 
@@ -143,8 +143,8 @@ function entrarNaPresenca(codigo: string, passivo: boolean): SalaDeFundo {
    * outros junto: uma entrada de peer alimentaria a contagem E a prova de
    * identidade, e um `for` cru entrega só até o primeiro erro.
    */
-  const aoEntrar: ((peerId: string) => void)[] = []
-  const aoSair: ((peerId: string) => void)[] = []
+  const aoEntrar = criarEmissor<[peerId: string]>()
+  const aoSair = criarEmissor<[peerId: string]>()
 
   salas.forEach((sala, i) => {
     sala.onPeerJoin = (peerId) => {
@@ -154,7 +154,7 @@ function entrarNaPresenca(codigo: string, passivo: boolean): SalaDeFundo {
     }
     sala.onPeerLeave = (peerId) => {
       if (!declararam.delete(peerId)) return
-      avisarTodos(aoSair, peerId)
+      aoSair.avisar(peerId)
     }
     const canal = canais[i]
     if (canal) {
@@ -163,14 +163,14 @@ function entrarNaPresenca(codigo: string, passivo: boolean): SalaDeFundo {
         // reenvio periódico, não podem virar duas.
         if (declararam.has(peerId)) return
         declararam.add(peerId)
-        avisarTodos(aoEntrar, peerId)
+        aoEntrar.avisar(peerId)
       }
     }
   })
 
   return {
-    aoEntrarPeer: (cb) => { aoEntrar.push(cb) },
-    aoSairPeer: (cb) => { aoSair.push(cb) },
+    aoEntrarPeer: aoEntrar.ouvir,
+    aoSairPeer: aoSair.ouvir,
     // Devolve promessa, e isso NÃO é detalhe: `fecharUm` espera esta saída
     // antes de entrar no grupo de verdade, porque o Trystero devolve a mesma
     // sala num id já aberto. Antes o `sair` devolvia `void`, o `await`

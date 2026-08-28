@@ -26,6 +26,8 @@
  * É o que permite testar entrada, saída e reconciliação sem rede nenhuma.
  */
 
+import { criarEmissor } from '../net/avisar'
+
 /** O mínimo que uma sala de fundo precisa oferecer. */
 export interface SalaDeFundo {
   aoEntrarPeer(cb: (peerId: string) => void): void
@@ -110,7 +112,7 @@ export function observarGrupos(
 ): Presenca {
   /** código → sala aberta e quem foi visto lá. */
   const salas = new Map<string, { sala: SalaDeFundo; gente: Set<string> }>()
-  const ouvintes: (() => void)[] = []
+  const ouvintes = criarEmissor<[]>()
   /** Aberturas ainda na fila, para o encerramento poder cancelá-las. */
   const pendentes = new Set<ReturnType<typeof setTimeout>>()
   /** Salas agendadas mas ainda não abertas, para não agendar duas vezes. */
@@ -124,13 +126,7 @@ export function observarGrupos(
   function avisar(): void {
     if (!viva) return
     relatar('mudou')
-    for (const cb of [...ouvintes]) {
-      try {
-        cb()
-      } catch (erro) {
-        console.error('um ouvinte de presença estourou', erro)
-      }
-    }
+    ouvintes.avisar()
   }
 
   /**
@@ -262,7 +258,7 @@ export function observarGrupos(
       salas.delete(codigo)
       await Promise.resolve(aberta.sala.sair()).catch(() => {})
     },
-    aoMudar: (cb) => { ouvintes.push(cb) },
+    aoMudar: ouvintes.ouvir,
     encerrar: () => {
       viva = false
       // Uma abertura agendada que dispara depois do encerramento abriria uma

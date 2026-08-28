@@ -6,7 +6,7 @@ import { joinRoom as entrarTorrent } from '@trystero-p2p/torrent'
 import { fundirSalas } from './salas'
 import type { Salas, SalaNomeada } from './salas'
 import type { Acao, EstadoJogo } from '../game/types'
-import { avisarTodos } from './avisar'
+import { criarEmissor } from './avisar'
 
 export const APP_ID = 'topaz-ascendance-hub'
 
@@ -209,29 +209,29 @@ export function criarTransporte(salas: Salas): Transporte {
   const fotoAction = salas.criarAcao<string>('foto')
   const identidadeAction = salas.criarAcao<unknown>('identidade')
 
-  const aoFoto: ((foto: unknown, peerId: string) => void)[] = []
-  const aoIdentidade: ((mensagem: unknown, peerId: string) => void)[] = []
-  const aoAcao: ((acao: Acao, peerId: string) => void)[] = []
-  const aoEstado: ((estado: EstadoJogo, peerId: string) => void)[] = []
-  const aoEntrar: ((peerId: string) => void)[] = []
-  const aoSair: ((peerId: string) => void)[] = []
-  const aoMensagem: ((texto: string, peerId: string, escopo: EscopoChat) => void)[] = []
+  const aoFoto = criarEmissor<[foto: unknown, peerId: string]>()
+  const aoIdentidade = criarEmissor<[mensagem: unknown, peerId: string]>()
+  const aoAcao = criarEmissor<[acao: Acao, peerId: string]>()
+  const aoEstado = criarEmissor<[estado: EstadoJogo, peerId: string]>()
+  const aoEntrar = criarEmissor<[peerId: string]>()
+  const aoSair = criarEmissor<[peerId: string]>()
+  const aoMensagem = criarEmissor<[texto: string, peerId: string, escopo: EscopoChat]>()
 
   // A fusão já entrega `de` desduplicado: só o que veio pela rede dona.
   acaoAction.onMessage((acao, de) => {
-    avisarTodos(aoAcao, acao, de)
+    aoAcao.avisar(acao, de)
   })
   estadoAction.onMessage((estado, de) => {
-    avisarTodos(aoEstado, estado, de)
+    aoEstado.avisar(estado, de)
   })
   identidadeAction.onMessage((mensagem, de) => {
-    avisarTodos(aoIdentidade, mensagem, de)
+    aoIdentidade.avisar(mensagem, de)
   })
 
   fotoAction.onMessage((foto, de) => {
     // Entregue como `unknown`: a validação é de quem consome, que é quem sabe
     // o que serve como foto. Aqui só existe o transporte.
-    avisarTodos(aoFoto, foto, de)
+    aoFoto.avisar(foto, de)
   })
 
   chatAction.onMessage((bruto, de) => {
@@ -241,13 +241,13 @@ export function criarTransporte(salas: Salas): Transporte {
     // quem não recarregou a página ficaria mudo para nós.
     const msg = lerMensagemChat(bruto)
     if (msg === null) return
-    avisarTodos(aoMensagem, msg.texto, de, msg.escopo)
+    aoMensagem.avisar(msg.texto, de, msg.escopo)
   })
   salas.aoEntrarPeer((peerId) => {
-    avisarTodos(aoEntrar, peerId)
+    aoEntrar.avisar(peerId)
   })
   salas.aoSairPeer((peerId) => {
-    avisarTodos(aoSair, peerId)
+    aoSair.avisar(peerId)
   })
 
   return {
@@ -256,15 +256,11 @@ export function criarTransporte(salas: Salas): Transporte {
     enviarAcao: (acao) => {
       acaoAction.send(acao)
     },
-    aoReceberAcao: (cb) => {
-      aoAcao.push(cb)
-    },
+    aoReceberAcao: aoAcao.ouvir,
     enviarEstado: (estado) => {
       estadoAction.send(estado)
     },
-    aoReceberEstado: (cb) => {
-      aoEstado.push(cb)
-    },
+    aoReceberEstado: aoEstado.ouvir,
     enviarMensagem: (texto, escopo, para) => {
       // `para` presente e vazio significa "não há ninguém no meu canal além
       // de mim" — enviar sem alvo viraria broadcast, que é o oposto do
@@ -280,27 +276,17 @@ export function criarTransporte(salas: Salas): Transporte {
       // — deixaria o texto viajando para quem não devia recebê-lo.
       for (const alvo of para) chatAction.send({ texto, escopo }, alvo)
     },
-    aoReceberMensagem: (cb) => {
-      aoMensagem.push(cb)
-    },
+    aoReceberMensagem: aoMensagem.ouvir,
     enviarFoto: (foto) => {
       fotoAction.send(foto)
     },
-    aoReceberFoto: (cb) => {
-      aoFoto.push(cb)
-    },
+    aoReceberFoto: aoFoto.ouvir,
     enviarIdentidade: (mensagem, para) => {
       identidadeAction.send(mensagem, para)
     },
-    aoReceberIdentidade: (cb) => {
-      aoIdentidade.push(cb)
-    },
-    aoEntrarPeer: (cb) => {
-      aoEntrar.push(cb)
-    },
-    aoSairPeer: (cb) => {
-      aoSair.push(cb)
-    },
+    aoReceberIdentidade: aoIdentidade.ouvir,
+    aoEntrarPeer: aoEntrar.ouvir,
+    aoSairPeer: aoSair.ouvir,
     sair: () => {
       salas.sair()
     },
