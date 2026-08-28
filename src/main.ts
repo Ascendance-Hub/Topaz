@@ -2,8 +2,7 @@ import { Sessao } from './net/sessao'
 import {
   criarSalasTrystero, criarTransporte, relaysConectados,
 } from './net/transport'
-import { renderizarHome } from './ui/components/home'
-import { apelidoSalvo, salvarApelido } from './ui/components/lobby'
+import { salvarApelido } from './ui/components/lobby'
 import { renderizarBarraSala } from './ui/components/barra-sala'
 import { renderizarConexao } from './ui/components/conexao'
 import { criarChat } from './ui/components/chat'
@@ -15,14 +14,12 @@ import { renderizarConfigPartida } from './ui/components/config-partida'
 import { formatoLembrado, lembrarFormato } from './partida/formato'
 import { CONFIG_PADRAO } from './game/rules'
 import { renderizarConfiguracoes } from './ui/components/configuracoes'
-import { renderizarFaixaGrupos } from './ui/components/faixa-grupos'
 import { grupos, grupoSalvo, removerGrupo, salvarGrupo } from './grupos/grupos'
 import { renderizarControlesCall } from './ui/components/call'
 import { renderizarMixer } from './ui/components/mixer'
 import { AreaDeMidia } from './ui/area-midia'
 import { criarAcoesCall } from './ui/acoes-da-call'
 import { fotoLembrada, fotoRecebida } from './perfil/foto-navegador'
-import { renderizarIdentidade } from './ui/components/identidade'
 import { identidadeAtual } from './identidade/atual'
 import { criarAcoesIdentidade } from './identidade/acoes'
 import type { Identidade } from './identidade/atual'
@@ -37,6 +34,7 @@ import { criarPainelDeRede } from './ui/painel-rede'
 import { criarPessoas } from './sala/pessoas'
 import { criarPresencaLocal } from './sala/presenca-local'
 import { oQueOPalcoMostra } from './sala/desenho'
+import { montarHome } from './sala/home'
 import { criarRostos } from './sala/rostos'
 import { criarSincronizacao } from './sala/sincronizacao'
 import { renderizar } from './ui/render'
@@ -45,7 +43,7 @@ import { rngSemente } from './game/shoe'
 import { mesaEsperaPor } from './game/rules'
 import { faltaCripto, renderizarSemCripto } from './ui/components/sem-cripto'
 import { renderizarSalasSalvas, type AcoesDeSalas } from './ui/components/salas-salvas'
-import { observarGrupos, PAUSA_ENTRE_SALAS_MS } from './presenca/presenca'
+import { PAUSA_ENTRE_SALAS_MS } from './presenca/presenca'
 import { abrirSalaDeFundo, anunciarPresenca } from './presenca/sala-de-fundo'
 
 function rngDaSessao() {
@@ -777,93 +775,9 @@ export function iniciarApp(app: HTMLElement): void {
   }
 
   try {
-    // O teste de rede também mora na home, e não só dentro da sala: quem
-    // recebeu um link e não consegue entrar nunca chega à sala para achá-lo.
-    const painelRede = criarPainelDeRede(() => desenharHome())
-    let identidade: Identidade | null = null
-
-    /** Recarrega o painel depois de qualquer mudança de identidade. */
-    const adotar = (nova: Identidade): void => {
-      identidade = nova
-      desenharHome()
-    }
-
-    const acoesIdentidade = criarAcoesIdentidade(() => identidade, adotar)
-
-    identidadeAtual().then(adotar).catch((erro: unknown) => {
-      // Cofre indisponível (janela anônima, política do navegador): a home
-      // continua servindo para entrar em sala, só sem identidade.
-      console.warn('não deu para carregar a identidade', erro)
-    })
-
-    /**
-     * Quem está online em cada grupo salvo, já na tela inicial.
-     *
-     * Aqui pode começar na hora: não há sala se formando para competir com
-     * ela. As aberturas continuam espaçadas mesmo assim — são três redes por
-     * grupo, e abrir todas de uma vez trava a página de quem tem vários.
-     */
-    const presencaHome = observarGrupos(
-      grupos().map((g) => g.codigo), abrirSalaDeFundo, PAUSA_ENTRE_SALAS_MS)
-    presencaHome.aoMudar(() => desenharHome())
-
-    /**
-     * Sair da tela inicial para uma sala.
-     *
-     * A observação da home é encerrada, e **sem esperar**: as salas de
-     * presença têm id próprio (`codigo#presenca`), então nenhuma delas pode
-     * ser devolvida no lugar da sala de verdade. Esperar aqui foi o que
-     * deixou a entrada lenta nas tentativas anteriores, e não protege de nada
-     * neste desenho.
-     */
-    const irParaSala = (apelido: string, cod: string): void => {
-      presencaHome.encerrar()
-      entrarNaSala(app, apelido, cod)
-    }
-
-    /**
-     * Entrar direto por um cartão de grupo.
-     *
-     * O apelido guardado é usado sem perguntar — quem tem grupos salvos já
-     * passou pela porta da frente pelo menos uma vez. Se ele não existir (o
-     * armazenamento pode ter sido limpo pela metade), o cartão não faz nada em
-     * silêncio: leva o foco para o campo, que é o que resolve.
-     */
-    const entrarNoGrupo = (cod: string): void => {
-      const apelido = apelidoSalvo()
-      if (!apelido) {
-        app.querySelector<HTMLInputElement>('input[placeholder="Seu apelido"]')?.focus()
-        return
-      }
-      irParaSala(apelido, cod)
-    }
-
-    const desenharHome = (): void => {
-      app.replaceChildren(renderizarHome(
-        (apelido, codigo) => irParaSala(apelido, codigo),
-        // Sem a lista de servidores, de propósito. Aqui ninguém entrou em sala
-        // ainda, então nenhum socket está aberto e a contagem sairia "0 de 20"
-        // — que lê como falha catastrófica para quem acabou de abrir a página.
-        // A lista só quer dizer alguma coisa DENTRO da sala. O teste de NAT em
-        // si funciona sozinho: ele fala com os servidores STUN direto.
-        {
-          // Sem a lista de servidores, de propósito: aqui nenhum socket está
-          // aberto, e "0 de 20" lê como falha catastrófica.
-          testeRede: painelRede.desenhar(false),
-          identidade: renderizarIdentidade(identidade, acoesIdentidade),
-          grupos: renderizarFaixaGrupos(grupos(), entrarNoGrupo, (cod) => {
-            removerGrupo(cod)
-            // Grupo removido deixa de ser observado na hora: continuar
-            // segurando a sala dele seria pagar por uma contagem que ninguém
-            // mais vê.
-            presencaHome.sincronizar(grupos().map((g) => g.codigo))
-            desenharHome()
-          }, presencaHome.quantos),
-        },
-      ))
-    }
-
-    desenharHome()
+    // A home não sabe montar uma sala: quem sabe é aqui. A porta e o outro
+    // lado ficam separados de propósito.
+    montarHome(app, (apelido, codigo) => entrarNaSala(app, apelido, codigo))
   } catch {
     app.textContent = MENSAGEM_ERRO_INICIAL
   }
