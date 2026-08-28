@@ -216,60 +216,99 @@ O estado atual, o que está pendente e como trabalhamos ficam em
 
 ### Defeitos conhecidos
 
-- **`Presenca.fecharUm` existe, tem 6 testes e ninguém a chama.** Quem sai da
-  tela inicial para uma sala chama `presencaHome.encerrar()`, que fecha
-  **todas** as salas de fundo — e fechar a última sala de um `appId` faz o
-  Trystero destruir a piscina de 20 ofertas e reinicializar os relays
-  (`strategy.ts:698`). O `fecharUm` foi escrito justamente para fechar só uma e
-  manter a âncora de pé. Nunca foi ligado.
+#### A família "não conecta"
 
-  Em 2026-08-28 o Alexandre relatou o sintoma que isso explicaria: **trocar de
-  grupo no notebook às vezes demora de 10 a 20 s, e no PC não** — máquina mais
-  fraca, no wifi, contra máquina mais forte, no cabo. Refabricar 60
-  `RTCPeerConnection` é trabalho de CPU e de rede.
+Três relatos que a gente tratava como coisas separadas, e que provavelmente não
+são. Ficam juntos porque o sintoma que a pessoa vê é o mesmo — **"entrei e estou
+sozinho"** — e porque investigar um sem olhar os outros já custou caro aqui.
 
-  **Mas ele testou de novo e não achou padrão:** às vezes é instantâneo na
-  mesma máquina. Custo fixo não é intermitente, então isso tem sorte no meio —
-  a assinatura de relay e descoberta, não a de refazer piscina. Fica como
-  **medição pendente**, e o instrumento certo não é cronômetro na mão: é o app
-  registrar sozinho, atrás de `?diag=`, o tempo até achar o primeiro par a cada
-  entrada em sala, para a gente olhar 30 amostras em vez de 6.
+O que está **medido** e o que está **suposto**, sem misturar:
 
-- **A descoberta é intermitente — e NÃO é a presença.** Medido em 2026-08-27:
-  2 de 4 trocas de sala não acharam o par em 44 s, **com e sem presença**,
-  mesma taxa. Nesta máquina o app reporta 4 de 20 relays respondendo. É o
-  candidato mais forte para explicar o "às vezes não conecta, tenho que apertar
-  Reconectar", e ainda não foi investigado.
-- **⚠️ `Reconectar` racha a sala. Remedido em 2026-08-28, e continua quebrado
-  depois do PR 60.** `joinRoom` num id já registrado devolve a MESMA sala
-  (`strategy.ts:213`), e a saída do Trystero só desregistra depois de um envio
-  e mais 99 ms (`room.ts:162`) — então o `encerrar(); entrarNaSala(mesmoCódigo)`
-  do botão recebe de volta a sala que está morrendo.
+| Membro | Estado | Evidência |
+|---|---|---|
+| `Reconectar` racha a sala | **determinístico**, com controle | 2026-08-28, duas abas |
+| Troca de grupo lenta no notebook | relatado, **sem padrão** | relato de uso, 2026-08-28 |
+| Descoberta intermitente | medido, **sem causa** | 2026-08-27, 2 de 4 em 44 s |
 
-  A entrada anterior dizia "vale remedir antes de consertar". **Remedido, com
-  duas abas e com controle:**
+---
 
-  | Rodada | Resultado |
-  |---|---|
-  | com a correção do `<audio>` | as duas abas ficaram sozinhas, as duas se declararam anfitriã |
-  | **controle**, sem nenhuma mudança | **idêntico** |
+**1. ⚠️ `Reconectar` racha a sala — e é determinístico.**
 
-  Duas de duas, nas duas rodadas. Não é intermitente por este caminho: é
-  **determinístico**, e é a reprodução mais barata que temos do "às vezes não
-  conecta, tenho que apertar Reconectar" — só que aqui o Reconectar é a
-  **causa**, não o remédio.
+Duas abas numa call; uma aperta Reconectar. As duas terminam **sozinhas**, e as
+duas se declaram anfitriã. Medido em 2026-08-28, **com controle**:
 
-  Fica registrado como caçada própria, não como refatoração. O conserto
-  provável é não reentrar no mesmo id antes de o Trystero desregistrar — ou
-  não sair antes de entrar, mantendo a âncora. **Nenhum dos dois às cegas:**
-  são exatamente as duas coisas que já quebraram a troca de sala antes.
-- **O ouvinte de `devicechange` nunca é removido.** Cada sala desmontada deixa
-  um pendurado, e ele chama `desenhar()` numa sala morta. Foi por esse caminho
-  que o anúncio órfão da presença nascia. Pequeno, e real.
+| Rodada | Resultado |
+|---|---|
+| com uma mudança de mídia na árvore | as duas sozinhas, as duas anfitriãs |
+| **controle**, sem mudança nenhuma | **idêntico** |
+
+A causa provável está na fonte da lib: `joinRoom` num id já registrado devolve a
+**mesma sala** (`strategy.ts:213`), e o `leave` só desregistra depois de um envio
+e mais 99 ms (`room.ts:162`). O `encerrar(); entrarNaSala(mesmoCódigo)` do botão
+recebe de volta a sala que está morrendo.
+
+**Isto inverte o papel do botão.** O Alexandre relata apertar Reconectar e
+continuar sozinho — e por este caminho o Reconectar é a **causa**, não o
+remédio. É a reprodução mais barata que temos de qualquer coisa nesta família.
+
+A entrada anterior, desde o PR 60, dizia "vale remedir antes de consertar".
+Remedido: **continua quebrado**.
+
+O conserto provável é não reentrar no mesmo id antes de o Trystero desregistrar,
+ou entrar antes de sair mantendo a âncora. **Nenhum dos dois às cegas** — são
+exatamente as duas coisas que já quebraram a troca de sala antes (ver o
+Capítulo 13 do diário).
+
+**2. Trocar de grupo demora no notebook, e no PC não.**
+
+Relatado em 2026-08-28: de 10 a 20 s para as duas máquinas se acharem depois de
+trocar de grupo. Notebook mais fraco, no wifi; PC mais forte, no cabo.
+
+A hipótese com evidência na fonte: sair de todos os grupos ao mesmo tempo faz o
+Trystero destruir a piscina de 20 ofertas por estratégia e reinicializar os
+relays (`strategy.ts:698`), e refabricar 60 `RTCPeerConnection` é trabalho de
+CPU e de rede. **`Presenca.fecharUm` foi escrito exatamente para evitar isso** —
+fecha um grupo em vez de todos, mantendo a âncora — e nunca foi ligado: quem sai
+da tela inicial chama `presencaHome.encerrar()`, que fecha tudo.
+
+**A hipótese está enfraquecida, e é honesto dizer.** Ele testou de novo e **não
+achou padrão**: às vezes é instantâneo na mesma máquina. Custo fixo não é
+intermitente. Isso tem sorte no meio, que é a assinatura de relay e descoberta,
+não a de refazer piscina.
+
+**3. A descoberta é intermitente — e NÃO é a presença.**
+
+Medido em 2026-08-27: 2 de 4 trocas de sala não acharam o par em 44 s, **com e
+sem presença**, mesma taxa. Nesta máquina o app reporta **4 de 20 relays**
+respondendo.
+
+#### O instrumento que falta
+
+As três só andam juntas com **amostra**, e cronômetro na mão não dá amostra: a
+segunda tentativa já é uma medição diferente da primeira.
+
+O que serve é o app registrar sozinho, atrás de `?diag=`, **o tempo até achar o
+primeiro par a cada entrada em sala** — com quantos relays estavam conectados e
+por qual rede o par chegou. Aí o dado se acumula no uso normal e a gente olha 30
+amostras em vez de 6.
+
+**Antes de construir qualquer conserto, perguntar o de sempre: quais respostas
+este instrumento NÃO distingue?** Este não distingue "o relay demorou" de "a
+piscina estava fria" — para separar as duas, a linha precisa dizer também se a
+sala anterior ainda estava registrada quando esta abriu.
+
+#### Fora da família
+
 - **A conexão reserva não é adotada.** Quando a rede dona de um peer cai, a
   duplicata das outras redes não é promovida — o `onPeerJoin` dela já tinha
   sido ignorado. Ela custa memória e não serve para nada. Fechá-la não é a
   saída: o Trystero reanuncia a cada ~5 s e viraria laço de reconexão.
+
+- **Um teste intermitente.** `apresentacao.test.ts` — "reconectar prova de
+  novo" — falhou uma vez na suíte inteira e passou sozinho depois. Depende de
+  `crypto.subtle`, que é assíncrono de verdade e não resolve em microtarefas.
+  Não foi investigado, e um teste que às vezes passa é pior que um que sempre
+  falha.
 
 ### Decisão em aberto
 
