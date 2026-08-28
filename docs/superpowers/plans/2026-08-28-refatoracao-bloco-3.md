@@ -459,12 +459,21 @@ o número honesto é **350 a 450**, e só se a camada de desenho inteira sair nu
 tarefa própria (ver Tarefa 5b). O resto é fiação de verdade: montar doze peças
 e ligá-las umas nas outras.
 
-### Tarefa 5b — a camada de desenho (PR novo)
+### Tarefa 5b — `sala/rostos.ts` — **feita, e menor do que a 5b prometida**
 
-`desenhar()`, `desenharParticipantes()`, `acenderQuemFala()`,
-`invalidarRostos()` e os oito slots. É o ganho de linhas de verdade, e é
-coeso: **tudo que pinta a sala**, num lugar só. Fica para depois da Tarefa 5
-porque depende da decisão já estar extraída.
+Levou o desenho que acompanha a FALA: a lista de canais, a roda de rostos, o
+anel de quem fala e as duas memoizações por assinatura. 86 linhas fora do
+`main.ts` (959 → 873), com 9 testes.
+
+**O que ficou, e por quê.** A ideia original era mover "tudo que pinta a sala",
+incluindo o `desenhar()` inteiro e os oito slots. Olhando de perto, a moldura
+(barra, trilho, controles, mixer) precisa de **quinze** coisas da sala para se
+desenhar — mover isso trocaria um bloco inline por uma função com quinze
+parâmetros, movendo o acoplamento em vez de removê-lo.
+
+Os rostos são diferentes: dependem de **cinco** coisas, têm ritmo próprio (a
+fala, não a partida) e carregam as duas memoizações que existem por custo
+medido. Essa é a fronteira que valia.
 
 ### Tarefa 6 — `sala/home.ts` (PR 12) ⭐ amigos
 
