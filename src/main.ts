@@ -39,6 +39,7 @@ import { AparelhosEmUso } from './call/aparelhos-em-uso'
 import { criarPainelDeRede } from './ui/painel-rede'
 import { criarPessoas } from './sala/pessoas'
 import { criarPresencaLocal } from './sala/presenca-local'
+import { criarSincronizacao } from './sala/sincronizacao'
 import { renderizar } from './ui/render'
 import { criarSlot } from './ui/slot'
 import { rngSemente } from './game/shoe'
@@ -365,57 +366,9 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       monitorVoz.encerrar()
       pessoas.limparFalantes()
     },
-    sincronizarMidia: () => sincronizarMidia(),
+    sincronizarMidia: () => sincronizacao.sincronizarMidia(),
     desenhar: () => desenhar(),
   })
-
-  /**
-   * Uma função só, idempotente, chamada a cada mudança E depois de cada
-   * captura ficar pronta. Não guarda "o que mudou": descreve o que deveria
-   * estar publicado agora, e a `Midia` faz a diferença.
-   *
-   * A versão anterior detectava borda e marcava como feito mesmo quando a
-   * publicação era descartada por a captura ainda não existir — e como as duas
-   * pessoas clicam "Entrar na call" quase juntas, o caso comum era cada uma
-   * receber o anúncio da outra durante a própria janela de permissão e nunca
-   * mais tentar.
-   */
-  function sincronizarMidia(): void {
-    const atual = protocolo.estado()
-    // `comigo` e não `naCall`: o microfone vai só para quem está no MEU
-    // canal. É esta linha que faz dois grupos conversarem na mesma sala sem se
-    // atrapalhar — e ela sozinha, porque a conexão com todos continua de pé.
-    midia.sincronizarMicrofone(atual.comigo)
-    // A assinatura vira efeito: sem espectador nenhum, a `Midia` despublica do
-    // último e o codificador desliga — que é o ponto de todo o desenho.
-    midia.sincronizarTela(atual.assistidoPor)
-
-    area.ajustar(atual.assistindo, atual.compartilhando, atual.comigo)
-    area.previaDaMinhaTela(atual.euCompartilhando ? midia.telaLocal() : null)
-    sincronizarMedidorDeVoz(atual.comigo, atual.euNaCall)
-  }
-
-  /**
-   * Deixa o medidor de voz observando exatamente quem está na call.
-   *
-   * Reconciliação, não detecção de borda — a mesma regra do resto da mídia.
-   * Quem sai da call deixaria para trás um analisador pendurado num stream
-   * morto: vazamento, e o anel dele congelado aceso.
-   *
-   * O meu microfone entra aqui porque ele NUNCA chega pelo caminho de mídia
-   * recebida — sai daqui direto para a rede. Sem isto eu seria o único sem
-   * anel.
-   */
-  function sincronizarMedidorDeVoz(naCall: string[], euNaCall: boolean): void {
-    const meu = midia.microfoneLocal()
-    if (euNaCall && meu) monitorVoz.observar(EU, meu)
-    else monitorVoz.esquecer(EU)
-
-    const devem = new Set(euNaCall ? naCall : [])
-    for (const id of monitorVoz.observando()) {
-      if (id !== EU && !devem.has(id)) monitorVoz.esquecer(id)
-    }
-  }
 
   /**
    * Só a tira de salas, sem redesenhar o resto.
@@ -448,7 +401,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       chat.limparCanal()
       canalDoChat = agora
     }
-    sincronizarMidia()
+    sincronizacao.sincronizarMidia()
     desenhar()
   })
 
@@ -855,76 +808,30 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     void encerrar().then(() => entrarNaSala(app, apelido, codigo))
   }
 
-  // O host avalia prazos vencidos (turno, reconexão); nos clientes o tique
-  // resolve a descoberta e reanuncia a presença quando ela se perde.
-  //
-  // `sincronizarMidia` entra no mesmo ritmo porque é idempotente e porque a
-  // publicação para um peer que ainda não completou o handshake é descartada
-  // pelo Trystero: sem uma nova tentativa periódica, quem entrou na call
-  // enquanto o par ainda se formava nunca seria ouvido. Quando está tudo em
-  // dia, a chamada não faz nada.
-  const tique = setInterval(() => {
-    sessao.tique(Date.now())
-    sincronizarMidia()
-  }, 500)
-  // Ritmo próprio, dez vezes mais rápido: o anel precisa acompanhar a fala, e
-  // meio segundo de atraso para acender seria pior que não ter anel. Ainda
-  // assim é bem mais barato que medir a cada quadro.
-  const tiqueVoz = setInterval(() => monitorVoz.tique(Date.now()), MS_AMOSTRAGEM)
-
-  // ---- Sonda de voz -----------------------------------------------------
-  //
-  // Ligada por `?diag=voz` na URL, e desligada para todo mundo por padrão.
-  //
-  // Existe porque os limiares nasceram estimados e só se acertam com voz real
-  // — e porque "o anel não acende" tem três causas indistinguíveis a olho: o
-  // áudio não chega ao analisador, o limiar está alto demais, ou o desenho não
-  // atualiza. O número separa as três em dez segundos.
-  //
-  // Reporta o PICO desde a última linha, além do nível instantâneo: falar é
-  // intermitente, e uma amostra tirada no meio de uma sílaba fechada mede
-  // silêncio. É o pico que diz qual limiar serviria.
-  // Guardados para serem desligados no `encerrar`: trocar de sala desmonta a
-  // sala e monta outra, e um intervalo esquecido continua medindo um monitor
-  // morto — um por troca, para sempre.
-  const tiquesDeDiagnostico: ReturnType<typeof setInterval>[] = []
-  if (new URLSearchParams(location.search).get('diag') === 'voz') {
-    const picos = new Map<string, number>()
-    tiquesDeDiagnostico.push(setInterval(() => {
-      const lidos = monitorVoz.niveis()
-      if (lidos.length === 0) {
-        console.log('[voz] ninguém sendo medido — o microfone não chegou ao analisador')
-        return
-      }
-      console.log('[voz] ' + lidos.map((l) => {
-        const pico = Math.max(picos.get(l.id) ?? 0, l.nivel)
-        picos.set(l.id, 0)
-        return `${l.id}: agora=${l.nivel.toFixed(4)} pico=${pico.toFixed(4)}`
-          + (l.falando ? ' FALANDO' : '')
-      }).join('   '))
-    }, 900))
-    // Amostra mais fina que a linha impressa, senão o pico seria só uma
-    // fotografia a cada 0,9 s — que é justamente o que perde a sílaba.
-    tiquesDeDiagnostico.push(setInterval(() => {
-      for (const l of monitorVoz.niveis()) {
-        picos.set(l.id, Math.max(picos.get(l.id) ?? 0, l.nivel))
-      }
-    }, MS_AMOSTRAGEM))
-  }
+  /**
+   * O pulso da sala, criado aqui e não antes: o tique não pode começar a bater
+   * sobre uma sala que ainda está sendo montada.
+   */
+  const sincronizacao = criarSincronizacao({
+    estadoCall: () => protocolo.estado(),
+    midia,
+    area,
+    vozes: monitorVoz,
+    aoTique: (agora) => sessao.tique(agora),
+    msAmostragemDeVoz: MS_AMOSTRAGEM,
+    diagnosticoDeVoz: new URLSearchParams(location.search).get('diag') === 'voz',
+  })
 
   encerrar = () => {
-    clearInterval(tique)
-    clearInterval(tiqueVoz)
+    sincronizacao.encerrar()
     try {
       navigator.mediaDevices.removeEventListener('devicechange', aoTrocarAparelho)
     } catch {
       // Mesmo motivo do registro: navegador sem `mediaDevices`.
     }
-    for (const t of tiquesDeDiagnostico) clearInterval(t)
     // Tranca de vez: um desenho atrasado não pode reabrir o anúncio de um
     // grupo que a pessoa acabou de deixar. O porquê está em presenca-local.ts.
     presencaLocal.encerrar()
-    monitorVoz.encerrar()
     midia.desligarMicrofone()
     midia.pararTela()
     // A promessa vem daqui: é a saída das três salas do Trystero.
