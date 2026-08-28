@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head><meta charset="UTF-8" /><title>Sonda — o Reconectar racha?</title></head>
+  <body style="background:#061511;color:#F4EBD7;font:13px/1.6 ui-monospace,Consolas,monospace;padding:16px">
+    <h1 style="font-size:15px" id="papel">…</h1>
+    <pre id="saida">…</pre>
+    <script type="module">
+      import { joinRoom as nostr, selfId } from '@trystero-p2p/nostr'
+      import { joinRoom as mqtt } from '@trystero-p2p/mqtt'
+      import { joinRoom as torrent } from '@trystero-p2p/torrent'
+
+      const p = new URLSearchParams(location.search)
+      const papel = p.get('papel') ?? 'fixo'
+      const sala = p.get('sala') ?? 'sonda-racha'
+      const atraso = Number(p.get('atraso') ?? '0')
+      document.getElementById('papel').textContent =
+        `papel=${papel} sala=${sala} atraso=${atraso}ms · eu=${selfId.slice(0, 8)}`
+
+      const linhas = []
+      const t0 = performance.now()
+      const diz = (t) => {
+        linhas.push(`[${((performance.now() - t0) / 1000).toFixed(1)}s] ${t}`)
+        document.getElementById('saida').textContent = linhas.join('\n')
+        window.__log = linhas.join('\n')
+      }
+
+      const cfg = () => ({ appId: 'topaz-ascendance-hub', relayConfig: { redundancy: 20 } })
+      const espera = (ms) => new Promise((r) => setTimeout(r, ms))
+
+      /** Abre nas TRES redes, como o app, e desduplica por pessoa. */
+      function abrir(id) {
+        const salas = [nostr(cfg(), id), mqtt(cfg(), id), torrent(cfg(), id)]
+        const vistos = new Set()
+        for (const s of salas) {
+          s.onPeerJoin = (peerId) => {
+            if (vistos.has(peerId)) return
+            vistos.add(peerId)
+            diz(`+ vi ${peerId.slice(0, 8)} (total ${vistos.size})`)
+          }
+          s.onPeerLeave = (peerId) => {
+            if (!vistos.delete(peerId)) return
+            diz(`- saiu ${peerId.slice(0, 8)} (total ${vistos.size})`)
+          }
+        }
+        return {
+          salas, vistos,
+          /**
+           * ESPELHA o `salas.sair()` do app, e nao so o `leave()`.
+           *
+           * A primeira versao desta sonda so chamava `leave()`, e ela
+           * RECUPEROU em 1,8s mesmo tendo colidido — enquanto o app racha. A
+           * diferenca e o PR 60: o app FECHA todas as RTCPeerConnection antes
+           * de sair, para nao herdar conexao entre salas.
+           *
+           * Uma sonda que nao espelha o desmonte do app mede outra coisa.
+           */
+          sair: () => {
+            for (const s of salas) {
+              for (const pc of Object.values(s.getPeers())) {
+                try { pc.close() } catch { /* ja estava fechada */ }
+              }
+            }
+            return salas.map((s) => s.leave())
+          },
+        }
+      }
+
+      if (papel === 'fixo') {
+        diz('entrando e ficando')
+        const r = abrir(sala)
+        setInterval(() => diz(`ainda aqui · vejo ${r.vistos.size}`), 10_000)
+      } else {
+        diz('entrando')
+        let r = abrir(sala)
+        // Espera achar o par antes de mexer — sem isso eu mediria descoberta,
+        // nao reconexao. E o erro do Capitulo 13: instrumento que nao separa.
+        const limite = performance.now() + 60_000
+        while (r.vistos.size === 0 && performance.now() < limite) await espera(500)
+        if (r.vistos.size === 0) { diz('NAO ACHEI O PAR — medicao invalida'); throw new Error('sem par')  }
+        diz(`par achado. RECONECTANDO com atraso=${atraso}ms`)
+
+        // O roteiro do botao: sair e entrar, sem esperar.
+        const saidas = r.sair()
+        if (atraso === -1) {
+          // O conserto PRINCIPIADO: esperar o proprio `leave` terminar, em vez
+          // de chutar um numero. O `leave` do Trystero espera um envio e mais
+          // 99ms antes de desregistrar (room.ts:162) — entao a promessa dele e
+          // exatamente a condicao que a gente precisa, e se a lib mudar o
+          // numero o conserto acompanha sozinho.
+          await Promise.all(saidas.map((x) => Promise.resolve(x).catch(() => {})))
+          diz('esperei o leave terminar')
+        } else if (atraso > 0) await espera(atraso)
+        const antes = r.salas[0]
+        r = abrir(sala)
+        diz(`mesma sala do nostr? ${antes === r.salas[0] ? 'SIM — colidiu' : 'nao'}`)
+
+        const fim = performance.now() + 45_000
+        while (r.vistos.size === 0 && performance.now() < fim) await espera(500)
+        diz(r.vistos.size > 0
+          ? `RECUPEROU em ${((performance.now() - t0) / 1000).toFixed(1)}s`
+          : 'NAO RECUPEROU em 45s')
+      }
+    </script>
+  </body>
+</html>

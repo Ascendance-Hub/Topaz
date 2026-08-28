@@ -397,7 +397,7 @@ describe('migração de host', () => {
     b!.entrar('Bruno')
 
     expect(b!.souHost()).toBe(false)
-    tA!.sair()
+    void tA!.sair()
 
     expect(b!.souHost()).toBe(true)
     expect(b!.estado().hostAtual).toBe('pb')
@@ -409,7 +409,7 @@ describe('migração de host', () => {
     b!.entrar('Bruno')
     b!.despachar({ tipo: 'sentar', cadeira: 0 })
 
-    tA!.sair()
+    void tA!.sair()
 
     const bruno = b!.estado().jogadores.find((j) => j.peerId === 'pb')!
     expect(bruno.fichas).toBe(CONFIG_PADRAO.fichasIniciais)
@@ -431,7 +431,7 @@ describe('migração de host', () => {
       j.maos.flatMap((m) => m.cartas),
     ).length
 
-    tA!.sair()
+    void tA!.sair()
 
     expect(b!.souHost()).toBe(true)
     // A sapata reconstruída desconta exatamente as cartas visíveis (mãos dos
@@ -448,7 +448,7 @@ describe('migração de host', () => {
     a!.entrar('Alex')
     b!.entrar('Bruno')
 
-    tA!.sair()
+    void tA!.sair()
 
     const alex = b!.estado().jogadores.find((j) => j.apelido === 'Alex')
     expect(alex).toBeDefined()
@@ -465,7 +465,7 @@ describe('migração de host', () => {
     // saída primeiro e publica de dentro do próprio handler, o que pode
     // alcançar 'pc' antes que ele tenha processado a saída de 'pa'. A
     // autodeclaração no payload precisa fechar essa corrida mesmo assim.
-    tA!.sair()
+    void tA!.sair()
 
     expect(b!.souHost()).toBe(true)
     expect(c!.souHost()).toBe(false)
@@ -520,7 +520,7 @@ describe('migração de host', () => {
     expect(a!.estado().fase).toBe('dealer')
     expect(a!.estado().maoDealer.length).toBeGreaterThan(2)
 
-    tA!.sair()
+    void tA!.sair()
     expect(b!.souHost()).toBe(true)
     expect(b!.estado().fase).toBe('dealer')
 
@@ -549,7 +549,7 @@ describe('reconexão', () => {
     b!.despachar({ tipo: 'sentar', cadeira: 2 })
 
     // Bruno cai...
-    tBAntigo!.sair()
+    void tBAntigo!.sair()
     // ...e volta com outro peerId, mesmo apelido.
     const bruno = new Sessao(rede.conectar('pb-novo'), rng)
     rede.conectar('pz') // um terceiro peer na mesa, sem efeito na eleição
@@ -567,7 +567,7 @@ describe('reconexão', () => {
     a!.entrar('Alex')
     b!.entrar('Bruno')
 
-    tB!.sair()
+    void tB!.sair()
     expect(a!.estado().jogadores).toHaveLength(2)
 
     a!.tique(Date.now() + REGRAS.segundosReconexao * 1000 + 1)

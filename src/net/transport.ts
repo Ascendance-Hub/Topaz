@@ -116,7 +116,9 @@ export interface Transporte {
   aoReceberIdentidade(cb: (mensagem: unknown, peerId: string) => void): void
   aoEntrarPeer(cb: (peerId: string) => void): void
   aoSairPeer(cb: (peerId: string) => void): void
-  sair(): void
+  /** Devolve promessa: quem reentra no MESMO id precisa esperar. Ver
+   *  `Salas.sair`. */
+  sair(): Promise<void>
 }
 
 /** A conexão crua do Trystero. Dados e mídia viajam por ela. */
@@ -287,8 +289,6 @@ export function criarTransporte(salas: Salas): Transporte {
     aoReceberIdentidade: aoIdentidade.ouvir,
     aoEntrarPeer: aoEntrar.ouvir,
     aoSairPeer: aoSair.ouvir,
-    sair: () => {
-      salas.sair()
-    },
+    sair: () => salas.sair(),
   }
 }

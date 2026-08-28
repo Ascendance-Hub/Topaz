@@ -226,38 +226,54 @@ O que está **medido** e o que está **suposto**, sem misturar:
 
 | Membro | Estado | Evidência |
 |---|---|---|
-| `Reconectar` racha a sala | **determinístico**, com controle | 2026-08-28, duas abas |
+| `Reconectar` racha a sala | **CONSERTADO** em 2026-08-28 | 2 de 2 no app, 2 de 2 na sonda |
 | Troca de grupo lenta no notebook | relatado, **sem padrão** | relato de uso, 2026-08-28 |
 | Descoberta intermitente | medido, **sem causa** | 2026-08-27, 2 de 4 em 44 s |
 
 ---
 
-**1. ⚠️ `Reconectar` racha a sala — e é determinístico.**
+**1. ✅ `Reconectar` rachava a sala — consertado, e era determinístico.**
 
-Duas abas numa call; uma aperta Reconectar. As duas terminam **sozinhas**, e as
-duas se declaram anfitriã. Medido em 2026-08-28, **com controle**:
+O botão fazia `encerrar(); entrarNaSala(mesmoCódigo)` **no mesmo tique**. O
+Trystero só desregistra a sala depois de um envio e mais 99 ms
+(`room.ts:162`), e `joinRoom` num id ainda registrado devolve a **mesma sala**
+(`strategy.ts:213`) — a que está morrendo. A sessão nova nascia segurando uma
+sala que se desregistrava debaixo dela; ninguém reanunciava, e os dois lados
+ficavam sozinhos, os dois declarados anfitrião.
 
-| Rodada | Resultado |
-|---|---|
-| com uma mudança de mídia na árvore | as duas sozinhas, as duas anfitriãs |
-| **controle**, sem mudança nenhuma | **idêntico** |
+**Isso invertia o papel do botão.** O relato era apertar Reconectar e continuar
+sozinho — e por este caminho o botão era a **causa**.
 
-A causa provável está na fonte da lib: `joinRoom` num id já registrado devolve a
-**mesma sala** (`strategy.ts:213`), e o `leave` só desregistra depois de um envio
-e mais 99 ms (`room.ts:162`). O `encerrar(); entrarNaSala(mesmoCódigo)` do botão
-recebe de volta a sala que está morrendo.
+Medido com a sonda `sonda/reconectar.html` (instrumento de desenvolvimento, não
+entra no build), com duas páginas:
 
-**Isto inverte o papel do botão.** O Alexandre relata apertar Reconectar e
-continuar sozinho — e por este caminho o Reconectar é a **causa**, não o
-remédio. É a reprodução mais barata que temos de qualquer coisa nesta família.
+| Espera antes de reentrar | Colidiu? | Quem reconecta | Quem ficou parado |
+|---|---|---|---|
+| 0 ms (o que o botão fazia) | **sim** | não recupera, 2/2 | 85–120 s sem ver ninguém |
+| 300 ms fixos | não | recupera, 2/2 | volta, estável 90–100 s |
+| **esperar o `leave` (~200 ms)** | não | recupera | volta, estável 90 s |
 
-A entrada anterior, desde o PR 60, dizia "vale remedir antes de consertar".
-Remedido: **continua quebrado**.
+E o limiar da colisão, nas três redes: colide em 0, 50 e 100 ms; não colide em
+150, 300 e 600. Cai exatamente nos ~99 ms documentados.
 
-O conserto provável é não reentrar no mesmo id antes de o Trystero desregistrar,
-ou entrar antes de sair mantendo a âncora. **Nenhum dos dois às cegas** — são
-exatamente as duas coisas que já quebraram a troca de sala antes (ver o
-Capítulo 13 do diário).
+**O conserto: esperar o próprio `leave`, não um número.** O `Salas.sair()`
+passou a devolver promessa e o `reconectar` a aguarda. Fica mais curto que
+qualquer valor chutado e acompanha sozinho se a biblioteca mudar os 99 ms dela.
+
+**Só no `reconectar`.** Trocar de grupo usa um código **outro**, não colide, e
+esperar lá deixaria mais lento justamente o passo que já demora. Clicar na sala
+em que já se está não faz nada, então não há terceiro caminho.
+
+**O que isto NÃO resolve:** a lentidão da troca de grupo (id diferente, sem
+colisão) e a descoberta intermitente. E pode não ser a única causa do "apertei
+Reconectar e continuei sozinho" — foi achado um caminho determinístico, que
+pode ser só o mais barato de encontrar.
+
+**Um erro de método que vale registrar.** A primeira versão da sonda **passou**:
+colidia e recuperava em 1,8 s. Ela só chamava `leave()`, e o app **fecha as
+conexões antes** (PR 60). Sonda que não espelha o desmonte do app mede outra
+coisa — é a armadilha do Capítulo 13, e quem a pegou foi a segunda pergunta:
+*quais respostas este instrumento não distingue?*
 
 **2. Trocar de grupo demora no notebook, e no PC não.**
 

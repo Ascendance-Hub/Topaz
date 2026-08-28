@@ -131,6 +131,14 @@ export function criarRedeFalsa(opcoes: OpcoesRedeFalsa = {}) {
       aoSairPeer: (cb) => {
         no.aoSair.push(cb)
       },
+      /**
+       * Devolve promessa como o de verdade, e resolve JÁ.
+       *
+       * O `Salas.sair` real espera o `leave` das três redes — e é essa espera
+       * que impede o `reconectar` de reentrar na sala que está morrendo. Aqui
+       * não há rede, então não há o que esperar; o que a fake precisa espelhar
+       * é a FORMA (promessa), para quem depende dela poder aguardar.
+       */
       sair: () => {
         nos.delete(id)
         visiveis.delete(id)
@@ -138,6 +146,7 @@ export function criarRedeFalsa(opcoes: OpcoesRedeFalsa = {}) {
           if (!visiveis.has(outro.id)) continue
           for (const cb of outro.aoSair) cb(id)
         }
+        return Promise.resolve()
       },
     }
   }

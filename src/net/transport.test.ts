@@ -31,7 +31,7 @@ describe('criarTransporte', () => {
 
   it('sair() encerra todas as redes', () => {
     const { salas } = criarSalasFalsas()
-    criarTransporte(salas).sair()
+    void criarTransporte(salas).sair()
 
     expect(salas.sair).toHaveBeenCalled()
   })
