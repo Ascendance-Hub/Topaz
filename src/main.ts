@@ -41,6 +41,7 @@ import { ProtocoloCall } from './call/protocolo'
 import { Midia } from './call/midia'
 import { AparelhosEmUso } from './call/aparelhos-em-uso'
 import { renderizar } from './ui/render'
+import { criarSlot } from './ui/slot'
 import { rngSemente } from './game/shoe'
 import { mesaEsperaPor } from './game/rules'
 import { faltaCripto, renderizarSemCripto } from './ui/components/sem-cripto'
@@ -64,12 +65,11 @@ function rngDaSessao() {
  * junto com as outras pessoas, e abrir a mesa é uma das coisas que se faz lá
  * dentro.
  *
- * `Node.replaceWith` só substitui o nó no DOM uma vez — chamar de novo sobre
- * a MESMA referência antiga mexe num nó já órfão, e a tela para de
- * acompanhar (é assim que passaria batido um "você é o anfitrião" que nunca
- * atualiza após uma migração de host). Por isso `barra` e `nav` são
- * reatribuídas a cada troca: cada `desenhar()` sempre substitui o nó que está
- * de fato na página, nunca um órfão de uma rodada anterior.
+ * As peças que se refazem inteiras — a barra, o trilho, a fileira de canais, a
+ * roda — moram em `criarSlot`, e não em variáveis reatribuídas à mão. O motivo
+ * está lá: `replaceWith` só funciona uma vez sobre a mesma referência, e a
+ * disciplina de reatribuir a variável a cada troca era nove oportunidades de
+ * esquecer — cada uma congelando um pedaço da tela em silêncio.
  */
 export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string): void {
   const salas = criarSalasTrystero(codigo)
@@ -471,10 +471,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       presenca.sincronizar(
         grupos().map((g) => g.codigo).filter((c) => c !== codigo))
     }
-    const novas = renderizarSalasSalvas(
-      grupos(), codigo, acoesDeSalas, presenca.quantos)
-    salasSalvas.replaceWith(novas)
-    salasSalvas = novas
+    salasSalvas.trocar(renderizarSalasSalvas(
+      grupos(), codigo, acoesDeSalas, presenca.quantos))
   }
 
   /** Em que canal a aba de conversa está aberta agora. `''` fora da call. */
@@ -495,13 +493,13 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     desenhar()
   })
 
-  let barra = renderizarBarraSala(codigo, sessao.souHost(), {
+  const barra = criarSlot(renderizarBarraSala(codigo, sessao.souHost(), {
     aoReconectar: reconectar,
     naSala: sessao.estado().jogadores.length,
     conectados: conectadosComigo().length,
-  })
-  let nav = renderizarTrilho(tela, irPara, { mesaEspera: mesaEspera() })
-  let mixer = montarMixer()
+  }))
+  const nav = criarSlot(renderizarTrilho(tela, irPara, { mesaEspera: mesaEspera() }))
+  const mixer = criarSlot(montarMixer())
 
   /**
    * A coluna lateral: conversa e volumes.
@@ -513,9 +511,9 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    */
   const lateral = document.createElement('aside')
   lateral.className = 'lateral'
-  lateral.append(chat.raiz, mixer)
-  let controles = renderizarControlesCall(
-    protocolo.estado(), acoesCall, midia.qualidade(), midia.tipoConteudo())
+  lateral.append(chat.raiz, mixer.atual)
+  const controles = criarSlot(renderizarControlesCall(
+    protocolo.estado(), acoesCall, midia.qualidade(), midia.tipoConteudo()))
   // `palco` é criado uma vez e só tem os filhos trocados: `renderizar` guarda
   // a contagem de cartas no dataset dele para decidir animação, e recriar o
   // elemento a cada ida e volta faria as cartas voarem de novo sem motivo.
@@ -528,7 +526,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * ritmo de partida. Dentro dele, o anel de quem fala só acenderia quando o
    * jogo mudasse — que é o que acontecia até aqui.
    */
-  let roda = renderizarRoda([])
+  const roda = criarSlot(renderizarRoda([]))
 
   /**
    * Quem está na sala, logo abaixo da barra.
@@ -537,8 +535,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * cabeçalho — quem está nesta sala, esteja em call ou não. Junto do código
    * e do "2 de 2 conectados", que respondem à mesma pergunta.
    */
-  let naSala = renderizarSalaParada(
-    sessao.estado(), sessao.meuId(), conectadosComigo())
+  const naSala = criarSlot(renderizarSalaParada(
+    sessao.estado(), sessao.meuId(), conectadosComigo()))
 
   /**
    * A coluna da esquerda: suas salas, os canais, e as seções.
@@ -617,10 +615,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     anuncio = anunciarPresenca(codigo)
   }
 
-  let salasSalvas = renderizarSalasSalvas(
-    grupos(), codigo, acoesDeSalas, presenca.quantos)
-  let canais = renderizarCanais([], CANAL_PADRAO, { mudar: () => {} })
-  coluna.append(salasSalvas, canais, nav)
+  const salasSalvas = criarSlot(renderizarSalasSalvas(
+    grupos(), codigo, acoesDeSalas, presenca.quantos))
+  const canais = criarSlot(renderizarCanais([], CANAL_PADRAO, { mudar: () => {} }))
+  coluna.append(salasSalvas.atual, canais.atual, nav.atual)
   /**
    * O que rola: o palco e as telas compartilhadas, juntos.
    *
@@ -633,10 +631,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   conteudo.className = 'conteudo'
   // A roda vem antes: em modo faixa ela é a coluna da esquerda do miolo, e a
   // ordem no DOM é a ordem na tela.
-  conteudo.append(roda, palco, area.videos)
+  conteudo.append(roda.atual, palco, area.videos)
 
   app.replaceChildren(
-    barra, naSala, coluna, conteudo, controles, lateral, area.audios,
+    barra.atual, naSala.atual, coluna, conteudo, controles.atual, lateral, area.audios,
   )
 
   /**
@@ -646,12 +644,12 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * única parte da lista de canais que muda em ritmo de fala.
    */
   function acenderQuemFala(): void {
-    for (const item of roda.querySelectorAll<HTMLElement>('.roda-pessoa')) {
+    for (const item of roda.atual.querySelectorAll<HTMLElement>('.roda-pessoa')) {
       const quem = item.dataset['pessoa']
       if (quem !== undefined && falantes.has(quem)) item.dataset['falando'] = '1'
       else delete item.dataset['falando']
     }
-    for (const linha of canais.querySelectorAll<HTMLElement>('.canal-pessoa')) {
+    for (const linha of canais.atual.querySelectorAll<HTMLElement>('.canal-pessoa')) {
       const quem = linha.dataset['pessoa']
       // Eu apareço sob a chave própria do medidor, não sob o meu peerId: o
       // meu microfone é local e nunca chega pelo caminho de mídia recebida.
@@ -748,8 +746,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
           ...(atual.podeAbrirCanal ? { abrir: () => protocolo.abrirCanal() } : {}),
         },
       )
-      canais.replaceWith(novosCanais)
-      canais = novosCanais
+      canais.trocar(novosCanais)
     }
     acenderQuemFala()
 
@@ -762,9 +759,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       + gente.map((p) => `${p.peerId}:${p.mudo}${p.semMicrofone}${p.selo ?? ''}`).join(',')
     if (assinaturaRoda !== assinaturaDaRoda) {
       assinaturaDaRoda = assinaturaRoda
-      const nova = renderizarRoda(gente, modo)
-      roda.replaceWith(nova)
-      roda = nova
+      roda.trocar(renderizarRoda(gente, modo))
     }
   }
 
@@ -782,19 +777,16 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       naSala: sessao.estado().jogadores.length,
       conectados: conectadosComigo().length,
     })
-    barra.replaceWith(novaBarra)
-    barra = novaBarra
+    barra.trocar(novaBarra)
 
     const novoNaSala = renderizarSalaParada(
       sessao.estado(), sessao.meuId(), conectadosComigo())
-    naSala.replaceWith(novoNaSala)
-    naSala = novoNaSala
+    naSala.trocar(novoNaSala)
 
     desenharSalasSalvas()
 
     const novaNav = renderizarTrilho(tela, irPara, { mesaEspera: mesaEspera() })
-    nav.replaceWith(novaNav)
-    nav = novaNav
+    nav.trocar(novaNav)
 
     const novosControles =
       renderizarControlesCall(
@@ -806,12 +798,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
           semMicrofone: aparelhos.semMicrofone(),
           saidas: aparelhos.saidas(), saidaAtual: aparelhos.saidaAtual(),
         })
-    controles.replaceWith(novosControles)
-    controles = novosControles
+    controles.trocar(novosControles)
 
     const novoMixer = montarMixer()
-    mixer.replaceWith(novoMixer)
-    mixer = novoMixer
+    mixer.trocar(novoMixer)
     area.aplicarVolumes()
     desenharParticipantes()
 
