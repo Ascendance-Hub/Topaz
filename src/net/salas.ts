@@ -40,7 +40,16 @@ export interface Salas {
   despublicarStream(stream: MediaStream, alvos?: string[]): void
   /** Troca a faixa sem renegociar; a rede sem esse sender ignora. */
   substituirFaixa(velha: MediaStreamTrack, nova: MediaStreamTrack): void
-  sair(): void
+  /**
+   * Fecha as conexões e sai das três redes.
+   *
+   * Devolve promessa, e isso NÃO é detalhe: quem for **reentrar no mesmo id**
+   * precisa esperar. O Trystero só desregistra a sala depois de um envio e
+   * mais 99 ms (`room.ts:162`), e `joinRoom` num id ainda registrado devolve a
+   * MESMA sala (`strategy.ts:213`) — a que está morrendo. Ver `reconectar` em
+   * `main.ts`.
+   */
+  sair(): Promise<void>
 }
 
 /**
@@ -245,7 +254,13 @@ export function fundirSalas(salas: SalaNomeada[]): Salas {
           try { conexao.close() } catch { /* já estava fechada */ }
         }
       }
-      for (const nomeada of salas) void nomeada.sala.leave()
+      // A promessa é o ponto: `leave` desregistra a sala depois de um envio
+      // e mais 99 ms, e quem reentra no mesmo id antes disso recebe de volta a
+      // sala que está morrendo. Esperar o próprio `leave` é melhor que esperar
+      // um número — se a biblioteca mudar os 99 ms, isto acompanha sozinho.
+      return Promise.all(
+        salas.map((nomeada) => Promise.resolve(nomeada.sala.leave()).catch(() => {})),
+      ).then(() => undefined)
     },
   }
 }

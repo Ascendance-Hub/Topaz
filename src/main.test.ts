@@ -113,7 +113,7 @@ describe('entrarNaSala — barra de sala continua atualizando o DOM real', () =>
     // essa terceira (ou mais) troca que o bug do `replaceWith` congelava —
     // o nó teoricamente substituído na verdade era um órfão, e o nó
     // realmente na página nunca chegava a mostrar "você é o anfitrião".
-    outraAba.encerrar()
+    void outraAba.encerrar()
 
     const barrasNaPagina = app.querySelectorAll('.barra-sala')
     expect(barrasNaPagina).toHaveLength(1)
@@ -1447,7 +1447,7 @@ describe('entrarNaSala — a voz de quem sai é solta', () => {
       const audio = app.querySelector<HTMLAudioElement>('audio[data-de="pa"]')
       expect(audio).not.toBeNull()
 
-      outra.sair()
+      void outra.sair()
       rede.bombear()
 
       expect(app.querySelector('audio[data-de="pa"]')).toBeNull()
@@ -1487,7 +1487,7 @@ describe('entrarNaSala — a voz de quem sai é solta', () => {
       rede.bombear()
 
       ctx.entregarStream(vozFalsa(), 'pa', { tipo: 'microfone' })
-      outra.sair()
+      void outra.sair()
       rede.bombear()
       expect(app.querySelector('audio[data-de="pa"]')).toBeNull()
 
@@ -1499,6 +1499,61 @@ describe('entrarNaSala — a voz de quem sai é solta', () => {
       const voltou = app.querySelector<HTMLAudioElement>('audio[data-de="pa"]')
       expect(voltou).not.toBeNull()
       expect(voltou!.srcObject).not.toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('entrarNaSala — Reconectar espera a saída antes de reentrar', () => {
+  /**
+   * O defeito, medido com duas páginas em 2026-08-28, 2 de 2 em cada braço.
+   *
+   * O `reconectar` saía e entrava no MESMO id no mesmo tique. O Trystero só
+   * desregistra a sala depois de um envio e mais 99 ms (`room.ts:162`), e
+   * `joinRoom` num id ainda registrado devolve a MESMA sala
+   * (`strategy.ts:213`) — a que está morrendo. A sessão "nova" nascia segurando
+   * uma sala que se desregistrava debaixo dela, ninguém reanunciava, e os dois
+   * lados ficavam sozinhos: 85 s depois, ainda sem se ver, os dois declarados
+   * anfitrião.
+   *
+   * Esperando o `leave`, o par volta em ~1,3 s e fica estável.
+   *
+   * Este teste guarda a ORDEM, que é o que importa: nenhuma sala nova antes de
+   * a saída terminar.
+   */
+  it('não abre a sala nova enquanto a saída não termina', async () => {
+    vi.useFakeTimers()
+    try {
+      let liberarSaida: () => void = () => {}
+      const saiu = new Promise<void>((r) => { liberarSaida = r })
+
+      const rede = criarRedeFalsa()
+      const base = rede.conectar('eu')
+      // A contagem é a asserção: sem limpar, ela vem somada dos casos
+      // anteriores deste arquivo.
+      vi.mocked(criarSalasTrystero).mockClear()
+      vi.mocked(criarSalasTrystero).mockImplementation(() => criarSalasFalsas([]).salas)
+      // A saída fica presa até eu soltar: é assim que dá para ver a ordem.
+      vi.mocked(criarTransporte).mockImplementation(() => ({ ...base, sair: () => saiu }))
+
+      const app = document.createElement('div')
+      entrarNaSala(app, 'Alex', 'CODIGO01')
+      rede.bombear()
+      expect(vi.mocked(criarSalasTrystero)).toHaveBeenCalledTimes(1)
+
+      app.querySelector<HTMLButtonElement>('button[data-sala="reconectar"]')!.click()
+
+      // Ainda NÃO: a saída não terminou, e reentrar agora receberia de volta a
+      // sala que está morrendo.
+      await Promise.resolve()
+      expect(vi.mocked(criarSalasTrystero)).toHaveBeenCalledTimes(1)
+
+      liberarSaida()
+      await saiu
+      await Promise.resolve()
+
+      expect(vi.mocked(criarSalasTrystero)).toHaveBeenCalledTimes(2)
     } finally {
       vi.useRealTimers()
     }

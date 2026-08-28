@@ -182,7 +182,7 @@ describe('fundirSalas — sair fecha a conexão em vez de herdá-la', () => {
     a.conexoes['p1'] = { close: vi.fn() }
     b.conexoes['p2'] = { close: vi.fn() }
 
-    salas.sair()
+    void salas.sair()
 
     expect(a.conexoes['p1']!.close).toHaveBeenCalled()
     expect(b.conexoes['p2']!.close).toHaveBeenCalled()
@@ -194,7 +194,7 @@ describe('fundirSalas — sair fecha a conexão em vez de herdá-la', () => {
     a.conexoes['p1'] = { close: vi.fn(() => { ordem.push('fechou') }) }
     a.bruta.leave.mockImplementation(() => { ordem.push('saiu') })
 
-    salas.sair()
+    void salas.sair()
 
     // Herdar a conexão é o defeito; fechar depois de sair deixaria a janela
     // aberta do mesmo jeito.

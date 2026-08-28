@@ -69,7 +69,7 @@ describe('rede falsa', () => {
     const saiu = vi.fn()
     a.aoSairPeer(saiu)
 
-    b.sair()
+    void b.sair()
 
     expect(saiu).toHaveBeenCalledWith('p2')
     expect(a.peers()).toEqual([])
@@ -244,7 +244,7 @@ describe('rede falsa com conexão diferida', () => {
     const saiu = vi.fn()
     a.aoSairPeer(saiu)
 
-    b.sair()
+    void b.sair()
 
     expect(saiu).toHaveBeenCalledWith('p2')
     expect(a.peers()).toEqual([])

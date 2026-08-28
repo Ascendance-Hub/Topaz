@@ -366,7 +366,7 @@ export class Sessao {
     if (purgou || JSON.stringify(this.ctx.estado) !== antes) this.publicar()
   }
 
-  encerrar(): void {
-    this.transporte.sair()
+  encerrar(): Promise<void> {
+    return this.transporte.sair()
   }
 }

@@ -354,11 +354,14 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    */
   const acoesDeSalas: AcoesDeSalas = {
     ir: (destino: string) => {
-      encerrar()
+      // Sem esperar, de propósito: o código é OUTRO, então não há a colisão
+      // que o `reconectar` sofre — e esperar aqui deixaria mais lento
+      // justamente o passo que já demora.
+      void encerrar()
       entrarNaSala(app, apelido, destino)
     },
     outra: () => {
-      encerrar()
+      void encerrar()
       window.location.hash = ''
       iniciarApp(app)
     },
@@ -932,7 +935,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   }
 
   /** Preenchido no fim da montagem, quando o tique já existe. */
-  let encerrar: () => void = () => {}
+  let encerrar: () => Promise<void> = () => Promise.resolve()
 
   let analiseRede: Analise | null = null
   /** Sobrevive ao redesenho: a sala é reconstruída a cada clique na call. */
@@ -967,8 +970,23 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * pessoas), e uma variável de módulo faria a segunda matar a primeira.
    */
   function reconectar(): void {
-    encerrar()
-    entrarNaSala(app, apelido, codigo)
+    // ESPERA a saída terminar antes de reentrar. É o único caminho do app que
+    // reentra no MESMO id, e sem a espera ele recebia de volta a sala que está
+    // morrendo — `joinRoom` num id ainda registrado devolve a mesma sala
+    // (`strategy.ts:213`), e o `leave` só desregistra depois de um envio e
+    // mais 99 ms (`room.ts:162`).
+    //
+    // Medido com duas páginas, 2 de 2 em cada braço: sem esperar, os dois
+    // lados ficam sozinhos e não se reencontram (85 s+, e os dois se declaram
+    // anfitrião). Esperando o `leave`, o par volta em ~1,3 s e fica estável.
+    //
+    // Esperar o próprio `leave`, e não um número: a espera real fica em torno
+    // de 200 ms, é menor que qualquer valor que eu chutaria, e acompanha
+    // sozinha se a biblioteca mudar os 99 ms dela.
+    //
+    // `trocar de grupo` NÃO passa por aqui: lá o código é outro, não há
+    // colisão, e esperar só deixaria mais lento o que já é o passo lento.
+    void encerrar().then(() => entrarNaSala(app, apelido, codigo))
   }
 
   // O host avalia prazos vencidos (turno, reconexão); nos clientes o tique
@@ -1049,10 +1067,11 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     monitorVoz.encerrar()
     midia.desligarMicrofone()
     midia.pararTela()
-    sessao.encerrar()
+    // A promessa vem daqui: é a saída das três salas do Trystero.
+    return sessao.encerrar()
   }
 
-  window.addEventListener('beforeunload', () => sessao.encerrar())
+  window.addEventListener('beforeunload', () => void sessao.encerrar())
 }
 
 export const MENSAGEM_ERRO_INICIAL = 'Não foi possível carregar o Topaz. Recarregue a página.'
