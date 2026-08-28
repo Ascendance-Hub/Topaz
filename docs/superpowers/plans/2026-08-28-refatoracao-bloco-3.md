@@ -32,6 +32,11 @@ comportamento**. A ordem vai do mais seguro (duplicação literal) ao mais sutil
   documento novo. **Matar o vite pelo PID** ao terminar.
 - Não trocar o `Set<string>` de `observarGrupos` por contador (amigos precisa
   do *quem*).
+- **O navegador automatizado NÃO serve para o teste de NAT.** Medido em
+  2026-08-28: dentro dele o teste responde *"sua rede não permite conexão
+  direta"*, enquanto o Chrome normal da mesma máquina, na mesma rede, responde
+  *"sua rede permite"*. Quem pergunta isso é o Alexandre, no navegador dele.
+  Vale para o teste de rede; o resto do app o automatizado cobre bem.
 
 ## Sobre o `ui/el.ts`
 

@@ -21,7 +21,7 @@ import { renderizarControlesCall } from './ui/components/call'
 import { renderizarMixer } from './ui/components/mixer'
 import { AreaDeMidia } from './ui/area-midia'
 import { criarAcoesCall } from './ui/acoes-da-call'
-import { EU, montarParticipantes } from './ui/components/participantes'
+import { EU } from './ui/components/participantes'
 import { renderizarCanais } from './ui/components/canais'
 import { CANAL_PADRAO } from './call/protocolo'
 import { fotoLembrada, fotoRecebida } from './perfil/foto-navegador'
@@ -30,7 +30,6 @@ import { identidadeAtual } from './identidade/atual'
 import { criarAcoesIdentidade } from './identidade/acoes'
 import type { Identidade } from './identidade/atual'
 import { Apresentacao } from './identidade/apresentacao'
-import type { Participante } from './ui/components/participantes'
 import { MonitorDeVoz, MS_AMOSTRAGEM } from './call/monitor-voz'
 import { suportaTrocarSaida } from './ui/dom-midia'
 import { criarCanalCall } from './call/canal'
@@ -38,6 +37,7 @@ import { ProtocoloCall } from './call/protocolo'
 import { Midia } from './call/midia'
 import { AparelhosEmUso } from './call/aparelhos-em-uso'
 import { criarPainelDeRede } from './ui/painel-rede'
+import { criarPessoas } from './sala/pessoas'
 import { renderizar } from './ui/render'
 import { criarSlot } from './ui/slot'
 import { rngSemente } from './game/shoe'
@@ -46,12 +46,8 @@ import { faltaCripto, renderizarSemCripto } from './ui/components/sem-cripto'
 import { renderizarSalasSalvas, type AcoesDeSalas } from './ui/components/salas-salvas'
 import { observarGrupos, PAUSA_ENTRE_SALAS_MS, type SalaDeFundo } from './presenca/presenca'
 import { abrirSalaDeFundo, anunciarPresenca } from './presenca/sala-de-fundo'
-import { montarDoCanal, type FonteDeParticipantes } from './ui/components/participantes'
+import { montarDoCanal } from './ui/components/participantes'
 import { renderizarRoda } from './ui/components/roda'
-
-/** Quem falou antes de a mesa saber o nome dele. */
-const APELIDO_DESCONHECIDO = 'Alguém'
-
 
 function rngDaSessao() {
   return rngSemente(Date.now() ^ Math.floor(Math.random() * 1e9))
@@ -77,17 +73,6 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   const protocolo = new ProtocoloCall(criarCanalCall(salas, transporte))
   const midia = new Midia(salas)
 
-  /**
-   * O apelido sai do `EstadoJogo` pelo peerId, não do payload do chat: assim
-   * ninguém digita o próprio nome e, portanto, ninguém se passa por outro. Um
-   * peer que falou antes do primeiro snapshot do host chegar ainda não tem
-   * nome conhecido aqui — daí o genérico em vez de exibir um peerId cru.
-   */
-  function apelidoDe(peerId: string): string {
-    const jogador = sessao.estado().jogadores.find((j) => j.peerId === peerId)
-    return jogador?.apelido || APELIDO_DESCONHECIDO
-  }
-
   // O chat é criado uma única vez e nunca substituído: `renderizar` troca
   // todos os filhos do `palco` a cada mudança de estado, e um campo de texto
   // ali dentro perderia foco e conteúdo a cada broadcast do host. Por isso
@@ -108,7 +93,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     app.dataset['trocado'] = trocado ? '1' : ''
   })
   transporte.aoReceberMensagem((texto, peerId, escopo) =>
-    chat.receber(apelidoDe(peerId), texto, escopo))
+    chat.receber(pessoas.apelidoDe(peerId), texto, escopo))
 
   /**
    * Anuncia a minha foto para a sala inteira.
@@ -128,7 +113,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // descompressão, que o teto de bytes sozinho não pega.
     void fotoRecebida(foto).then((valida) => {
       if (!valida) return
-      fotos.set(peerId, valida)
+      pessoas.guardarFoto(peerId, valida)
       // Mesma razão da minha: a assinatura dos círculos não olha a foto, e sem
       // isto a foto de quem trocou no meio da conversa nunca apareceria.
       invalidarRostos()
@@ -138,9 +123,9 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
 
   transporte.aoEntrarPeer(() => anunciarFoto())
   transporte.aoSairPeer((peerId) => {
-    // Sem isto, a foto de quem saiu ficaria guardada até a aba fechar, e
-    // reapareceria se outra pessoa herdasse o mesmo id.
-    fotos.delete(peerId)
+    // Sem isto, a foto e o selo de quem saiu ficariam guardados até a aba
+    // fechar, e reapareceriam se outra pessoa herdasse o mesmo id.
+    pessoas.esquecer(peerId)
   })
 
   /**
@@ -208,6 +193,22 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     midia, suportaTrocarSaida, () => area.aplicarSaidaNosNovos(),
   )
 
+  /**
+   * Quem é quem na sala: nome, foto, selo e quem está falando.
+   *
+   * Tudo função nas dependências, e nada valor: ele é consultado no ritmo da
+   * FALA — dez vezes por segundo — e precisa enxergar o estado de agora.
+   */
+  const pessoas = criarPessoas({
+    jogadores: () => sessao.estado().jogadores,
+    euNaCall: () => protocolo.estado().euNaCall,
+    comigo: () => protocolo.estado().comigo,
+    meuApelido: () => apelido,
+    minhaFoto: () => fotoLembrada() ?? undefined,
+    meuMicrofoneMudo: () => midia.microfoneMudo(),
+    euSemMicrofone: () => aparelhos.semMicrofone() !== null,
+  })
+
   /** O mixer é remontado a cada desenho: canais aparecem e somem conforme
    *  quem entra na call e quem está sendo assistido. */
   function montarMixer(): HTMLElement {
@@ -225,32 +226,15 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * é desenhado a partir do som dela que este navegador está recebendo.
    */
   const monitorVoz = new MonitorDeVoz()
-  const falantes = new Set<string>()
-
-  /**
-   * A foto de cada pessoa, já conferida.
-   *
-   * Só entra aqui o que passou por `fotoRecebida` — formato, tamanho em bytes
-   * e tamanho depois de decodificar. O mapa é a fronteira: daqui para a tela,
-   * ninguém precisa desconfiar de novo.
-   */
-  const fotos = new Map<string, string>()
-
-  /**
-   * O selo de quem já PROVOU quem é. Só entra aqui depois de a assinatura
-   * fechar — afirmar uma identidade é trivial, provar não.
-   */
-  const selos = new Map<string, string>()
 
   identidadeAtual().then((eu) => {
     identidade = eu
     desenhar()
     const apresentacao = new Apresentacao(transporte, eu.par, codigo)
     apresentacao.aoVerificar((peerId, selo) => {
-      selos.set(peerId, selo)
+      pessoas.guardarSelo(peerId, selo)
       desenharParticipantes()
     })
-    transporte.aoSairPeer((peerId) => selos.delete(peerId))
   }).catch((erro: unknown) => {
     // Sem identidade a sala continua funcionando: ninguém ganha selo, e é só
     // isso. Derrubar a sala por causa de um cofre indisponível seria trocar um
@@ -258,8 +242,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     console.warn('não deu para carregar a identidade desta máquina', erro)
   })
   monitorVoz.aoMudar((id, falando) => {
-    if (falando) falantes.add(id)
-    else falantes.delete(id)
+    pessoas.definirFalando(id, falando)
     // Só a fileira: redesenhar a página inteira dez vezes por segundo por
     // causa de um anel seria caro e faria a mesa piscar.
     desenharParticipantes()
@@ -296,34 +279,6 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       identidade = nova
       desenhar()
     }),
-  }
-
-  /** Junta o que a sala sabe e deixa a decisão com `montarParticipantes`. */
-  /**
-   * Tudo que se sabe sobre quem está na call, num lugar só.
-   *
-   * Serve à fileira de baixo e à lista de canais da esquerda. Separada porque
-   * as duas precisam exatamente do mesmo, e uma cópia divergiria na primeira
-   * vez que alguém acrescentasse um campo.
-   */
-  function fonteDeParticipantes(): FonteDeParticipantes {
-    const atual = protocolo.estado()
-    return {
-      euNaCall: atual.euNaCall,
-      naCall: atual.comigo,
-      meuApelido: apelido,
-      minhaFoto: fotoLembrada() ?? undefined,
-      meuMicrofoneMudo: midia.microfoneMudo(),
-      euSemMicrofone: aparelhos.semMicrofone() !== null,
-      falantes,
-      fotos,
-      selos,
-      apelidoDe,
-    }
-  }
-
-  function participantesAgora(): Participante[] {
-    return montarParticipantes(fonteDeParticipantes())
   }
 
   /**
@@ -371,7 +326,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * reinicia o fluxo, e a mesa é redesenhada a cada anúncio do anfitrião.
    */
   const area = new AreaDeMidia({
-    apelidoDe,
+    apelidoDe: pessoas.apelidoDe,
     saidaAtual: () => aparelhos.saidaAtual(),
     aoOuvirVoz: (peerId, stream) => monitorVoz.observar(peerId, stream),
     aoPerderVoz: (peerId) => monitorVoz.esquecer(peerId),
@@ -407,7 +362,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     protocolo, midia, aparelhos, area,
     pararDeMedirVoz: () => {
       monitorVoz.encerrar()
-      falantes.clear()
+      pessoas.limparFalantes()
     },
     sincronizarMidia: () => sincronizarMidia(),
     desenhar: () => desenhar(),
@@ -652,7 +607,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   function acenderQuemFala(): void {
     for (const item of roda.atual.querySelectorAll<HTMLElement>('.roda-pessoa')) {
       const quem = item.dataset['pessoa']
-      if (quem !== undefined && falantes.has(quem)) item.dataset['falando'] = '1'
+      if (quem !== undefined && pessoas.falando(quem)) item.dataset['falando'] = '1'
       else delete item.dataset['falando']
     }
     for (const linha of canais.atual.querySelectorAll<HTMLElement>('.canal-pessoa')) {
@@ -660,7 +615,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       // Eu apareço sob a chave própria do medidor, não sob o meu peerId: o
       // meu microfone é local e nunca chega pelo caminho de mídia recebida.
       const falando = quem !== undefined
-        && falantes.has(linha.dataset['eu'] === '1' ? EU : quem)
+        && pessoas.falando(linha.dataset['eu'] === '1' ? EU : quem)
       if (falando) linha.dataset['falando'] = '1'
       else delete linha.dataset['falando']
     }
@@ -740,7 +695,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
           nome: c.nome,
           // O protocolo entrega peerIds; nome e foto vêm do jogo e das fotos
           // recebidas. É aqui que os dois vocabulários se encontram.
-          gente: montarDoCanal(c.quem, transporte.meuId(), fonteDeParticipantes()),
+          gente: montarDoCanal(c.quem, transporte.meuId(), pessoas.fonte()),
         })),
         // Fora da call eu não estou em canal nenhum, e nenhum deve aparecer
         // aceso: `meuCanal` guarda para onde eu iria, não onde eu estou.
@@ -759,7 +714,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // A roda segue a mesma regra dos canais: só se refaz quando a composição
     // muda. Assistindo alguém ela vira faixa, e o modo entra na assinatura
     // porque muda o desenho inteiro.
-    const gente = participantesAgora()
+    const gente = pessoas.participantes()
     const modo = atual.assistindo.length > 0 ? 'faixa' : 'grade'
     const assinaturaRoda = `${modo}|`
       + gente.map((p) => `${p.peerId}:${p.mudo}${p.semMicrofone}${p.selo ?? ''}`).join(',')
@@ -798,7 +753,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       renderizarControlesCall(
         protocolo.estado(), acoesCall, midia.qualidade(), midia.tipoConteudo(),
         {
-          apelidoDe, meuMicrofoneMudo: midia.microfoneMudo(),
+          apelidoDe: pessoas.apelidoDe, meuMicrofoneMudo: midia.microfoneMudo(),
           todosSilenciados: area.silenciados(),
           microfones: aparelhos.microfones(), microfoneAtual: midia.microfoneAtual(),
           semMicrofone: aparelhos.semMicrofone(),
