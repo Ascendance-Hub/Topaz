@@ -21,9 +21,6 @@ import { renderizarControlesCall } from './ui/components/call'
 import { renderizarMixer } from './ui/components/mixer'
 import { AreaDeMidia } from './ui/area-midia'
 import { criarAcoesCall } from './ui/acoes-da-call'
-import { EU } from './ui/components/participantes'
-import { renderizarCanais } from './ui/components/canais'
-import { CANAL_PADRAO } from './call/protocolo'
 import { fotoLembrada, fotoRecebida } from './perfil/foto-navegador'
 import { renderizarIdentidade } from './ui/components/identidade'
 import { identidadeAtual } from './identidade/atual'
@@ -40,6 +37,7 @@ import { criarPainelDeRede } from './ui/painel-rede'
 import { criarPessoas } from './sala/pessoas'
 import { criarPresencaLocal } from './sala/presenca-local'
 import { oQueOPalcoMostra } from './sala/desenho'
+import { criarRostos } from './sala/rostos'
 import { criarSincronizacao } from './sala/sincronizacao'
 import { renderizar } from './ui/render'
 import { criarSlot } from './ui/slot'
@@ -49,8 +47,6 @@ import { faltaCripto, renderizarSemCripto } from './ui/components/sem-cripto'
 import { renderizarSalasSalvas, type AcoesDeSalas } from './ui/components/salas-salvas'
 import { observarGrupos, PAUSA_ENTRE_SALAS_MS } from './presenca/presenca'
 import { abrirSalaDeFundo, anunciarPresenca } from './presenca/sala-de-fundo'
-import { montarDoCanal } from './ui/components/participantes'
-import { renderizarRoda } from './ui/components/roda'
 
 function rngDaSessao() {
   return rngSemente(Date.now() ^ Math.floor(Math.random() * 1e9))
@@ -119,8 +115,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       pessoas.guardarFoto(peerId, valida)
       // Mesma razão da minha: a assinatura dos círculos não olha a foto, e sem
       // isto a foto de quem trocou no meio da conversa nunca apareceria.
-      invalidarRostos()
-      desenharParticipantes()
+      rostos.invalidar()
+      rostos.desenhar()
     })
   })
 
@@ -236,7 +232,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     const apresentacao = new Apresentacao(transporte, eu.par, codigo)
     apresentacao.aoVerificar((peerId, selo) => {
       pessoas.guardarSelo(peerId, selo)
-      desenharParticipantes()
+      rostos.desenhar()
     })
   }).catch((erro: unknown) => {
     // Sem identidade a sala continua funcionando: ninguém ganha selo, e é só
@@ -248,7 +244,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     pessoas.definirFalando(id, falando)
     // Só a fileira: redesenhar a página inteira dez vezes por segundo por
     // causa de um anel seria caro e faria a mesa piscar.
-    desenharParticipantes()
+    rostos.desenhar()
   })
 
   const acoesConfiguracoes = {
@@ -275,8 +271,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       // não olha a foto — olhar exigiria comparar dezenas de milhares de
       // caracteres a cada mudança de quem fala. Invalidar na mão é exato e
       // custa nada, porque trocar de foto é raro.
-      invalidarRostos()
-      desenharParticipantes()
+      rostos.invalidar()
+      rostos.desenhar()
     },
     identidade: criarAcoesIdentidade(() => identidade, (nova) => {
       identidade = nova
@@ -439,7 +435,13 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * ritmo de partida. Dentro dele, o anel de quem fala só acenderia quando o
    * jogo mudasse — que é o que acontecia até aqui.
    */
-  const roda = criarSlot(renderizarRoda([]))
+  const rostos = criarRostos({
+    estadoCall: () => protocolo.estado(),
+    pessoas,
+    meuId: () => transporte.meuId(),
+    aoEntrarNoCanal: (id) => entrarNoCanal(id),
+    aoAbrirCanal: () => protocolo.abrirCanal(),
+  })
 
   /**
    * Quem está na sala, logo abaixo da barra.
@@ -483,8 +485,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
 
   const salasSalvas = criarSlot(renderizarSalasSalvas(
     grupos(), codigo, acoesDeSalas, presencaLocal.quantos))
-  const canais = criarSlot(renderizarCanais([], CANAL_PADRAO, { mudar: () => {} }))
-  coluna.append(salasSalvas.atual, canais.atual, nav.atual)
+  coluna.append(salasSalvas.atual, rostos.canais.atual, nav.atual)
   /**
    * O que rola: o palco e as telas compartilhadas, juntos.
    *
@@ -497,34 +498,11 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   conteudo.className = 'conteudo'
   // A roda vem antes: em modo faixa ela é a coluna da esquerda do miolo, e a
   // ordem no DOM é a ordem na tela.
-  conteudo.append(roda.atual, palco, area.videos)
+  conteudo.append(rostos.roda.atual, palco, area.videos)
 
   app.replaceChildren(
     barra.atual, naSala.atual, coluna, conteudo, controles.atual, lateral, area.audios,
   )
-
-  /**
-   * Quem está falando, marcado no lugar.
-   *
-   * O anel acende trocando um atributo, sem refazer elemento nenhum: é a
-   * única parte da lista de canais que muda em ritmo de fala.
-   */
-  function acenderQuemFala(): void {
-    for (const item of roda.atual.querySelectorAll<HTMLElement>('.roda-pessoa')) {
-      const quem = item.dataset['pessoa']
-      if (quem !== undefined && pessoas.falando(quem)) item.dataset['falando'] = '1'
-      else delete item.dataset['falando']
-    }
-    for (const linha of canais.atual.querySelectorAll<HTMLElement>('.canal-pessoa')) {
-      const quem = linha.dataset['pessoa']
-      // Eu apareço sob a chave própria do medidor, não sob o meu peerId: o
-      // meu microfone é local e nunca chega pelo caminho de mídia recebida.
-      const falando = quem !== undefined
-        && pessoas.falando(linha.dataset['eu'] === '1' ? EU : quem)
-      if (falando) linha.dataset['falando'] = '1'
-      else delete linha.dataset['falando']
-    }
-  }
 
   /**
    * Clicar num canal: entra na call ali, se ainda não estiver nela.
@@ -562,72 +540,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     return convite
   }
 
-  /** A assinatura da última lista desenhada, para não refazê-la à toa. */
-  let assinaturaDosCanais = ''
+  /** A assinatura do painel de Ajustes, para não refazê-lo à toa. */
   let assinaturaDaConfig = ''
-  let assinaturaDaRoda = ''
-
-  /**
-   * Força o próximo desenho a refazer os rostos.
-   *
-   * As assinaturas comparam quem está onde, não como cada um está desenhado —
-   * incluir a foto obrigaria a concatenar dezenas de milhares de caracteres a
-   * cada mudança de quem fala, muitas vezes por minuto. Trocar de foto é raro,
-   * então avisar na mão é exato e muito mais barato que a alternativa.
-   */
-  function invalidarRostos(): void {
-    assinaturaDaRoda = ''
-    assinaturaDosCanais = ''
-  }
-
-  /** Só a fileira, sem redesenhar o resto. Chamada a cada mudança de quem
-   *  está falando, que acontece muitas vezes por minuto. */
-  function desenharParticipantes(): void {
-    const atual = protocolo.estado()
-    // A lista de canais só existe dentro da call: fora dela não há para onde
-    // ir, e uma fileira de pílulas mortas seria só ruído.
-    // A lista só se reconstrói quando a COMPOSIÇÃO muda. Esta função roda a
-    // cada mudança de quem fala, e refazer os retratos nesse ritmo mandaria o
-    // navegador redecodificar toda foto várias vezes por minuto — a mesma
-    // preocupação que fez a fileira existir separada do resto.
-    const assinatura = `${atual.euNaCall}|${atual.meuCanal}|${atual.podeAbrirCanal}|`
-      + atual.porCanal.map((c) => `${c.id}:${c.quem.join(',')}`).join(';')
-    if (assinatura !== assinaturaDosCanais) {
-      assinaturaDosCanais = assinatura
-      const novosCanais = renderizarCanais(
-        atual.porCanal.map((c) => ({
-          id: c.id,
-          nome: c.nome,
-          // O protocolo entrega peerIds; nome e foto vêm do jogo e das fotos
-          // recebidas. É aqui que os dois vocabulários se encontram.
-          gente: montarDoCanal(c.quem, transporte.meuId(), pessoas.fonte()),
-        })),
-        // Fora da call eu não estou em canal nenhum, e nenhum deve aparecer
-        // aceso: `meuCanal` guarda para onde eu iria, não onde eu estou.
-        atual.euNaCall ? atual.meuCanal : '',
-        {
-          mudar: entrarNoCanal,
-          // O botão só existe quando há id livre: um "+" que não abre nada
-          // seria um botão que engana.
-          ...(atual.podeAbrirCanal ? { abrir: () => protocolo.abrirCanal() } : {}),
-        },
-      )
-      canais.trocar(novosCanais)
-    }
-    acenderQuemFala()
-
-    // A roda segue a mesma regra dos canais: só se refaz quando a composição
-    // muda. Assistindo alguém ela vira faixa, e o modo entra na assinatura
-    // porque muda o desenho inteiro.
-    const gente = pessoas.participantes()
-    const modo = atual.assistindo.length > 0 ? 'faixa' : 'grade'
-    const assinaturaRoda = `${modo}|`
-      + gente.map((p) => `${p.peerId}:${p.mudo}${p.semMicrofone}${p.selo ?? ''}`).join(',')
-    if (assinaturaRoda !== assinaturaDaRoda) {
-      assinaturaDaRoda = assinaturaRoda
-      roda.trocar(renderizarRoda(gente, modo))
-    }
-  }
 
   function desenhar(): void {
     presencaLocal.liberarSeConectou()
@@ -669,7 +583,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     const novoMixer = montarMixer()
     mixer.trocar(novoMixer)
     area.aplicarVolumes()
-    desenharParticipantes()
+    rostos.desenhar()
 
     // A decisão do que o palco mostra mora em `sala/desenho.ts`, junto com o
     // porquê de cada regra. Aqui só se obedece.
