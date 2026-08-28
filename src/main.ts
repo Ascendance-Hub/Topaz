@@ -397,6 +397,28 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     area.receber(stream, de, protocolo.estado().assistindo.includes(de))
   })
 
+  /**
+   * Quem saiu da sala perde a voz na tela: o elemento sai da árvore e o stream
+   * é largado.
+   *
+   * A tela já era resolvida — `ajustar` remove quem saiu de `compartilhando`.
+   * O `<audio>` não: `ajustar` só **cala** (`muted`), e calar não solta o
+   * `srcObject`. Ficava um elemento e um stream morto por pessoa que sai, para
+   * sempre, porque o `selfId` do Trystero nasce a cada carregamento e quem
+   * volta volta com id novo.
+   *
+   * **Remover, e não reaproveitar.** Se a mesma pessoa reaparecer com o MESMO
+   * peerId (o "Reconectar" preserva o `selfId`), quem manda republica um
+   * invólucro novo — o `ProtocoloCall` dela tirou você do `comigo` na saída e
+   * põe de volta na entrada, e `sincronizarMicrofone` reconcilia. Chega um
+   * `onPeerStream` novo, e `AreaDeMidia.receber` monta um `<audio>` novo.
+   *
+   * Reaproveitar o elemento antigo seria o defeito de 2026-08-26 de volta: o
+   * receptor cacheia o stream pelo OBJETO, e um elemento apontando para um
+   * stream morto nunca mais toca nada.
+   */
+  transporte.aoSairPeer((peerId) => area.removerVozDe(peerId))
+
   const acoesCall = criarAcoesCall({
     protocolo, midia, aparelhos, area,
     pararDeMedirVoz: () => {

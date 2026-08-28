@@ -1406,3 +1406,101 @@ describe('entrarNaSala — o ouvinte de aparelhos não fica pendurado', () => {
     }
   })
 })
+
+describe('entrarNaSala — a voz de quem sai é solta', () => {
+  /**
+   * Um stream sem faixa de vídeo é voz: `ehTela` classifica pelas FAIXAS,
+   * nunca pelo metadado — a fila que pareia metadado e faixa no Trystero
+   * desalinha, e o rótulo passa a mentir.
+   *
+   * `MediaStream` de verdade (do happy-dom) e não um objeto solto: o
+   * `srcObject` de um elemento de mídia recusa qualquer outra coisa, e a
+   * recusa some dentro do isolamento do emissor.
+   */
+  const vozFalsa = () => new MediaStream()
+
+  /**
+   * Medido no navegador em 2026-08-28: fechada a aba do outro, o `<video>` da
+   * tela dele some, mas o `<audio>` continua na árvore segurando um stream
+   * morto. Ninguém chamava `removerVozDe` na saída — o `ajustar` só **cala**,
+   * e calar não solta o `srcObject`.
+   *
+   * Não há sintoma audível, porque quem saiu já está fora do `comigo` e
+   * portanto mudo. O custo é um elemento e um stream morto POR PESSOA que sai,
+   * para sempre.
+   */
+  it('sair da sala tira o <audio> da árvore e larga o srcObject', () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = criarSalasFalsas(['pa'])
+      const rede = criarRedeFalsa()
+      vi.mocked(criarSalasTrystero).mockImplementation(() => ctx.salas)
+      vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('eu'))
+
+      const outra = rede.conectar('pa')
+      const app = document.createElement('div')
+      entrarNaSala(app, 'Alex', 'CODIGO01')
+      rede.bombear()
+
+      ctx.entregarStream(vozFalsa(), 'pa', { tipo: 'microfone' })
+
+      const audio = app.querySelector<HTMLAudioElement>('audio[data-de="pa"]')
+      expect(audio).not.toBeNull()
+
+      outra.sair()
+      rede.bombear()
+
+      expect(app.querySelector('audio[data-de="pa"]')).toBeNull()
+      // `remove()` sozinho não basta: enquanto o elemento aponta para o
+      // `srcObject`, o stream e o decodificador continuam vivos.
+      expect(audio!.srcObject).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  /**
+   * A invariante que torna a remoção segura, e a razão de REMOVER em vez de
+   * reaproveitar.
+   *
+   * Se a mesma pessoa voltar com o MESMO peerId — é o que o "Reconectar" faz,
+   * porque preserva o `selfId` —, quem manda republica um invólucro novo (o
+   * `ProtocoloCall` dela tirou você do `comigo` na saída e põe de volta na
+   * entrada, e `sincronizarMicrofone` reconcilia). Chega um `onPeerStream`
+   * novo, e a área monta um `<audio>` novo.
+   *
+   * Reaproveitar o elemento antigo seria o defeito de 2026-08-26 de volta: o
+   * receptor cacheia o stream pelo OBJETO, e um elemento apontando para um
+   * stream morto nunca mais toca nada.
+   */
+  it('e a voz volta quando a mesma pessoa reaparece com o mesmo peerId', () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = criarSalasFalsas(['pa'])
+      const rede = criarRedeFalsa()
+      vi.mocked(criarSalasTrystero).mockImplementation(() => ctx.salas)
+      vi.mocked(criarTransporte).mockImplementation(() => rede.conectar('eu'))
+
+      const outra = rede.conectar('pa')
+      const app = document.createElement('div')
+      entrarNaSala(app, 'Alex', 'CODIGO01')
+      rede.bombear()
+
+      ctx.entregarStream(vozFalsa(), 'pa', { tipo: 'microfone' })
+      outra.sair()
+      rede.bombear()
+      expect(app.querySelector('audio[data-de="pa"]')).toBeNull()
+
+      // A mesma pessoa de volta, mesmo id, com um invólucro NOVO.
+      rede.conectar('pa')
+      rede.bombear()
+      ctx.entregarStream(vozFalsa(), 'pa', { tipo: 'microfone' })
+
+      const voltou = app.querySelector<HTMLAudioElement>('audio[data-de="pa"]')
+      expect(voltou).not.toBeNull()
+      expect(voltou!.srcObject).not.toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
