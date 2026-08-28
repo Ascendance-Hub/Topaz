@@ -15,29 +15,52 @@ Os companheiros deste documento:
 
 ## O estado agora
 
-**Nada pendente.** Os PRs 57 a 61 estão todos na `main`, e o Alexandre
-confirmou em uso real: *"parece estar funcionando legal"*.
+**Ciclo de refatoração em andamento**, desenhado em
+`docs/superpowers/specs/2026-08-27-refatoracao-design.md` e planejado em
+`docs/superpowers/plans/2026-08-27-refatoracao-bloco-1.md` e
+`docs/superpowers/plans/2026-08-28-refatoracao-bloco-2.md`.
 
-O que entrou nesta sessão:
+O pedido foi "melhoria de código, boas práticas, otimizações, tipagens", com
+duas restrições dele: **não estragar feature existente** e **não atrapalhar
+amigos**, que é a próxima feature.
 
-| PR | O quê |
-|---|---|
-| 57 | Volta o app ao estado do PR 45 (a presença sai) |
-| 58 | Despublica o objeto que publicou — o áudio para de sumir |
-| 59 | Para de remexer no codificador duas vezes por segundo |
-| 60 | Fecha a conexão ao trocar de grupo, em vez de herdá-la |
-| 61 | Presença entre grupos, com sala própria e declaração explícita |
+| PR | O quê | Estado |
+|---|---|---|
+| 63 | O spec do ciclo | mergeado |
+| 64 | Linter (ESLint 9 + typescript-eslint) e verificação **antes** do merge | mergeado |
+| 65 | Quatro defeitos pequenos, cada um com teste | mergeado |
+| 66 | Limpeza: exports internos, CSS órfão, comentários que mentiam | mergeado |
+| 67 | `ui/slot.ts` — o `replaceWith` que congelava a tela | mergeado |
+| 68 | `criarEmissor` — um lugar só para "avisar um ouvinte" | mergeado |
+| 69 | Solta a voz de quem sai da sala | mergeado |
 
-## Os próximos passos, escolhidos por ele
+Fecham os Blocos 1 e 2. **Falta o Bloco 3**: partir o `main.ts` em seis peças
+(`identidade/acoes`, `sala/pessoas`, `sala/presenca-local`, `sala/sincronizacao`,
+`sala/desenho`, `sala/home`). Ele ainda não tem plano escrito — de propósito,
+para ser escrito olhando o código como ele estiver então.
 
-1. **Refatoração e melhorias de código** — passe de qualidade de verdade, o que
-   a revisão do #59 não foi (ela olhou caminhos quentes, memória e segurança;
-   não passou arquivo por arquivo).
-2. **Sistema de amizade** — item 6 do roteiro. É onde entra o **quem**: a
-   presença de hoje conta *quantos*, de propósito, e o Alexandre foi explícito
-   que a identidade fica para os amigos.
+### O que o ciclo já pagou
 
----
+Duas minas desarmadas **por causa de amigos**, e nenhuma das duas doía hoje:
+
+- `sala-de-fundo.ts` guardava ouvintes em **slot único** — o segundo inscrito
+  apagaria o primeiro em silêncio (PR 65).
+- `apresentacao.ts` percorria a lista de ouvintes **viva e sem isolamento** — um
+  estouro impedia os seguintes de saberem que alguém provou a identidade
+  (PR 68).
+
+As duas mordem no dia em que a `Apresentacao` for escutar a sala de presença,
+que é exatamente o que amigos precisa.
+
+### Um achado grande, e ele NÃO é refatoração
+
+**O botão `Reconectar` racha a sala, de forma determinística** — medido com
+controle em 2026-08-28. Está detalhado no
+[roteiro](roteiro.md), na seção "A família não conecta".
+
+Isso inverte o papel do botão: o Alexandre relata apertá-lo e continuar sozinho,
+e por este caminho ele é a **causa**. É a caçada mais promissora que existe
+agora, e ela tem PR próprio — **não** entra em PR de refatoração.
 
 ## O que a próxima sessão precisa saber antes de mexer em rede
 
@@ -58,23 +81,25 @@ TypeScript inteira está nos **sourcemaps**. Extraia e leia antes de investigar.
 
 ---
 
-## Defeitos conhecidos que sobraram
+## Defeitos conhecidos
 
-- **A descoberta é intermitente, e não é a presença.** Medido: 2 de 4 trocas de
-  sala não acharam o par em 44 s — **com e sem presença**, mesma taxa. Nesta
-  máquina o app reporta 4 de 20 relays respondendo. É provavelmente a outra
-  metade do "às vezes não conecta, tenho que apertar Reconectar". **Não foi
-  investigado**, e é o candidato mais forte para a próxima caçada.
-- **`Reconectar` reentra na conexão velha.** `joinRoom` num id já registrado
-  devolve a MESMA sala, e o `leave` só desregistra ~99 ms depois. Confirmado na
-  fonte e medido. O #60 fechou as conexões ao sair, o que muda o quadro — vale
-  remedir antes de consertar.
+**A fonte é o [roteiro](roteiro.md)**, seção "Defeitos conhecidos" — ela foi
+reescrita em 2026-08-28 para juntar os três relatos de conexão numa família só,
+separando o que está **medido** do que está **suposto**.
+
+O resumo, para decidir se vale abrir:
+
+- **`Reconectar` racha a sala** — determinístico, com controle. A caçada.
+- **Trocar de grupo demora no notebook** — relatado, sem padrão.
+- **Descoberta intermitente** — 2 de 4 em 44 s, com e sem presença.
 - **A conexão reserva não é adotada** quando a rede dona cai.
-- **O ouvinte de `devicechange` nunca é removido.** Cada sala desmontada deixa
-  um, e ele chama `desenhar()` numa sala morta. Foi por esse caminho que o
-  anúncio órfão da presença nascia. Pequeno, e real.
 - **Um teste intermitente** em `apresentacao.test.ts`, que depende de
   `crypto.subtle`.
+
+Consertados no ciclo de refatoração, e por isso já **fora** da lista: o ouvinte
+de `devicechange` pendurado, o codificador acordando por quem não assiste, o
+diagnóstico da presença falando sozinho no console, e o `<audio>` órfão de quem
+sai da sala.
 
 ## Decisão em aberto, agora com número
 
