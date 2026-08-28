@@ -216,22 +216,6 @@ O estado atual, o que está pendente e como trabalhamos ficam em
 
 ### Defeitos conhecidos
 
-- **Quem sai da sala deixa um `<audio>` órfão, com o stream morto dentro.**
-  Medido no navegador em 2026-08-28: fechada a aba do outro, o `<video>` da
-  tela dele some (o `ajustar` remove quem saiu de `compartilhando`), mas o
-  `<audio>` continua na árvore. Ninguém chama `area.removerVozDe` no
-  `aoSairPeer` — o `ajustar` só **cala** (`muted`), e calar não solta o
-  `srcObject`.
-
-  Não há sintoma audível, porque quem saiu já está fora do `comigo` e portanto
-  mudo. O custo é um elemento e um stream morto **por pessoa que sai**, para
-  sempre: o `selfId` do Trystero nasce a cada carregamento, então quem volta
-  volta com id novo e nunca reaproveita o elemento antigo. É a mesma família do
-  vazamento de mídia já registrado no Capítulo 8 — tirar da árvore sem soltar o
-  `srcObject` —, aqui na variante "nem tirar da árvore".
-
-  Pequeno e real. Cabe num PR próprio, com teste.
-
 - **`Presenca.fecharUm` existe, tem 6 testes e ninguém a chama.** Quem sai da
   tela inicial para uma sala chama `presencaHome.encerrar()`, que fecha
   **todas** as salas de fundo — e fechar a última sala de um `appId` faz o
@@ -256,10 +240,29 @@ O estado atual, o que está pendente e como trabalhamos ficam em
   mesma taxa. Nesta máquina o app reporta 4 de 20 relays respondendo. É o
   candidato mais forte para explicar o "às vezes não conecta, tenho que apertar
   Reconectar", e ainda não foi investigado.
-- **`Reconectar` reentra na conexão velha.** `joinRoom` num id já registrado
-  devolve a MESMA sala, e a saída do Trystero só desregistra ~99ms depois.
-  Confirmado na fonte e medido. O quadro mudou depois do PR 60, que passou a
-  fechar as conexões ao sair — vale **remedir antes de consertar**.
+- **⚠️ `Reconectar` racha a sala. Remedido em 2026-08-28, e continua quebrado
+  depois do PR 60.** `joinRoom` num id já registrado devolve a MESMA sala
+  (`strategy.ts:213`), e a saída do Trystero só desregistra depois de um envio
+  e mais 99 ms (`room.ts:162`) — então o `encerrar(); entrarNaSala(mesmoCódigo)`
+  do botão recebe de volta a sala que está morrendo.
+
+  A entrada anterior dizia "vale remedir antes de consertar". **Remedido, com
+  duas abas e com controle:**
+
+  | Rodada | Resultado |
+  |---|---|
+  | com a correção do `<audio>` | as duas abas ficaram sozinhas, as duas se declararam anfitriã |
+  | **controle**, sem nenhuma mudança | **idêntico** |
+
+  Duas de duas, nas duas rodadas. Não é intermitente por este caminho: é
+  **determinístico**, e é a reprodução mais barata que temos do "às vezes não
+  conecta, tenho que apertar Reconectar" — só que aqui o Reconectar é a
+  **causa**, não o remédio.
+
+  Fica registrado como caçada própria, não como refatoração. O conserto
+  provável é não reentrar no mesmo id antes de o Trystero desregistrar — ou
+  não sair antes de entrar, mantendo a âncora. **Nenhum dos dois às cegas:**
+  são exatamente as duas coisas que já quebraram a troca de sala antes.
 - **O ouvinte de `devicechange` nunca é removido.** Cada sala desmontada deixa
   um pendurado, e ele chama `desenhar()` numa sala morta. Foi por esse caminho
   que o anúncio órfão da presença nascia. Pequeno, e real.
