@@ -39,6 +39,7 @@ import { AparelhosEmUso } from './call/aparelhos-em-uso'
 import { criarPainelDeRede } from './ui/painel-rede'
 import { criarPessoas } from './sala/pessoas'
 import { criarPresencaLocal } from './sala/presenca-local'
+import { oQueOPalcoMostra } from './sala/desenho'
 import { criarSincronizacao } from './sala/sincronizacao'
 import { renderizar } from './ui/render'
 import { criarSlot } from './ui/slot'
@@ -670,45 +671,53 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     area.aplicarVolumes()
     desenharParticipantes()
 
-    // Enquanto ninguém é anfitrião a mesa ainda não existe: mostrar a mesa
-    // vazia com "Aguardando jogadores…" confundiria "ninguém entrou ainda"
-    // com "a conexão falhou" (spec §14).
-    const status = sessao.statusConexao()
-    if (status !== 'conectado') {
-      palco.replaceChildren(renderizarConexao(status, relaysConectados()))
-      if (status === 'sem-conexao') {
-        palco.append(painelRede.desenhar(true))
-      }
+    // A decisão do que o palco mostra mora em `sala/desenho.ts`, junto com o
+    // porquê de cada regra. Aqui só se obedece.
+    const mostrar = oQueOPalcoMostra({
+      status: sessao.statusConexao(),
+      tela,
+      jogoEmAjuste,
+      euNaCall: protocolo.estado().euNaCall,
+      sozinho: conectadosComigo().length <= 1,
+    })
+
+    if (mostrar.tipo === 'conexao') {
+      palco.replaceChildren(renderizarConexao(mostrar.status, relaysConectados()))
+      if (mostrar.comTesteDeRede) palco.append(painelRede.desenhar(true))
       return
     }
-    if (tela === 'mesa') {
+
+    if (mostrar.tipo === 'mesa') {
       renderizar(palco, sessao.estado(), sessao.meuId(), (acao) => sessao.despachar(acao))
       return
     }
 
-    if (tela === 'jogos') {
-      palco.replaceChildren(jogoEmAjuste === null
-        ? renderizarJogos({
-          abrir: () => irPara('mesa'),
-          // A engrenagem só existe para o anfitrião: mostrá-la a todos e
-          // barrar no clique seria um botão que engana.
-          ...(sessao.souHost() ? { ajustar: abrirFormato } : {}),
-        })
-        : renderizarAjustesDoJogo(
-          JOGOS.find((j) => j.chave === jogoEmAjuste)?.nome ?? 'Formato',
-          renderizarConfigPartida(dadosDoFormato(), (config) => {
-            sessao.despachar({ tipo: 'configurar', config })
-            // Lembrar aqui e não no motor: é escolha DESTA pessoa nesta
-            // máquina, não estado da partida.
-            lembrarFormato(config)
-            desenhar()
-          }),
-          () => { jogoEmAjuste = null; desenhar() },
-        ))
+    if (mostrar.tipo === 'jogos') {
+      palco.replaceChildren(renderizarJogos({
+        abrir: () => irPara('mesa'),
+        // A engrenagem só existe para o anfitrião: mostrá-la a todos e barrar
+        // no clique seria um botão que engana.
+        ...(sessao.souHost() ? { ajustar: abrirFormato } : {}),
+      }))
       return
     }
 
-    if (tela === 'config') {
+    if (mostrar.tipo === 'formato') {
+      palco.replaceChildren(renderizarAjustesDoJogo(
+        JOGOS.find((j) => j.chave === mostrar.jogo)?.nome ?? 'Formato',
+        renderizarConfigPartida(dadosDoFormato(), (config) => {
+          sessao.despachar({ tipo: 'configurar', config })
+          // Lembrar aqui e não no motor: é escolha DESTA pessoa nesta máquina,
+          // não estado da partida.
+          lembrarFormato(config)
+          desenhar()
+        }),
+        () => { jogoEmAjuste = null; desenhar() },
+      ))
+      return
+    }
+
+    if (mostrar.tipo === 'config') {
       const meuApelido = sessao.estado().jogadores.find((j) => j.peerId === sessao.meuId())
         ?.apelido ?? apelido
       const grupo = grupoSalvo(codigo)
@@ -732,27 +741,21 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       return
     }
 
-    const call = protocolo.estado()
-    // Assistindo alguém, a roda cede o meio para a tela e vira faixa. Saber
-    // quem está falando importa MAIS com uma tela na frente, não menos — por
-    // isso ela encolhe em vez de sumir.
-    conteudo.dataset['assistindo'] = call.assistindo.length > 0 ? '1' : ''
+    // Daqui para baixo é a tela da sala, e SÓ ela atualiza este atributo —
+    // como antes. Assistindo alguém, a roda cede o meio para a tela e vira
+    // faixa: saber quem está falando importa MAIS com uma tela na frente.
+    conteudo.dataset['assistindo'] =
+      protocolo.estado().assistindo.length > 0 ? '1' : ''
 
     // Dentro de um canal o miolo são os rostos, e quem desenha a roda é
     // `desenharParticipantes` — aqui o palco fica de fora do caminho.
-    if (call.euNaCall) {
+    if (mostrar.tipo === 'rostos') {
       palco.replaceChildren()
       return
     }
 
     palco.replaceChildren(renderizarConvite())
-
-    // Quem está sozinho é exatamente quem precisa do teste: a aplicação não
-    // distingue de dentro "ninguém me achou" de "minha rede não deixa
-    // conectar", e o teste responde a segunda metade na máquina certa.
-    if (conectadosComigo().length <= 1) {
-      palco.append(painelRede.desenhar(true))
-    }
+    if (mostrar.comTesteDeRede) palco.append(painelRede.desenhar(true))
   }
 
   sessao.aoMudar(desenhar)

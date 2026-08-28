@@ -440,11 +440,31 @@ que torna isso seguro é a propriedade que já existe: a sincronização é
 agora, não o que mudou. Mover código idempotente é mais seguro que mover código
 que detecta borda.
 
-### Tarefa 5 — `sala/desenho.ts` (PR 11)
+### Tarefa 5 — `sala/desenho.ts` (PR 11) — **feita, e menor do que eu disse**
 
-Leva o roteador de telas de `desenhar()` — o `if (tela === 'mesa')`, o de
-`jogos`, o de `config` com a assinatura que impede o `<input type="file">` de
-ser recriado, e o miolo da call.
+Leva a **decisão** do que o palco mostra: `oQueOPalcoMostra`, pura e com 13
+testes. As três regras que ela guarda — a conexão antes de tudo (spec §14), o
+teste de rede para quem está sozinho, e o palco saindo da frente dentro da call
+— deixaram de morar num encadeado de `if` e passaram a ter nome.
+
+**O que ela NÃO levou: o desenho.** E isso custou 3 linhas a mais no `main.ts`
+em vez de tirar 70. A renderização do palco depende de dez componentes e de
+seis pedaços de estado da sala; movê-la moveria o acoplamento, não o
+removeria.
+
+**Correção da estimativa deste plano.** Eu disse "200 a 300 linhas" para o
+`main.ts` no fim do bloco. Olhando o que sobrou — 784 linhas no `entrarNaSala`,
+das quais ~140 são `desenhar()` e ~90 são o desenho rápido dos participantes —
+o número honesto é **350 a 450**, e só se a camada de desenho inteira sair numa
+tarefa própria (ver Tarefa 5b). O resto é fiação de verdade: montar doze peças
+e ligá-las umas nas outras.
+
+### Tarefa 5b — a camada de desenho (PR novo)
+
+`desenhar()`, `desenharParticipantes()`, `acenderQuemFala()`,
+`invalidarRostos()` e os oito slots. É o ganho de linhas de verdade, e é
+coeso: **tudo que pinta a sala**, num lugar só. Fica para depois da Tarefa 5
+porque depende da decisão já estar extraída.
 
 ### Tarefa 6 — `sala/home.ts` (PR 12) ⭐ amigos
 
