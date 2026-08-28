@@ -315,6 +315,22 @@ sala anterior ainda estava registrada quando esta abriu.
 
 #### Fora da família
 
+- **"Já guardei" não esconde o segredo dentro da sala.** Nos Ajustes, depois de
+  "Sair desta máquina", o segredo novo aparece — e o botão "Já guardei" não o
+  tira da tela. Na **home** funciona.
+
+  A causa é a assinatura que decide se o painel de Ajustes se refaz:
+  `apelido|grupo|selo`. O "Já guardei" mexe só no `segredoNovo`, então a
+  assinatura não muda e o painel não é redesenhado. Na home o desenho é
+  incondicional.
+
+  Medido em 2026-08-28 **com controle** (acontece igual sem nenhuma mudança
+  minha), enquanto eu verificava o PR 72. A assinatura existe por um motivo
+  bom — sem ela o `<input type="file">` dos Ajustes era recriado no meio do
+  diálogo do sistema e escolher foto não fazia nada —, então o conserto é
+  incluir o segredo na assinatura, **não** tirar a assinatura.
+
+
 - **A conexão reserva não é adotada.** Quando a rede dona de um peer cai, a
   duplicata das outras redes não é promovida — o `onPeerJoin` dela já tinha
   sido ignorado. Ela custa memória e não serve para nada. Fechá-la não é a

@@ -1,11 +1,7 @@
 import { Sessao } from './net/sessao'
 import {
-  criarSalasTrystero, criarTransporte, relaysConectados, relaysDetalhados,
+  criarSalasTrystero, criarTransporte, relaysConectados,
 } from './net/transport'
-import { coletarCandidatos } from './net/coletar-candidatos'
-import { analisarCandidatos } from './net/diagnostico-rede'
-import type { Analise } from './net/diagnostico-rede'
-import { renderizarTesteRede } from './ui/components/teste-rede'
 import { renderizarHome } from './ui/components/home'
 import { apelidoSalvo, salvarApelido } from './ui/components/lobby'
 import { renderizarBarraSala } from './ui/components/barra-sala'
@@ -30,7 +26,8 @@ import { renderizarCanais } from './ui/components/canais'
 import { CANAL_PADRAO } from './call/protocolo'
 import { fotoLembrada, fotoRecebida } from './perfil/foto-navegador'
 import { renderizarIdentidade } from './ui/components/identidade'
-import { entrarComSegredo, identidadeAtual, sairDaIdentidade } from './identidade/atual'
+import { identidadeAtual } from './identidade/atual'
+import { criarAcoesIdentidade } from './identidade/acoes'
 import type { Identidade } from './identidade/atual'
 import { Apresentacao } from './identidade/apresentacao'
 import type { Participante } from './ui/components/participantes'
@@ -40,6 +37,7 @@ import { criarCanalCall } from './call/canal'
 import { ProtocoloCall } from './call/protocolo'
 import { Midia } from './call/midia'
 import { AparelhosEmUso } from './call/aparelhos-em-uso'
+import { criarPainelDeRede } from './ui/painel-rede'
 import { renderizar } from './ui/render'
 import { criarSlot } from './ui/slot'
 import { rngSemente } from './game/shoe'
@@ -294,27 +292,10 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       invalidarRostos()
       desenharParticipantes()
     },
-    identidade: {
-      guardei: () => {
-        if (identidade) identidade = { ...identidade, segredoNovo: undefined }
-        desenhar()
-      },
-      entrarComSegredo: (segredo: string) => {
-        entrarComSegredo(segredo).then((nova) => {
-          identidade = nova
-          desenhar()
-        }).catch((erro: unknown) => console.warn('não deu para entrar com esse ID', erro))
-      },
-      sair: () => {
-        sairDaIdentidade()
-          .then(() => identidadeAtual())
-          .then((nova) => {
-            identidade = nova
-            desenhar()
-          })
-          .catch((erro: unknown) => console.warn('não deu para sair', erro))
-      },
-    },
+    identidade: criarAcoesIdentidade(() => identidade, (nova) => {
+      identidade = nova
+      desenhar()
+    }),
   }
 
   /** Junta o que a sala sabe e deixa a decisão com `montarParticipantes`. */
@@ -837,9 +818,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     if (status !== 'conectado') {
       palco.replaceChildren(renderizarConexao(status, relaysConectados()))
       if (status === 'sem-conexao') {
-        palco.append(
-        renderizarTesteRede(
-          analiseRede, testandoRede, testarRede, relaysDetalhados(), estadoDetalhes))
+        palco.append(painelRede.desenhar(true))
       }
       return
     }
@@ -913,9 +892,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
     // distingue de dentro "ninguém me achou" de "minha rede não deixa
     // conectar", e o teste responde a segunda metade na máquina certa.
     if (conectadosComigo().length <= 1) {
-      palco.append(
-        renderizarTesteRede(
-          analiseRede, testandoRede, testarRede, relaysDetalhados(), estadoDetalhes))
+      palco.append(painelRede.desenhar(true))
     }
   }
 
@@ -937,25 +914,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   /** Preenchido no fim da montagem, quando o tique já existe. */
   let encerrar: () => Promise<void> = () => Promise.resolve()
 
-  let analiseRede: Analise | null = null
-  /** Sobrevive ao redesenho: a sala é reconstruída a cada clique na call. */
-  let detalhesRede: boolean | undefined
-  const estadoDetalhes = {
-    get aberto() { return detalhesRede },
-    aoAlternar: (aberto: boolean) => { detalhesRede = aberto },
-  }
-  let testandoRede = false
-
-  function testarRede(): void {
-    if (testandoRede) return
-    testandoRede = true
-    desenhar()
-    void coletarCandidatos().then(({ candidatos, erros }) => {
-      analiseRede = analisarCandidatos(candidatos, erros)
-      testandoRede = false
-      desenhar()
-    })
-  }
+  /** Dentro da sala ele LISTA os servidores: aqui o número quer dizer algo. */
+  const painelRede = criarPainelDeRede(() => desenhar())
 
   /**
    * Refaz a conexão sem recarregar a página.
@@ -1095,8 +1055,7 @@ export function iniciarApp(app: HTMLElement): void {
   try {
     // O teste de rede também mora na home, e não só dentro da sala: quem
     // recebeu um link e não consegue entrar nunca chega à sala para achá-lo.
-    let analise: Analise | null = null
-    let rodando = false
+    const painelRede = criarPainelDeRede(() => desenharHome())
     let identidade: Identidade | null = null
 
     /** Recarrega o painel depois de qualquer mudança de identidade. */
@@ -1105,25 +1064,7 @@ export function iniciarApp(app: HTMLElement): void {
       desenharHome()
     }
 
-    const acoesIdentidade = {
-      // A pessoa afirmou ter guardado: paramos de mostrar o segredo. Ele não
-      // é apagado de lugar nenhum porque nunca foi guardado — só existia nesta
-      // variável.
-      guardei: () => {
-        if (identidade) adotar({ ...identidade, segredoNovo: undefined })
-      },
-      entrarComSegredo: (segredo: string) => {
-        entrarComSegredo(segredo).then(adotar).catch((erro: unknown) => {
-          console.warn('não deu para entrar com esse ID', erro)
-        })
-      },
-      sair: () => {
-        sairDaIdentidade()
-          .then(() => identidadeAtual())
-          .then(adotar)
-          .catch((erro: unknown) => console.warn('não deu para sair', erro))
-      },
-    }
+    const acoesIdentidade = criarAcoesIdentidade(() => identidade, adotar)
 
     identidadeAtual().then(adotar).catch((erro: unknown) => {
       // Cofre indisponível (janela anônima, política do navegador): a home
@@ -1182,7 +1123,9 @@ export function iniciarApp(app: HTMLElement): void {
         // A lista só quer dizer alguma coisa DENTRO da sala. O teste de NAT em
         // si funciona sozinho: ele fala com os servidores STUN direto.
         {
-          testeRede: renderizarTesteRede(analise, rodando, testar),
+          // Sem a lista de servidores, de propósito: aqui nenhum socket está
+          // aberto, e "0 de 20" lê como falha catastrófica.
+          testeRede: painelRede.desenhar(false),
           identidade: renderizarIdentidade(identidade, acoesIdentidade),
           grupos: renderizarFaixaGrupos(grupos(), entrarNoGrupo, (cod) => {
             removerGrupo(cod)
@@ -1194,17 +1137,6 @@ export function iniciarApp(app: HTMLElement): void {
           }, presencaHome.quantos),
         },
       ))
-    }
-
-    function testar(): void {
-      if (rodando) return
-      rodando = true
-      desenharHome()
-      void coletarCandidatos().then(({ candidatos, erros }) => {
-        analise = analisarCandidatos(candidatos, erros)
-        rodando = false
-        desenharHome()
-      })
     }
 
     desenharHome()
