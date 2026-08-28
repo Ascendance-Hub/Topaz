@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { avisarTodos } from './avisar'
+import { avisarTodos, criarEmissor } from './avisar'
 
 describe('avisarTodos', () => {
   it('avisa todo mundo, na ordem', () => {
@@ -50,5 +50,70 @@ describe('avisarTodos', () => {
 
     expect(depois).toHaveBeenCalledWith('pa')
     erro.mockRestore()
+  })
+})
+
+/**
+ * A lista de ouvintes com nome.
+ *
+ * O padrão — declarar `((...) => void)[]`, empurrar em `aoX(cb)` e chamar
+ * `avisarTodos` — aparecia em vinte declarações por dez arquivos, e em TRÊS
+ * implementações diferentes de "avisar". Uma delas percorria a lista viva e sem
+ * isolamento. Estes casos fixam a semântica num lugar só.
+ */
+describe('criarEmissor', () => {
+  it('avisa todos os inscritos, na ordem', () => {
+    const emissor = criarEmissor<[string]>()
+    const vistos: string[] = []
+    emissor.ouvir((x) => vistos.push(`a:${x}`))
+    emissor.ouvir((x) => vistos.push(`b:${x}`))
+
+    emissor.avisar('oi')
+
+    expect(vistos).toEqual(['a:oi', 'b:oi'])
+  })
+
+  it('um que estoura não impede os outros, e o estouro fica registrado', () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const emissor = criarEmissor<[]>()
+      const segundo = vi.fn()
+      emissor.ouvir(() => { throw new Error('estourei') })
+      emissor.ouvir(segundo)
+
+      emissor.avisar()
+
+      expect(segundo).toHaveBeenCalled()
+      expect(erro).toHaveBeenCalled()
+    } finally {
+      erro.mockRestore()
+    }
+  })
+
+  it('inscrever-se durante o aviso não pula o vizinho', () => {
+    const emissor = criarEmissor<[]>()
+    const tardio = vi.fn()
+    const segundo = vi.fn()
+    emissor.ouvir(() => emissor.ouvir(tardio))
+    emissor.ouvir(segundo)
+
+    emissor.avisar()
+
+    // Quem entra durante o aviso só é chamado no PRÓXIMO — mas quem já estava
+    // não pode ser pulado por a lista ter mudado no meio do laço.
+    expect(segundo).toHaveBeenCalledTimes(1)
+    expect(tardio).not.toHaveBeenCalled()
+  })
+
+  it('`ouvir` pode ser passado como referência, sem perder o `this`', () => {
+    // É assim que os consumidores o expõem: `aoReceberAcao: aoAcao.ouvir`.
+    const emissor = criarEmissor<[string]>()
+    const registrar = emissor.ouvir
+    const visto = vi.fn()
+
+    registrar(visto)
+    emissor.avisar('pa')
+
+    expect(visto).toHaveBeenCalledWith('pa')
   })
 })

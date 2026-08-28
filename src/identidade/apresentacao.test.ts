@@ -234,3 +234,38 @@ describe('Apresentacao', () => {
     expect(ladoA.seloDe('b')).toBeUndefined()
   })
 })
+
+/**
+ * A irmã da mina que o PR 65 desarmou na sala de fundo.
+ *
+ * `aoVerificar` guarda uma lista, mas a entrega era um `for` cru sobre a lista
+ * VIVA e sem isolamento: um ouvinte que estourasse impedia todos os seguintes
+ * de saberem que a pessoa provou quem é. É a forma do defeito do Capítulo 9 do
+ * diário — "um ouvinte que estoura levava os outros junto".
+ *
+ * Hoje há um consumidor só. Amigos põe outro, porque a `Apresentacao` é
+ * justamente quem diz *quem é quem*.
+ */
+describe('Apresentacao — um ouvinte não derruba os outros', () => {
+  it('quem se inscreveu depois recebe o selo mesmo se o primeiro estourar', async () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const rede = ligar()
+      const alex = await gerarIdentidade()
+      const bruno = await gerarIdentidade()
+      const ladoA = new Apresentacao(rede.canalDe('a'), alex.par, SALA)
+      new Apresentacao(rede.canalDe('b'), bruno.par, SALA)
+
+      const segundo = vi.fn()
+      ladoA.aoVerificar(() => { throw new Error('estourei') })
+      ladoA.aoVerificar(segundo)
+
+      rede.apresentar('a', 'b')
+      await assentar()
+
+      expect(segundo).toHaveBeenCalledWith('b', await impressaoDigital(bruno.par.publicKey))
+    } finally {
+      erro.mockRestore()
+    }
+  })
+})

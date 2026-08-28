@@ -216,6 +216,22 @@ O estado atual, o que está pendente e como trabalhamos ficam em
 
 ### Defeitos conhecidos
 
+- **Quem sai da sala deixa um `<audio>` órfão, com o stream morto dentro.**
+  Medido no navegador em 2026-08-28: fechada a aba do outro, o `<video>` da
+  tela dele some (o `ajustar` remove quem saiu de `compartilhando`), mas o
+  `<audio>` continua na árvore. Ninguém chama `area.removerVozDe` no
+  `aoSairPeer` — o `ajustar` só **cala** (`muted`), e calar não solta o
+  `srcObject`.
+
+  Não há sintoma audível, porque quem saiu já está fora do `comigo` e portanto
+  mudo. O custo é um elemento e um stream morto **por pessoa que sai**, para
+  sempre: o `selfId` do Trystero nasce a cada carregamento, então quem volta
+  volta com id novo e nunca reaproveita o elemento antigo. É a mesma família do
+  vazamento de mídia já registrado no Capítulo 8 — tirar da árvore sem soltar o
+  `srcObject` —, aqui na variante "nem tirar da árvore".
+
+  Pequeno e real. Cabe num PR próprio, com teste.
+
 - **`Presenca.fecharUm` existe, tem 6 testes e ninguém a chama.** Quem sai da
   tela inicial para uma sala chama `presencaHome.encerrar()`, que fecha
   **todas** as salas de fundo — e fechar a última sala de um `appId` faz o

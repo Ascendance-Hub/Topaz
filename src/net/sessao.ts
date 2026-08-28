@@ -5,7 +5,7 @@ import { REGRAS } from '../game/rules'
 import type { Acao, EstadoJogo, Rng } from '../game/types'
 import type { Transporte } from './transport'
 import { ehEstadoPlausivel } from './validar'
-import { avisarTodos } from './avisar'
+import { criarEmissor } from './avisar'
 
 /**
  * Quanto tempo esperamos, depois de entrar na sala (ou de ver um peer novo),
@@ -70,7 +70,7 @@ export class Sessao {
   private ctx: Contexto
   /** `null` = ainda não sei quem manda. Nunca colide com um peerId real. */
   private hostId: string | null = null
-  private ouvintes: (() => void)[] = []
+  private readonly ouvintes = criarEmissor<[]>()
   /** Ações despachadas antes de haver host: guardadas para não se perderem. */
   private pendentes: Acao[] = []
   /** Apelido com que eu entrei; `null` = ainda não me apresentei. */
@@ -260,7 +260,7 @@ export class Sessao {
   }
 
   private notificar(): void {
-    avisarTodos(this.ouvintes)
+    this.ouvintes.avisar()
   }
 
   souHost(): boolean {
@@ -282,7 +282,7 @@ export class Sessao {
   }
 
   aoMudar(cb: () => void): void {
-    this.ouvintes.push(cb)
+    this.ouvintes.ouvir(cb)
   }
 
   entrar(apelido: string): void {

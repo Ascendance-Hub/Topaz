@@ -1,5 +1,6 @@
 import { exportarPublica } from './chaves'
 import { conferir, criarDesafio, responder } from './prova'
+import { criarEmissor } from '../net/avisar'
 
 /**
  * A troca de identidade entre duas pessoas que acabaram de se conectar.
@@ -52,7 +53,14 @@ export class Apresentacao {
   private readonly par: CryptoKeyPair
   private readonly sala: string
   private readonly porPeer = new Map<string, Pendente>()
-  private readonly ouvintes: ((peerId: string, selo: string) => void)[] = []
+  /**
+   * Quem quer saber que alguém provou a identidade.
+   *
+   * Era um `for` cru sobre a lista viva: um ouvinte que estourasse impedia
+   * todos os seguintes de saberem — a forma do defeito do Capítulo 9. Hoje há
+   * um consumidor só; amigos põe outro, porque é aqui que mora o *quem*.
+   */
+  private readonly aoVerificado = criarEmissor<[peerId: string, selo: string]>()
 
   constructor(canal: CanalIdentidade, par: CryptoKeyPair, sala: string) {
     this.canal = canal
@@ -71,7 +79,7 @@ export class Apresentacao {
   }
 
   aoVerificar(cb: (peerId: string, selo: string) => void): void {
-    this.ouvintes.push(cb)
+    this.aoVerificado.ouvir(cb)
   }
 
   /** O selo já PROVADO desta pessoa, ou `undefined` enquanto não provou. */
@@ -118,7 +126,7 @@ export class Apresentacao {
       // sem selo, que é exatamente o que "não verificado" quer dizer.
       if (!selo) return
       estado.selo = selo
-      for (const cb of this.ouvintes) cb(peerId, selo)
+      this.aoVerificado.avisar(peerId, selo)
     }
   }
 }
