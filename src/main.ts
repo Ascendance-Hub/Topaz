@@ -32,6 +32,7 @@ import { ProtocoloCall } from './call/protocolo'
 import { Midia } from './call/midia'
 import { AparelhosEmUso } from './call/aparelhos-em-uso'
 import { criarPainelDeRede } from './ui/painel-rede'
+import { criarSons, definirSons, instanteDaCall, sonsDaMudanca, sonsLigados } from './call/sons'
 import { criarPessoas } from './sala/pessoas'
 import { criarPresencaLocal } from './sala/presenca-local'
 import { oQueOPalcoMostra } from './sala/desenho'
@@ -259,6 +260,8 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
       salvarGrupo(codigo, nome)
       desenhar()
     },
+    sonsLigados,
+    definirSons,
     esquecerGrupo: () => {
       removerGrupo(codigo)
       desenhar()
@@ -355,6 +358,28 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
    * stream morto nunca mais toca nada.
    */
   transporte.aoSairPeer((peerId) => area.removerVozDe(peerId))
+
+  /**
+   * Os avisos sonoros, e o instante anterior com que a mudança é comparada.
+   *
+   * Semeado com o estado de AGORA: assim entrar numa sala que já tem call
+   * rolando não dispara nada retroativo.
+   */
+  const sons = criarSons({ ligado: sonsLigados })
+  let ultimoInstante = instanteDaCall(protocolo.estado(), midia.microfoneMudo())
+
+  /**
+   * Detecção de borda — e aqui ela é a forma certa, ao contrário do resto da
+   * mídia. O que se perde ao errar é um som, não uma publicação.
+   *
+   * Chamada do `desenhar`, que é o funil por onde toda mudança passa: o
+   * protocolo, o tique e os cliques da call caem todos ali.
+   */
+  function avisarPorSom(): void {
+    const agora = instanteDaCall(protocolo.estado(), midia.microfoneMudo())
+    for (const tipo of sonsDaMudanca(ultimoInstante, agora)) sons.tocar(tipo)
+    ultimoInstante = agora
+  }
 
   const acoesCall = criarAcoesCall({
     protocolo, midia, aparelhos, area,
@@ -543,6 +568,7 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
   let assinaturaDaConfig = ''
 
   function desenhar(): void {
+    avisarPorSom()
     presencaLocal.liberarSeConectou()
     // A roda e os vídeos são irmãos persistentes do palco: eles NÃO são
     // trocados quando a tela muda, e por isso continuavam aparecendo por baixo
