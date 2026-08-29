@@ -7,13 +7,15 @@ export const ROTULO_ESPERANDO = 'a mesa está esperando você'
  * trilho marca `jogos` como atual enquanto a mesa está aberta, porque foi por
  * ali que ela entrou — e voltar para a galeria precisa ser um clique óbvio.
  */
-export type Tela = 'sala' | 'jogos' | 'mesa' | 'config'
+export type Tela = 'sala' | 'jogos' | 'mesa' | 'config' | 'dicas'
 
 /** Os destinos do trilho, na ordem em que aparecem. */
 const DESTINOS = [
   { chave: 'sala', rotulo: 'Sala' },
   { chave: 'jogos', rotulo: 'Jogos' },
   { chave: 'config', rotulo: 'Ajustes' },
+  // Por último de propósito: é o destino que se lê uma vez, não o que se usa.
+  { chave: 'dicas', rotulo: 'Dicas' },
 ] as const
 
 export type DestinoDoTrilho = (typeof DESTINOS)[number]['chave']

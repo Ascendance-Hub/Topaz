@@ -2381,3 +2381,50 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   /* A borda da cor do fundo separa o ponto do ícone sem desenhar um anel. */
   box-shadow: 0 0 0 2px var(--noite, #061511);
 }
+
+/* ---------------------------------------------------------------------------
+   DICAS — o que fazer quando não funciona, e o que é assim mesmo.
+
+   Boa parte dos problemas aqui não tem conserto: são a rede de alguém, o
+   antivírus de alguém, ou o preço de não ter servidor. Dizer isso é melhor que
+   deixar a pessoa achar que o site quebrou.
+   ------------------------------------------------------------------------ */
+.dicas {
+  max-width: 720px;
+  margin: 56px auto 0;
+  text-align: left;
+}
+.dicas-cabeca {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--topazio);
+  margin: 0 0 8px;
+}
+.dicas-secao + .dicas-secao { margin-top: 28px; }
+.dicas-titulo {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--creme-fraco);
+  margin: 24px 0 10px;
+}
+.dica {
+  border-left: 1px solid var(--latao-fraco);
+  padding: 2px 0 2px 14px;
+  margin-bottom: 14px;
+}
+.dica-nome {
+  color: var(--creme);
+  font-weight: 500;
+  margin: 0 0 3px;
+}
+.dica-corpo {
+  color: var(--creme-fraco);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Dentro da sala o palco já tem a sua própria margem de cima. */
+.palco .dicas { margin-top: 8px; }

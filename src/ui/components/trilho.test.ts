@@ -6,11 +6,13 @@ const item = (t: HTMLElement, chave: string) =>
   t.querySelector<HTMLElement>(`[data-nav="${chave}"]`)!
 
 describe('renderizarTrilho', () => {
-  it('tem os três destinos, nesta ordem', () => {
+  it('tem os quatro destinos, nesta ordem', () => {
+    // As Dicas ficam por último de propósito: é o destino que se lê uma vez,
+    // não o que se usa.
     const trilho = renderizarTrilho('sala', vi.fn())
 
     expect([...trilho.querySelectorAll('[data-nav]')].map((b) => b.textContent))
-      .toEqual(['Sala', 'Jogos', 'Ajustes'])
+      .toEqual(['Sala', 'Jogos', 'Ajustes', 'Dicas'])
   })
 
   it('marca onde a pessoa está', () => {

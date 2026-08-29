@@ -5,6 +5,7 @@ import {
 import { salvarApelido } from './ui/components/lobby'
 import { renderizarBarraSala } from './ui/components/barra-sala'
 import { renderizarConexao } from './ui/components/conexao'
+import { renderizarDicas } from './ui/components/dicas'
 import { criarChat } from './ui/components/chat'
 import { renderizarSalaParada } from './ui/components/sala'
 import { renderizarTrilho } from './ui/components/trilho'
@@ -650,6 +651,11 @@ export function entrarNaSala(app: HTMLElement, apelido: string, codigo: string):
         palco.replaceChildren(renderizarConfiguracoes(
           { apelido: meuApelido, codigo, grupo, identidade }, acoesConfiguracoes))
       }
+      return
+    }
+
+    if (mostrar.tipo === 'dicas') {
+      palco.replaceChildren(renderizarDicas())
       return
     }
 
