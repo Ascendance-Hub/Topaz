@@ -66,6 +66,23 @@ describe('textoLimitado', () => {
     expect(textoLimitado('oi pessoal', 200)).toBe('oi pessoal')
   })
 
+  it('não corta uma emoji ao meio', () => {
+    // `slice` corta por unidade UTF-16, e uma emoji ocupa duas: cortar entre
+    // elas deixa metade de um par substituto, que o navegador desenha como �.
+    // Com um seletor de emoji no chat, acertar essa fronteira deixou de ser
+    // raro.
+    expect(textoLimitado('abc😊def', 4)).toBe('abc😊')
+  })
+
+  it('conta emoji como UM caractere, e não como dois', () => {
+    expect(textoLimitado('😊😊😊', 2)).toBe('😊😊')
+  })
+
+  it('e vale para acentos compostos e bandeiras também', () => {
+    // Bandeira é um par de indicadores regionais: dois pontos de código.
+    expect(textoLimitado('🇧🇷oi', 2)).toBe('🇧🇷')
+  })
+
   it('corta o que passa do limite', () => {
     // O limite do chat vale para quem ENVIA. Quem recebe precisa aplicar o
     // dele: um cliente modificado manda o texto que quiser, e uma linha de

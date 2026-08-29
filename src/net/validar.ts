@@ -114,10 +114,23 @@ export function ehEstadoPlausivel(valor: unknown): valor is EstadoJogo {
 
 /**
  * Um texto vindo da rede, cortado no limite. Qualquer coisa que não seja
- * string vira vazio — inclusive objetos com `toString`, que numa
- * concatenação virariam texto sem ninguém perceber.
+ * string vira vazio — inclusive objetos com `toString`, que numa concatenação
+ * virariam texto sem ninguém perceber.
+ *
+ * **O corte é por ponto de código, e não por unidade UTF-16.** Uma emoji ocupa
+ * duas unidades, e um `slice` que caia entre elas deixa metade de um par
+ * substituto — que o navegador desenha como `�`. Enquanto o chat era só texto
+ * isso era raro; com um seletor de emoji, acertar essa fronteira deixou de
+ * ser.
+ *
+ * O `slice` de `limite * 2` antes de espalhar NÃO é otimização: é o que impede
+ * a defesa de virar o ataque. Espalhar a string inteira alocaria um item por
+ * caractere, e quem manda dez megabytes de texto passaria a derrubar quem
+ * recebe pelo próprio código que existe para impedir isso. Como todo ponto de
+ * código cabe em no máximo duas unidades, o dobro do limite sempre contém
+ * caracteres suficientes.
  */
 export function textoLimitado(valor: unknown, limite: number): string {
   if (typeof valor !== 'string') return ''
-  return valor.slice(0, limite)
+  return [...valor.slice(0, limite * 2)].slice(0, limite).join('')
 }

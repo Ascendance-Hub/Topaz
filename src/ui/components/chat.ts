@@ -1,4 +1,5 @@
 import { textoLimitado } from '../../net/validar'
+import { criarSeletorDeEmoji } from './emoji'
 import type { EscopoChat } from '../../net/transport'
 
 /** Teto de uma mensagem. Papo de mesa, não redação. */
@@ -125,7 +126,23 @@ export function criarChat(
   botao.className = 'chat-enviar'
   botao.textContent = 'Enviar'
 
-  form.append(campo, botao)
+  /**
+   * Insere no CURSOR, e não no fim.
+   *
+   * Escrever "boa " e querer a emoji ali é o caso comum; jogar sempre no fim
+   * obrigaria a pessoa a reposicionar depois. O foco volta para o campo com o
+   * cursor logo após a emoji, para ela continuar escrevendo.
+   */
+  const emoji = criarSeletorDeEmoji((escolhida) => {
+    const inicio = campo.selectionStart ?? campo.value.length
+    const fim = campo.selectionEnd ?? campo.value.length
+    campo.value = campo.value.slice(0, inicio) + escolhida + campo.value.slice(fim)
+    const cursor = inicio + escolhida.length
+    campo.focus()
+    campo.setSelectionRange(cursor, cursor)
+  })
+
+  form.append(emoji.botao, campo, botao)
 
   /**
    * Trocar o chat com o miolo de lugar.
@@ -169,7 +186,9 @@ export function criarChat(
     cabeca.append(trocar)
   }
 
-  raiz.append(cabeca, abas, logs.geral, logs.canal, form)
+  // A grade fica ACIMA do formulário: aberta, ela empurra a conversa para
+  // cima em vez de cobrir o campo que a pessoa está usando.
+  raiz.append(cabeca, abas, logs.geral, logs.canal, emoji.painel, form)
 
   let aberto = false
   let naoLidas = 0
@@ -294,8 +313,9 @@ export function criarChat(
     evento.preventDefault()
     // `maxLength` só limita a digitação; colar texto por script (ou um
     // navegador que ignore o atributo) passaria batido. O corte de verdade
-    // é aqui.
-    const texto = campo.value.trim().slice(0, LIMITE_TEXTO)
+    // é aqui — e por `textoLimitado`, e não por `slice`, para não partir uma
+    // emoji ao meio bem no limite.
+    const texto = textoLimitado(campo.value.trim(), LIMITE_TEXTO)
     campo.value = ''
     if (!texto) return
     aoEnviar(texto, escopoAtivo)

@@ -379,3 +379,63 @@ describe('as duas conversas', () => {
     expect(enviado).toHaveBeenCalledWith('oi', 'geral')
   })
 })
+
+describe('emoji', () => {
+  /** Abre a grade e clica na primeira emoji. */
+  function escolherPrimeira(chat: Chat): string {
+    chat.raiz.querySelector<HTMLButtonElement>('.chat-emoji-gatilho')!.click()
+    const item = chat.raiz.querySelector<HTMLButtonElement>('.chat-emoji-item')!
+    item.click()
+    return item.textContent ?? ''
+  }
+
+  it('insere no CURSOR, e não no fim', () => {
+    // Escrever "boa " e querer a emoji ali é o caso comum; jogar sempre no
+    // fim obrigaria a pessoa a reposicionar depois.
+    const chat = criarChat(vi.fn())
+    const campo = chat.raiz.querySelector('input')!
+    campo.value = 'boa mão'
+    campo.setSelectionRange(3, 3)
+
+    const emoji = escolherPrimeira(chat)
+
+    expect(campo.value).toBe(`boa${emoji} mão`)
+  })
+
+  it('deixa o cursor logo depois dela, para continuar escrevendo', () => {
+    const chat = criarChat(vi.fn())
+    const campo = chat.raiz.querySelector('input')!
+    campo.value = 'oi'
+    campo.setSelectionRange(2, 2)
+
+    const emoji = escolherPrimeira(chat)
+
+    expect(campo.selectionStart).toBe(2 + emoji.length)
+  })
+
+  it('substitui o que estiver selecionado', () => {
+    const chat = criarChat(vi.fn())
+    const campo = chat.raiz.querySelector('input')!
+    campo.value = 'que legal'
+    campo.setSelectionRange(4, 9)
+
+    const emoji = escolherPrimeira(chat)
+
+    expect(campo.value).toBe(`que ${emoji}`)
+  })
+
+  it('e a emoji atravessa o envio inteira', () => {
+    // O corte de segurança é por ponto de código: cortar por unidade UTF-16
+    // partiria a emoji ao meio e mandaria meio par substituto.
+    const enviado = vi.fn()
+    const chat = criarChat(enviado)
+    const campo = chat.raiz.querySelector('input')!
+    campo.value = ''
+    campo.setSelectionRange(0, 0)
+    const emoji = escolherPrimeira(chat)
+
+    chat.raiz.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }))
+
+    expect(enviado).toHaveBeenCalledWith(emoji, 'geral')
+  })
+})
