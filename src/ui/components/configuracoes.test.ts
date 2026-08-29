@@ -10,6 +10,8 @@ const acoes = () => ({
   esquecerGrupo: vi.fn(),
   trocouFoto: vi.fn(),
   identidade: { entrarComSegredo: vi.fn(), sair: vi.fn(), guardei: vi.fn() },
+  sonsLigados: vi.fn(() => true),
+  definirSons: vi.fn(),
 })
 
 const dados = (extras = {}) => ({
@@ -130,15 +132,16 @@ describe('esta sala', () => {
 })
 
 describe('ordem das seções', () => {
-  it('você, depois a sala, e a identidade por último', () => {
+  it('a identidade continua por último, agora com os sons antes dela', () => {
     // "Sair desta máquina" é destrutivo e não merece ficar no caminho de quem
-    // só queria trocar a foto.
+    // só queria trocar a foto — por isso a identidade fecha a lista, e
+    // qualquer seção nova entra ANTES dela.
     const area = renderizarConfiguracoes(dados(), acoes())
 
     expect([...area.querySelectorAll('.config-titulo')].map((t) => t.textContent))
       // "A partida" saiu daqui: o formato agora mora na aba de Jogos, no
       // cartão do jogo a que ele pertence.
-      .toEqual(['Você', 'Esta sala', 'Sua identidade'])
+      .toEqual(['Você', 'Esta sala', 'Avisos sonoros', 'Sua identidade'])
   })
 })
 
@@ -155,5 +158,27 @@ describe('trocar a foto avisa o resto do mundo', () => {
     area.querySelector<HTMLButtonElement>('[data-perfil="remover"]')!.click()
 
     expect(meus.trocouFoto).toHaveBeenCalled()
+  })
+})
+
+describe('avisos sonoros', () => {
+  it('o interruptor reflete a preferência guardada', () => {
+    const desligado = { ...acoes(), sonsLigados: vi.fn(() => false) }
+
+    expect(campo(renderizarConfiguracoes(dados(), acoes()), 'sons').checked).toBe(true)
+    expect(campo(renderizarConfiguracoes(dados(), desligado), 'sons').checked).toBe(false)
+  })
+
+  it('desligar avisa quem guarda a preferência', () => {
+    // App que faz barulho sem interruptor é app que a pessoa silencia no
+    // sistema inteiro — e aí perde junto a voz de quem está falando.
+    const meus = acoes()
+    const area = renderizarConfiguracoes(dados(), meus)
+
+    const caixa = campo(area, 'sons')
+    caixa.checked = false
+    caixa.dispatchEvent(new Event('change'))
+
+    expect(meus.definirSons).toHaveBeenCalledWith(false)
   })
 })

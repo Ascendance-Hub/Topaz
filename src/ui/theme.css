@@ -2463,3 +2463,13 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
   cursor: pointer;
 }
 .chat-emoji-item:hover { background: rgba(240, 179, 74, 0.16); }
+
+/* O interruptor dos avisos sonoros. */
+.config-interruptor {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--creme);
+  cursor: pointer;
+}
+.config-interruptor input { accent-color: var(--topazio); cursor: pointer; }

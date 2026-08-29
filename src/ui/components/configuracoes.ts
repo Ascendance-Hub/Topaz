@@ -35,6 +35,9 @@ export interface AcoesConfiguracoes {
   renomear(apelido: string): void
   salvarGrupo(nome: string): void
   esquecerGrupo(): void
+  /** A preferência de avisos sonoros, lida na montagem do painel. */
+  sonsLigados(): boolean
+  definirSons(ligados: boolean): void
   /**
    * A foto mudou nesta máquina.
    *
@@ -63,7 +66,7 @@ export function renderizarConfiguracoes(
   const area = document.createElement('div')
   area.className = 'config'
 
-  area.append(secaoVoce(dados, acoes), secaoGrupo(dados, acoes))
+  area.append(secaoVoce(dados, acoes), secaoGrupo(dados, acoes), secaoSons(acoes))
 
   const identidade = secao('config-identidade', 'Sua identidade')
   identidade.append(renderizarIdentidade(dados.identidade, acoes.identidade))
@@ -111,6 +114,38 @@ function secaoVoce(
 
   form.append(campo, salvar)
   el.append(form, retrato.raiz)
+  return el
+}
+
+/**
+ * O interruptor dos avisos sonoros.
+ *
+ * Existe porque app que faz barulho sem interruptor é app que a pessoa
+ * silencia no sistema inteiro — e aí perde junto a voz de quem está falando.
+ */
+function secaoSons(acoes: AcoesConfiguracoes): HTMLElement {
+  const el = secao('config-sons', 'Avisos sonoros')
+
+  const explicacao = document.createElement('p')
+  explicacao.className = 'config-texto'
+  explicacao.textContent = 'Um toque curto quando alguém entra, sai, muda de '
+    + 'microfone ou começa a compartilhar a tela.'
+  el.append(explicacao)
+
+  const rotulo = document.createElement('label')
+  rotulo.className = 'config-interruptor'
+
+  const caixa = document.createElement('input')
+  caixa.type = 'checkbox'
+  caixa.dataset['config'] = 'sons'
+  caixa.checked = acoes.sonsLigados()
+  caixa.onchange = () => acoes.definirSons(caixa.checked)
+
+  const texto = document.createElement('span')
+  texto.textContent = 'Tocar avisos'
+
+  rotulo.append(caixa, texto)
+  el.append(rotulo)
   return el
 }
 
