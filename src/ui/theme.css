@@ -673,7 +673,17 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 /* ---------------------------------------------------------------------------
    TELAS COMPARTILHADAS.
    ------------------------------------------------------------------------ */
-.call-videos { display: flex; flex-direction: column; gap: 12px; margin: 18px auto 0; max-width: 940px; }
+/* `align-items: flex-start` é o conserto de uma faixa preta: a caixa do vídeo
+   tem fundo preto e, esticada pelo flex, sobrava vazia ao lado de um vídeo
+   limitado a 420px. Medido: caixa 940, vídeo 420, 520px de preto. */
+.call-videos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 18px auto 0;
+  max-width: 940px;
+}
 .video-remoto {
   border-radius: var(--raio);
   border: 1px solid var(--latao-fraco);
@@ -683,8 +693,11 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 }
 .video-remoto video { display: block; width: 100%; }
 /* Expandir não vira tela cheia: a mesa e a conversa continuam acessíveis, e
-   quem quiser mais que isso tem a tela cheia ou a janela flutuante. */
-.video-remoto:not([data-expandido='1']) video { max-width: 420px; }
+   quem quiser mais que isso tem a tela cheia ou a janela flutuante.
+   O limite fica na CAIXA, e não no vídeo: no vídeo, a caixa continuava
+   esticando e o fundo preto dela aparecia ao lado. */
+.video-remoto:not([data-expandido='1']) { max-width: 560px; }
+.video-remoto[data-expandido='1'] { align-self: stretch; }
 .video-barra {
   display: flex;
   align-items: center;
