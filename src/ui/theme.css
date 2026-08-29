@@ -2428,3 +2428,38 @@ h2, h3, h4 { margin: 0; font-weight: 600; }
 
 /* Dentro da sala o palco já tem a sua própria margem de cima. */
 .palco .dicas { margin-top: 8px; }
+
+/* ---------------------------------------------------------------------------
+   EMOJI — grade curta acima do campo do chat.
+   ------------------------------------------------------------------------ */
+.chat-emoji-gatilho {
+  flex: none;
+  padding: 0 8px;
+  font-size: 17px;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--latao-fraco);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.chat-emoji-gatilho:hover { border-color: var(--latao); }
+.chat-emoji {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+  padding: 8px;
+  margin: 0 10px 6px;
+  border: 1px solid var(--latao-fraco);
+  border-radius: var(--raio);
+  background: rgba(6, 21, 17, 0.85);
+}
+.chat-emoji-item {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 0;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+.chat-emoji-item:hover { background: rgba(240, 179, 74, 0.16); }
