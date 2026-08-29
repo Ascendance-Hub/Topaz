@@ -14,6 +14,7 @@ export type ConteudoDoPalco =
   | { tipo: 'jogos' }
   | { tipo: 'formato'; jogo: string }
   | { tipo: 'config' }
+  | { tipo: 'dicas' }
   /** Dentro da call o miolo são os rostos, e o palco sai da frente. */
   | { tipo: 'rostos' }
   | { tipo: 'convite'; comTesteDeRede: boolean }
@@ -59,6 +60,7 @@ export function oQueOPalcoMostra(estado: EstadoDaSalaParaDesenhar): ConteudoDoPa
       : { tipo: 'formato', jogo: estado.jogoEmAjuste }
   }
   if (estado.tela === 'config') return { tipo: 'config' }
+  if (estado.tela === 'dicas') return { tipo: 'dicas' }
   if (estado.euNaCall) return { tipo: 'rostos' }
   return { tipo: 'convite', comTesteDeRede: estado.sozinho }
 }

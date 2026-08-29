@@ -1,5 +1,6 @@
 import { renderizarLobby } from './lobby'
 import { haCodigoNaUrl } from '../codigo'
+import { renderizarDicas } from './dicas'
 
 /**
  * A página inicial.
@@ -172,6 +173,10 @@ export function renderizarHome(
     rede.append(extras.testeRede)
     home.append(rede)
   }
+
+  // As dicas fecham a página: são a versão longa do que a seção acima começa a
+  // dizer. Quem chega lê antes de entrar; quem travou sai da sala e acha aqui.
+  home.append(renderizarDicas())
 
   return home
 }
